@@ -12,6 +12,7 @@ export type BranchSkillOption = {
   teacherName: string;
   classroomName: string;
   durationMonths: number;
+  registrationFee: string;
   monthlyFee: string;
 };
 

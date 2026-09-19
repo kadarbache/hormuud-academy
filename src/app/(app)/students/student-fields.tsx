@@ -190,13 +190,29 @@ export function StudentProfileFields({
   );
 }
 
+/** "$10.00 to register, then $20.00 a month for 3 months" */
+export function feesText(
+  option: Pick<BranchSkillOption, "registrationFee" | "monthlyFee" | "durationMonths">,
+) {
+  const monthly = `${formatMoney(option.monthlyFee)} a month for ${formatMonths(option.durationMonths)}`;
+  return Number(option.registrationFee) > 0
+    ? `${formatMoney(option.registrationFee)} to register, then ${monthly}`
+    : `${monthly}, no registration fee`;
+}
+
 /** One checkbox card per skill the branch offers. */
 export function SkillPicker({
   options,
+  picked,
+  onPickedChange,
   errors,
   emptyMessage,
 }: {
   options: BranchSkillOption[];
+  /** The ids of the ticked branch skills. */
+  picked: string[];
+  /** Takes an update function, like a state setter, so quick ticks don't overwrite each other. */
+  onPickedChange: (update: (picked: string[]) => string[]) => void;
   errors?: string[];
   emptyMessage: string;
 }) {
@@ -212,12 +228,23 @@ export function SkillPicker({
           {options.map((option) => (
             <FieldLabel key={option.id} htmlFor={`${id}-${option.id}`}>
               <Field orientation="horizontal">
-                <Checkbox id={`${id}-${option.id}`} name="branchSkillIds" value={option.id} />
+                <Checkbox
+                  id={`${id}-${option.id}`}
+                  name="branchSkillIds"
+                  value={option.id}
+                  checked={picked.includes(option.id)}
+                  onCheckedChange={(checked) =>
+                    onPickedChange((current) =>
+                      checked === true
+                        ? [...current, option.id]
+                        : current.filter((pickedId) => pickedId !== option.id),
+                    )
+                  }
+                />
                 <FieldContent>
                   <FieldTitle>{option.skillName}</FieldTitle>
                   <FieldDescription>
-                    {option.teacherName}, {option.classroomName}. {formatMoney(option.monthlyFee)} a month
-                    for {formatMonths(option.durationMonths)}.
+                    {option.teacherName}, {option.classroomName}. {feesText(option)}.
                   </FieldDescription>
                 </FieldContent>
               </Field>
@@ -227,5 +254,48 @@ export function SkillPicker({
       )}
       <FieldError errors={errors?.map((message) => ({ message }))} />
     </FieldSet>
+  );
+}
+
+/**
+ * A box to tick when the student pays the registration fees for the skills
+ * being added straight away. Shows nothing when those skills have no fee.
+ */
+export function RegistrationFeePaidField({
+  skills,
+  description,
+}: {
+  skills: Pick<BranchSkillOption, "id" | "skillName" | "registrationFee">[];
+  description: string;
+}) {
+  const id = useId();
+  const withFee = skills.filter((skill) => Number(skill.registrationFee) > 0);
+  if (withFee.length === 0) return null;
+
+  // Added up in cents, so 10.10 + 15.20 doesn't come out as 25.299999.
+  const totalCents = withFee.reduce(
+    (sum, skill) => sum + Math.round(Number(skill.registrationFee) * 100),
+    0,
+  );
+  const breakdown =
+    withFee.length > 1
+      ? `${withFee.map((skill) => `${skill.skillName} ${formatMoney(skill.registrationFee)}`).join(", ")}. `
+      : "";
+
+  return (
+    // Keyed on the skills, so a tick given for one amount doesn't carry over
+    // to a new amount after the skills change.
+    <Field key={withFee.map((skill) => skill.id).join()} orientation="horizontal">
+      <Checkbox id={id} name="registrationFeePaid" />
+      <FieldContent>
+        <FieldLabel htmlFor={id}>
+          Registration {withFee.length > 1 ? "fees" : "fee"} paid: {formatMoney(totalCents / 100)}
+        </FieldLabel>
+        <FieldDescription>
+          {breakdown}
+          {description}
+        </FieldDescription>
+      </FieldContent>
+    </Field>
   );
 }

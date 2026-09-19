@@ -16,7 +16,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { FormError, SelectField, TextField, type Option } from "@/components/form-fields";
 import { useFormAction } from "@/hooks/use-form-action";
 import { registerStudent } from "../actions";
-import { SkillPicker, StudentProfileFields } from "../student-fields";
+import { RegistrationFeePaidField, SkillPicker, StudentProfileFields } from "../student-fields";
 import type { BranchSkillOption } from "../types";
 
 export function RegistrationForm({
@@ -36,6 +36,7 @@ export function RegistrationForm({
 }) {
   const router = useRouter();
   const [branchId, setBranchId] = useState(fixedBranch?.id ?? "");
+  const [picked, setPicked] = useState<string[]>([]);
   const { pending, fieldErrors, formError, onSubmit } = useFormAction(registerStudent, {
     onSuccess: (result) => {
       if (result.data) router.push(`/students/${result.data.id}`);
@@ -43,6 +44,7 @@ export function RegistrationForm({
   });
 
   const options = branchSkills.filter((option) => option.branchId === branchId);
+  const pickedOptions = options.filter((option) => picked.includes(option.id));
 
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-6">
@@ -64,7 +66,11 @@ export function RegistrationForm({
                 options={branches}
                 placeholder="Pick a branch"
                 value={branchId}
-                onChange={(event) => setBranchId(event.target.value)}
+                onChange={(event) => {
+                  // Another branch has other skills, so the ticked ones go.
+                  setBranchId(event.target.value);
+                  setPicked([]);
+                }}
                 description="The branch the student registers at."
                 errors={fieldErrors.homeBranchId}
               />
@@ -105,16 +111,20 @@ export function RegistrationForm({
               required
               errors={fieldErrors.startDate}
             />
-            {/* Keyed on the branch so switching branch clears the ticked skills. */}
             <SkillPicker
-              key={branchId}
               options={options}
+              picked={picked}
+              onPickedChange={setPicked}
               errors={fieldErrors.branchSkillIds}
               emptyMessage={
                 branchId
                   ? "This branch has no open skills. An admin sets them up under Skills."
                   : "Pick the home branch first."
               }
+            />
+            <RegistrationFeePaidField
+              skills={pickedOptions}
+              description="Tick it if the student paid now. It's recorded as paid on the registration date. If they'll pay later, record it on their page once they do."
             />
           </FieldGroup>
         </CardContent>

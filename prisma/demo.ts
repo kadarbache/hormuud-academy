@@ -100,7 +100,8 @@ async function main() {
     responsiblePhone?: string;
     homeBranchId: string;
     registered: string;
-    skills: { offer: Offer; start: string; status?: "FINISHED" | "DROPPED" }[];
+    /** `paid` means the registration fee was paid on the start date. */
+    skills: { offer: Offer; start: string; paid: boolean; status?: "FINISHED" | "DROPPED" }[];
   }[] = [
     {
       fullName: "Demo Student One",
@@ -109,8 +110,8 @@ async function main() {
       homeBranchId: main.id,
       registered: monthsAgo(1),
       skills: [
-        { offer: withSkill(mainComputer, computer), start: monthsAgo(1) },
-        { offer: withSkill(mainTailoring, tailoring), start: monthsAgo(1) },
+        { offer: withSkill(mainComputer, computer), start: monthsAgo(1), paid: true },
+        { offer: withSkill(mainTailoring, tailoring), start: monthsAgo(1), paid: true },
       ],
     },
     {
@@ -120,7 +121,8 @@ async function main() {
       homeBranchId: main.id,
       registered: monthsAgo(5),
       // Started five months ago on a four-month skill: past its end date.
-      skills: [{ offer: withSkill(mainDesign, design), start: monthsAgo(5) }],
+      // Never paid the registration fee.
+      skills: [{ offer: withSkill(mainDesign, design), start: monthsAgo(5), paid: false }],
     },
     {
       fullName: "Demo Student Three",
@@ -128,10 +130,11 @@ async function main() {
       phone: "0613333333",
       homeBranchId: second.id,
       registered: monthsAgo(2),
-      // Registered at the second branch, also taking a skill at the main one.
+      // Registered at the second branch, also taking a skill at the main one,
+      // whose registration fee is still unpaid.
       skills: [
-        { offer: withSkill(secondElectrical, electrical), start: monthsAgo(2) },
-        { offer: withSkill(mainDesign, design), start: monthsAgo(1) },
+        { offer: withSkill(secondElectrical, electrical), start: monthsAgo(2), paid: true },
+        { offer: withSkill(mainDesign, design), start: monthsAgo(1), paid: false },
       ],
     },
     {
@@ -140,7 +143,14 @@ async function main() {
       phone: "0614444444",
       homeBranchId: second.id,
       registered: monthsAgo(8),
-      skills: [{ offer: withSkill(secondComputer, computer), start: monthsAgo(8), status: "FINISHED" }],
+      skills: [
+        {
+          offer: withSkill(secondComputer, computer),
+          start: monthsAgo(8),
+          paid: true,
+          status: "FINISHED",
+        },
+      ],
     },
   ];
 
@@ -155,13 +165,15 @@ async function main() {
         registrationDate: toDbDate(student.registered),
         createdById: admin.id,
         enrollments: {
-          create: student.skills.map(({ offer, start, status }) => ({
+          create: student.skills.map(({ offer, start, paid, status }) => ({
             branchSkillId: offer.id,
             skillId: offer.skillId,
             startDate: toDbDate(start),
             endDate: toDbDate(addMonths(start, offer.durationMonths)),
             monthlyFee: offer.fee,
             registrationFee: offer.registrationFee,
+            registrationFeePaidOn: paid ? toDbDate(start) : null,
+            registrationFeeRecordedById: paid ? admin.id : null,
             status: status ?? "ACTIVE",
             statusChangedAt: status ? new Date() : null,
             createdById: admin.id,

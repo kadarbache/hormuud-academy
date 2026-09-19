@@ -16,14 +16,23 @@ import {
 } from "@/components/ui/table";
 import { ActionButton } from "@/components/action-button";
 import { EmptyRow } from "@/components/status-badge";
+import type { Prisma } from "@/generated/prisma/client";
 import { collegeToday, formatDate, fromDbDate, toCollegeDate } from "@/lib/dates";
 import { formatMoney, formatStudentNumber } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { canActAtBranch, canEditStudent } from "../access";
-import { deleteStudent, enrollStudent, setEnrollmentStatus } from "../actions";
+import {
+  changeRegistrationFee,
+  deleteStudent,
+  enrollStudent,
+  recordRegistrationFee,
+  setEnrollmentStatus,
+  undoRegistrationFeePayment,
+} from "../actions";
 import { enrollableBranchSkills, getStudentProfile } from "../queries";
 import { EnrollDialog } from "./enroll-dialog";
+import { ChangeFeeDialog, RecordPaymentDialog } from "./registration-fee-dialogs";
 
 export async function generateMetadata({ params }: PageProps<"/students/[id]">): Promise<Metadata> {
   const { id } = await params;
@@ -48,6 +57,102 @@ function Detail({ label, children }: { label: string; children: React.ReactNode 
     <div>
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className="text-sm">{children}</dd>
+    </div>
+  );
+}
+
+/**
+ * One skill's registration fee: the amount, whether it's paid, and the
+ * buttons for it. Staff at the skill's branch record the payment; only the
+ * admin changes the fee (while it's unpaid) or takes a payment back.
+ */
+function RegistrationFee({
+  enrollment,
+  canRecord,
+  isAdmin,
+  today,
+}: {
+  enrollment: {
+    id: string;
+    registrationFee: Prisma.Decimal;
+    registrationFeePaidOn: Date | null;
+    registrationFeeRecordedBy: { name: string } | null;
+    skill: { name: string };
+  };
+  canRecord: boolean;
+  isAdmin: boolean;
+  today: string;
+}) {
+  const fee = enrollment.registrationFee.toString();
+  const paidOn = enrollment.registrationFeePaidOn;
+  const unpaid = Number(fee) > 0 && !paidOn;
+
+  return (
+    <div className="space-y-1">
+      {Number(fee) === 0 ? (
+        <div className="text-muted-foreground">Nothing to pay</div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="tabular-nums">{formatMoney(fee)}</span>
+          {unpaid && (
+            <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-900">
+              Unpaid
+            </Badge>
+          )}
+        </div>
+      )}
+      {paidOn && (
+        <div className="text-xs text-muted-foreground">
+          Paid {formatDate(paidOn)}
+          {enrollment.registrationFeeRecordedBy &&
+            `, recorded by ${enrollment.registrationFeeRecordedBy.name}`}
+        </div>
+      )}
+      {((canRecord && unpaid) || isAdmin) && (
+        <div className="flex flex-wrap gap-1">
+          {canRecord && unpaid && (
+            <RecordPaymentDialog
+              action={recordRegistrationFee.bind(null, enrollment.id)}
+              skillName={enrollment.skill.name}
+              fee={formatMoney(fee)}
+              today={today}
+              trigger={
+                <Button variant="outline" size="xs">
+                  Record payment
+                </Button>
+              }
+            />
+          )}
+          {isAdmin && !paidOn && (
+            <ChangeFeeDialog
+              action={changeRegistrationFee.bind(null, enrollment.id)}
+              skillName={enrollment.skill.name}
+              fee={fee}
+              trigger={
+                <Button variant="ghost" size="xs">
+                  Change fee
+                </Button>
+              }
+            />
+          )}
+          {isAdmin && paidOn && (
+            <ActionButton
+              variant="ghost"
+              size="xs"
+              action={undoRegistrationFeePayment.bind(null, enrollment.id)}
+              confirm={{
+                title: `Undo the ${enrollment.skill.name} payment?`,
+                description:
+                  "The registration fee goes back to unpaid. Use this only for a payment recorded by mistake.",
+                confirmLabel: "Undo payment",
+                destructive: true,
+              }}
+            >
+              Undo payment
+            </ActionButton>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -126,7 +231,7 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
               confirm={{
                 title: `Delete ${student.fullName}?`,
                 description:
-                  "Only for duplicates and typing mistakes. The student and every skill record they have are removed for good.",
+                  "Only for duplicates and typing mistakes. The student, every skill record they have and the fee payments recorded on them are removed for good.",
                 confirmLabel: "Delete student",
                 destructive: true,
               }}
@@ -173,6 +278,7 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
                   <TableHead>Skill</TableHead>
                   <TableHead>Teacher and class</TableHead>
                   <TableHead>Dates</TableHead>
+                  <TableHead>Registration fee</TableHead>
                   <TableHead className="text-right">Monthly fee</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">
@@ -208,6 +314,14 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
                             Past end date
                           </Badge>
                         )}
+                      </TableCell>
+                      <TableCell>
+                        <RegistrationFee
+                          enrollment={enrollment}
+                          canRecord={canAct}
+                          isAdmin={isAdmin}
+                          today={today}
+                        />
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
                         {formatMoney(enrollment.monthlyFee.toString())}

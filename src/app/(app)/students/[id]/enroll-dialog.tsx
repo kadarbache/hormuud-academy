@@ -5,7 +5,7 @@ import { FormDialog } from "@/components/form-dialog";
 import { SelectField, TextField } from "@/components/form-fields";
 import type { ActionResult } from "@/lib/action-result";
 import { addMonths, formatDate, isIsoDate } from "@/lib/dates";
-import { formatMoney, formatMonths } from "@/lib/format";
+import { feesText, RegistrationFeePaidField } from "../student-fields";
 import type { BranchSkillOption } from "../types";
 
 export function EnrollDialog({
@@ -60,10 +60,15 @@ export function EnrollDialog({
           />
           {selected && isIsoDate(startDate) && (
             <p className="rounded-md bg-muted p-3 text-sm">
-              {selected.teacherName} teaches it in {selected.classroomName}.{" "}
-              {formatMoney(selected.monthlyFee)} a month for {formatMonths(selected.durationMonths)},
-              so it ends around {formatDate(addMonths(startDate, selected.durationMonths))}.
+              {selected.teacherName} teaches it in {selected.classroomName}. {feesText(selected)}. It
+              ends around {formatDate(addMonths(startDate, selected.durationMonths))}.
             </p>
+          )}
+          {selected && (
+            <RegistrationFeePaidField
+              skills={[selected]}
+              description="Tick it if the student paid now. If they'll pay later, record it on this page once they do."
+            />
           )}
         </>
       )}

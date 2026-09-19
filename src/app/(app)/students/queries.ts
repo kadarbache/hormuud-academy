@@ -142,6 +142,7 @@ export async function getStudentProfile(user: CurrentUser, id: string) {
         include: {
           skill: { select: { name: true } },
           createdBy: { select: { name: true } },
+          registrationFeeRecordedBy: { select: { name: true } },
           branchSkill: {
             select: {
               branchId: true,
@@ -188,6 +189,7 @@ export async function enrollableBranchSkills(branchId?: string): Promise<BranchS
         select: {
           name: true,
           durationMonths: true,
+          registrationFee: true,
           monthlyFee: true,
           category: { select: { name: true } },
         },
@@ -205,6 +207,7 @@ export async function enrollableBranchSkills(branchId?: string): Promise<BranchS
     teacherName: row.teacher.name,
     classroomName: row.classroom.name,
     durationMonths: row.skill.durationMonths,
+    registrationFee: row.skill.registrationFee.toString(),
     monthlyFee: row.skill.monthlyFee.toString(),
   }));
 }
