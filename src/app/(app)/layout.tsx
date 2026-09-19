@@ -1,4 +1,5 @@
 import { Separator } from "@/components/ui/separator";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
@@ -34,6 +35,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <span className="text-sm text-muted-foreground">
             {user.role === "admin" ? "All branches" : (branch?.name ?? "No branch")}
           </span>
+          <ThemeToggle className="ml-auto" />
         </header>
         <main className="flex-1 p-4 md:p-6">
           <div className="mx-auto w-full max-w-6xl space-y-6">

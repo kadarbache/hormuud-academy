@@ -8,6 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { getCurrentUser } from "@/lib/session";
 import { LoginForm } from "./login-form";
 
@@ -17,7 +18,8 @@ export default async function LoginPage() {
   if (await getCurrentUser()) redirect("/students");
 
   return (
-    <main className="flex flex-1 items-center justify-center bg-muted/40 p-4">
+    <main className="relative flex flex-1 items-center justify-center bg-muted/40 p-4">
+      <ThemeToggle className="absolute top-4 right-4" />
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <div className="mx-auto mb-2 flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
