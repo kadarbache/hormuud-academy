@@ -37,11 +37,12 @@ export const isoDate = (message = "Pick a date.") =>
 export const requiredId = (message: string) =>
   z.string({ error: message }).min(1, message);
 
-/** US dollars with up to two decimals, like 20 or 20.50. */
-export const money = z
-  .string({ error: "Enter the monthly fee." })
-  .trim()
-  .regex(/^\d{1,8}(\.\d{1,2})?$/, "Enter an amount like 20 or 20.50.");
+/** US dollars with up to two decimals, like 20 or 20.50. Zero is allowed. */
+export const money = (message: string) =>
+  z
+    .string({ error: message })
+    .trim()
+    .regex(/^\d{1,8}(\.\d{1,2})?$/, "Enter an amount like 20 or 20.50.");
 
 /** Reads a form into a plain object. Use getAll() for fields that repeat. */
 export function formObject(formData: FormData) {

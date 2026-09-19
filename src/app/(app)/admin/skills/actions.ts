@@ -24,7 +24,8 @@ const skillSchema = z.object({
     .int("Use whole months.")
     .min(1, "At least 1 month.")
     .max(60, "At most 60 months."),
-  monthlyFee: money,
+  registrationFee: money("Enter the registration fee, or 0 if there's none."),
+  monthlyFee: money("Enter the monthly fee."),
 });
 
 const skillNameTaken = failure("Check the highlighted fields.", {
@@ -55,8 +56,8 @@ export async function createSkill(formData: FormData): Promise<ActionResult<{ id
 }
 
 /**
- * Changing the fee or duration only affects students who join from now on.
- * Each enrollment keeps the fee and end date it was created with.
+ * Changing a fee or the duration only affects students who join from now on.
+ * Each enrollment keeps the fees and end date it was created with.
  */
 export async function updateSkill(id: string, formData: FormData): Promise<ActionResult> {
   await requireAdmin();

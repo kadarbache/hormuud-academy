@@ -13,7 +13,13 @@ export function SkillDialog({
 }: {
   action: (formData: FormData) => Promise<ActionResult<{ id: string }>>;
   categories: Option[];
-  skill?: { name: string; categoryId: string; durationMonths: number; monthlyFee: string };
+  skill?: {
+    name: string;
+    categoryId: string;
+    durationMonths: number;
+    registrationFee: string;
+    monthlyFee: string;
+  };
   trigger: React.ReactNode;
 }) {
   const router = useRouter();
@@ -45,15 +51,15 @@ export function SkillDialog({
             required
             errors={errors.name}
           />
-          <SelectField
-            label="Category"
-            name="categoryId"
-            options={categories}
-            placeholder="Pick a category"
-            defaultValue={skill?.categoryId ?? ""}
-            errors={errors.categoryId}
-          />
           <div className="grid gap-4 sm:grid-cols-2">
+            <SelectField
+              label="Category"
+              name="categoryId"
+              options={categories}
+              placeholder="Pick a category"
+              defaultValue={skill?.categoryId ?? ""}
+              errors={errors.categoryId}
+            />
             <TextField
               label="Duration in months"
               name="durationMonths"
@@ -66,12 +72,25 @@ export function SkillDialog({
               required
               errors={errors.durationMonths}
             />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <TextField
+              label="Registration fee (USD)"
+              name="registrationFee"
+              inputMode="decimal"
+              placeholder="10.00"
+              defaultValue={skill?.registrationFee ?? ""}
+              description="Paid once by each student who starts it. 0 if none."
+              required
+              errors={errors.registrationFee}
+            />
             <TextField
               label="Monthly fee (USD)"
               name="monthlyFee"
               inputMode="decimal"
               placeholder="20.00"
               defaultValue={skill?.monthlyFee ?? ""}
+              description="Paid every month while the student takes it."
               required
               errors={errors.monthlyFee}
             />

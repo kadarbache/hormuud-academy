@@ -35,8 +35,9 @@ model User {
   sessions Session[]
   accounts Account[]
 
-  studentsCreated    Student[]    @relation("StudentCreatedBy")
-  enrollmentsCreated Enrollment[] @relation("EnrollmentCreatedBy")
+  studentsCreated          Student[]    @relation("StudentCreatedBy")
+  enrollmentsCreated       Enrollment[] @relation("EnrollmentCreatedBy")
+  registrationFeesRecorded Enrollment[] @relation("RegistrationFeeRecordedBy")
 
   @@unique([email])
   @@index([branchId])
@@ -129,15 +130,17 @@ model Category {
 /// One entry in the college-wide catalog. Head office owns it; every branch
 /// shares it. Branch-specific details (teacher, class) live on BranchSkill.
 model Skill {
-  id             String   @id @default(cuid())
-  name           String   @unique
-  categoryId     String
-  category       Category @relation(fields: [categoryId], references: [id])
-  durationMonths Int
-  monthlyFee     Decimal  @db.Decimal(10, 2)
-  active         Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              String   @id @default(cuid())
+  name            String   @unique
+  categoryId      String
+  category        Category @relation(fields: [categoryId], references: [id])
+  durationMonths  Int
+  /// Paid once for every enrollment in the skill, on top of the monthly fee.
+  registrationFee Decimal  @db.Decimal(10, 2)
+  monthlyFee      Decimal  @db.Decimal(10, 2)
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   branchSkills BranchSkill[]
   enrollments  Enrollment[]
@@ -254,27 +257,36 @@ enum EnrollmentStatus {
 /// One student taking one skill at one branch. A student is Active while any
 /// of their enrollments is ACTIVE; there is no stored student status.
 model Enrollment {
-  id              String           @id @default(cuid())
-  studentId       String
-  student         Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  branchSkillId   String
-  branchSkill     BranchSkill      @relation(fields: [branchSkillId], references: [id])
+  id                          String           @id @default(cuid())
+  studentId                   String
+  student                     Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  branchSkillId               String
+  branchSkill                 BranchSkill      @relation(fields: [branchSkillId], references: [id])
   /// Copied from the branch skill so the database itself can refuse a second
   /// active enrollment in the same skill, even across branches.
-  skillId         String
-  skill           Skill            @relation(fields: [skillId], references: [id])
-  startDate       DateTime         @db.Date
+  skillId                     String
+  skill                       Skill            @relation(fields: [skillId], references: [id])
+  startDate                   DateTime         @db.Date
   /// Start date plus the skill's duration. A guide only: staff mark the
   /// enrollment Finished themselves.
-  endDate         DateTime         @db.Date
+  endDate                     DateTime         @db.Date
   /// The skill's monthly fee on the day the student joined.
-  monthlyFee      Decimal          @db.Decimal(10, 2)
-  status          EnrollmentStatus @default(ACTIVE)
-  statusChangedAt DateTime?
-  createdById     String
-  createdBy       User             @relation("EnrollmentCreatedBy", fields: [createdById], references: [id])
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  monthlyFee                  Decimal          @db.Decimal(10, 2)
+  /// The skill's registration fee on the day the student joined, unless the
+  /// admin lowered or waived it since. Zero means there's nothing to pay.
+  registrationFee             Decimal          @db.Decimal(10, 2)
+  /// The day the student paid the registration fee. Empty while it's unpaid.
+  /// The admin can change the fee only while it's unpaid, so what was paid
+  /// is always the fee above.
+  registrationFeePaidOn       DateTime?        @db.Date
+  registrationFeeRecordedById String?
+  registrationFeeRecordedBy   User?            @relation("RegistrationFeeRecordedBy", fields: [registrationFeeRecordedById], references: [id])
+  status                      EnrollmentStatus @default(ACTIVE)
+  statusChangedAt             DateTime?
+  createdById                 String
+  createdBy                   User             @relation("EnrollmentCreatedBy", fields: [createdById], references: [id])
+  createdAt                   DateTime         @default(now())
+  updatedAt                   DateTime         @updatedAt
 
   @@unique([studentId, skillId], where: raw("status = 'ACTIVE'"), map: "enrollments_one_active_per_skill")
   @@index([studentId])

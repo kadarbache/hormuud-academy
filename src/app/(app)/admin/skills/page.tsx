@@ -77,6 +77,7 @@ export default async function SkillsPage() {
                 <TableHead>Skill</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead>Duration</TableHead>
+                <TableHead className="text-right">Registration fee</TableHead>
                 <TableHead className="text-right">Monthly fee</TableHead>
                 <TableHead>Taught at</TableHead>
                 <TableHead className="text-right">Active students</TableHead>
@@ -93,6 +94,9 @@ export default async function SkillsPage() {
                   </TableCell>
                   <TableCell>{skill.category.name}</TableCell>
                   <TableCell>{formatMonths(skill.durationMonths)}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatMoney(skill.registrationFee.toString())}
+                  </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {formatMoney(skill.monthlyFee.toString())}
                   </TableCell>

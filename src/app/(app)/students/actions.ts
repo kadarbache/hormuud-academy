@@ -82,7 +82,7 @@ function enrollmentRows(
   branchSkills: {
     id: string;
     skillId: string;
-    skill: { durationMonths: number; monthlyFee: Prisma.Decimal };
+    skill: { durationMonths: number; registrationFee: Prisma.Decimal; monthlyFee: Prisma.Decimal };
   }[],
 ) {
   return branchSkills.map((bs) => ({
@@ -93,6 +93,7 @@ function enrollmentRows(
     endDate: toDbDate(addMonths(startDate, bs.skill.durationMonths)),
     // Copied now so a later price change doesn't touch what this student joined at.
     monthlyFee: bs.skill.monthlyFee,
+    registrationFee: bs.skill.registrationFee,
     createdById,
   }));
 }
@@ -126,7 +127,7 @@ export async function registerStudent(formData: FormData): Promise<ActionResult<
   const branchSkillIds = [...new Set(skills.data.branchSkillIds)];
   const branchSkills = await prisma.branchSkill.findMany({
     where: { id: { in: branchSkillIds }, branchId: homeBranchId, active: true, skill: { active: true } },
-    include: { skill: { select: { durationMonths: true, monthlyFee: true } } },
+    include: { skill: { select: { durationMonths: true, registrationFee: true, monthlyFee: true } } },
   });
   if (branchSkills.length !== branchSkillIds.length) {
     return failure("One of the skills is no longer open at this branch. Reload the page and pick again.");

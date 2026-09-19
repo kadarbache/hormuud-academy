@@ -44,13 +44,18 @@ async function main() {
     teacher("Demo Teacher 4", [second.id]),
   ]);
 
-  const skill = (name: string, categoryId: string, durationMonths: number, monthlyFee: string) =>
-    prisma.skill.create({ data: { name, categoryId, durationMonths, monthlyFee } });
+  const skill = (
+    name: string,
+    categoryId: string,
+    durationMonths: number,
+    registrationFee: string,
+    monthlyFee: string,
+  ) => prisma.skill.create({ data: { name, categoryId, durationMonths, registrationFee, monthlyFee } });
   const [computer, design, tailoring, electrical] = await Promise.all([
-    skill("Computer Basics", tech.id, 3, "20"),
-    skill("Graphic Design", tech.id, 4, "30"),
-    skill("Tailoring", hand.id, 6, "15"),
-    skill("Electrical Installation", hand.id, 6, "25"),
+    skill("Computer Basics", tech.id, 3, "10", "20"),
+    skill("Graphic Design", tech.id, 4, "15", "30"),
+    skill("Tailoring", hand.id, 6, "5", "15"),
+    skill("Electrical Installation", hand.id, 6, "10", "25"),
   ]);
 
   const offer = (skillId: string, branchId: string, teacherId: string, classroomId: string) =>
@@ -76,10 +81,15 @@ async function main() {
 
   const today = collegeToday();
   const monthsAgo = (months: number) => addMonths(today, -months);
-  type Offer = typeof mainComputer & { durationMonths: number; fee: string };
+  type Offer = typeof mainComputer & {
+    durationMonths: number;
+    registrationFee: string;
+    fee: string;
+  };
   const withSkill = (bs: typeof mainComputer, s: typeof computer): Offer => ({
     ...bs,
     durationMonths: s.durationMonths,
+    registrationFee: s.registrationFee.toString(),
     fee: s.monthlyFee.toString(),
   });
 
@@ -151,6 +161,7 @@ async function main() {
             startDate: toDbDate(start),
             endDate: toDbDate(addMonths(start, offer.durationMonths)),
             monthlyFee: offer.fee,
+            registrationFee: offer.registrationFee,
             status: status ?? "ACTIVE",
             statusChangedAt: status ? new Date() : null,
             createdById: admin.id,

@@ -101,6 +101,9 @@ export default async function SkillPage({ params }: PageProps<"/admin/skills/[id
         ...categories.map((category) => ({ value: category.id, label: category.name })),
       ];
   const canDelete = skill.branchSkills.length === 0 && skill._count.enrollments === 0;
+  const registration = skill.registrationFee.gt(0)
+    ? `${formatMoney(skill.registrationFee.toString())} to register`
+    : "no registration fee";
 
   return (
     <>
@@ -118,7 +121,7 @@ export default async function SkillPage({ params }: PageProps<"/admin/skills/[id
             <ActiveBadge active={skill.active} />
           </span>
         }
-        description={`${skill.category.name} · ${formatMonths(skill.durationMonths)} · ${formatMoney(skill.monthlyFee.toString())} a month`}
+        description={`${skill.category.name} · ${formatMonths(skill.durationMonths)} · ${registration} · ${formatMoney(skill.monthlyFee.toString())} a month`}
       >
         <SkillDialog
           action={updateSkill.bind(null, skill.id)}
@@ -127,6 +130,7 @@ export default async function SkillPage({ params }: PageProps<"/admin/skills/[id
             name: skill.name,
             categoryId: skill.categoryId,
             durationMonths: skill.durationMonths,
+            registrationFee: skill.registrationFee.toString(),
             monthlyFee: skill.monthlyFee.toString(),
           }}
           trigger={<Button variant="outline">Edit skill</Button>}
