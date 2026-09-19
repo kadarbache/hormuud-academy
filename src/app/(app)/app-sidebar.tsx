@@ -55,12 +55,29 @@ const studentItems: NavItem[] = [
   },
 ];
 
+// Everyone can open these. Admins manage every branch's; branch staff see
+// their own branch's, read-only.
+const teachersItem: NavItem = {
+  href: "/teachers",
+  label: "Teachers",
+  icon: Presentation,
+  match: under("/teachers"),
+};
+const classesItem: NavItem = {
+  href: "/classes",
+  label: "Classes",
+  icon: DoorOpen,
+  match: under("/classes"),
+};
+
+const branchItems: NavItem[] = [teachersItem, classesItem];
+
 const adminItems: NavItem[] = [
   { href: "/admin/branches", label: "Branches", icon: Building2, match: under("/admin/branches") },
   { href: "/admin/skills", label: "Skills", icon: BookOpen, match: under("/admin/skills") },
   { href: "/admin/categories", label: "Categories", icon: Tags, match: under("/admin/categories") },
-  { href: "/admin/teachers", label: "Teachers", icon: Presentation, match: under("/admin/teachers") },
-  { href: "/admin/classes", label: "Classes", icon: DoorOpen, match: under("/admin/classes") },
+  teachersItem,
+  classesItem,
   { href: "/admin/staff", label: "Staff accounts", icon: KeyRound, match: under("/admin/staff") },
 ];
 
@@ -107,11 +124,18 @@ export function AppSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {user.role === "admin" && (
+        {user.role === "admin" ? (
           <SidebarGroup>
             <SidebarGroupLabel>Admin</SidebarGroupLabel>
             <SidebarGroupContent>
               <NavMenu items={adminItems} pathname={pathname} />
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ) : (
+          <SidebarGroup>
+            <SidebarGroupLabel>Your branch</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <NavMenu items={branchItems} pathname={pathname} />
             </SidebarGroupContent>
           </SidebarGroup>
         )}

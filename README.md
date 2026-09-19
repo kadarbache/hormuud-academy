@@ -75,6 +75,7 @@ Leave `DATABASE_POOL_MAX` and `SHADOW_DATABASE_URL` unset in production.
 
 - `prisma/schema.prisma` has the data model.
 - `src/app/(app)/students` has the student list, registration, profile and edit screens.
-- `src/app/(app)/admin` has the setup screens: branches, skills, categories, teachers, classes and staff accounts.
+- `src/app/(app)/admin` has the admin-only setup screens: branches, skills, categories and staff accounts.
+- `src/app/(app)/teachers` and `src/app/(app)/classes` are open to everyone. Admins manage them; branch staff see their own branch's, read-only.
 - `src/app/(app)/students/access.ts` decides which students and enrollments each staff member can see.
 - `src/lib` holds auth, the signed-in user checks, date helpers (dates follow East Africa Time) and formatting.
