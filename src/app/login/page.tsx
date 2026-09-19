@@ -23,7 +23,7 @@ export default async function LoginPage() {
           <div className="mx-auto mb-2 flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <GraduationCap className="size-5" />
           </div>
-          <CardTitle className="text-xl">College System</CardTitle>
+          <CardTitle className="text-xl">Hormuud Academy</CardTitle>
           <CardDescription>
             Log in with the account the admin gave you.
           </CardDescription>

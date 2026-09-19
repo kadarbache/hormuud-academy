@@ -29,7 +29,7 @@ export async function uploadStudentPhoto(file: File) {
     cloudinary.uploader
       .upload_stream(
         {
-          folder: "college-system/students",
+          folder: "hormuud-academy/students",
           resource_type: "image",
           // Phone photos are often 4000px wide. 600px is plenty for a profile.
           transformation: [{ width: 600, height: 600, crop: "limit" }],

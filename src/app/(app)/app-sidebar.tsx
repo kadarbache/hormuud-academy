@@ -95,7 +95,7 @@ export function AppSidebar({
           <div className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
             <GraduationCap className="size-4" />
           </div>
-          <span className="font-semibold">College System</span>
+          <span className="font-semibold">Hormuud Academy</span>
         </div>
       </SidebarHeader>
 

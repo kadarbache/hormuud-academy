@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: { default: "College System", template: "%s · College System" },
-  description: "Student registration and skills for every branch of the college.",
+  title: { default: "Hormuud Academy", template: "%s · Hormuud Academy" },
+  description: "Student registration and skills for every branch of Hormuud Academy.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

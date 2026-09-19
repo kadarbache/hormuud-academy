@@ -1,6 +1,6 @@
 @AGENTS.md
 
-# College System
+# Hormuud Academy
 
 - Read CONTEXT.md before naming anything. The screens say "Class" for a room; the code calls it `Classroom` so it can't be mistaken for a group of students.
 - Verify with `pnpm lint` and `pnpm build`, not only `pnpm typecheck`. A `"use server"` file may export only async functions, and only the build catches a violation.

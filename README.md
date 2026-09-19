@@ -1,6 +1,6 @@
-# College System
+# Hormuud Academy
 
-Student registration and skills for one college with several branches.
+Student registration and skills for Hormuud Academy, across all its branches.
 
 Phase 1 covers branches, the skill catalog, teachers, classes, staff accounts, student registration and enrollments. Fees, attendance, exams, salaries, expenses and reports come in later phases.
 

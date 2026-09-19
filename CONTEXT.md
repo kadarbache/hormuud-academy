@@ -1,13 +1,13 @@
-# College System
+# Hormuud Academy
 
-Runs one college with several branches: the skills it teaches, the students it registers, and which skills each student takes at which branch.
+Runs Hormuud Academy, one college with several branches: the skills it teaches, the students it registers, and which skills each student takes at which branch.
 
 ## Language
 
 ### The college
 
 **College**:
-The one organisation this system runs. There is no second college.
+Hormuud Academy, the one organisation this system runs. There is no second college.
 _Avoid_: Tenant, organisation, school
 
 **Branch**:
