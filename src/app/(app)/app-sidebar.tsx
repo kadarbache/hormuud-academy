@@ -1,0 +1,140 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import {
+  BookOpen,
+  Building2,
+  DoorOpen,
+  GraduationCap,
+  KeyRound,
+  LogOut,
+  Presentation,
+  Tags,
+  UserPlus,
+  Users,
+} from "lucide-react";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "@/components/ui/sidebar";
+import type { Role } from "@/lib/session";
+import { signOut } from "./actions";
+
+type NavItem = {
+  href: string;
+  label: string;
+  icon: React.ComponentType;
+  /** Returns true when this item is the page being shown. */
+  match: (pathname: string) => boolean;
+};
+
+const under = (href: string) => (pathname: string) =>
+  pathname === href || pathname.startsWith(`${href}/`);
+
+const studentItems: NavItem[] = [
+  {
+    href: "/students",
+    label: "Students",
+    icon: Users,
+    match: (pathname) => under("/students")(pathname) && pathname !== "/students/new",
+  },
+  {
+    href: "/students/new",
+    label: "Register student",
+    icon: UserPlus,
+    match: (pathname) => pathname === "/students/new",
+  },
+];
+
+const adminItems: NavItem[] = [
+  { href: "/admin/branches", label: "Branches", icon: Building2, match: under("/admin/branches") },
+  { href: "/admin/skills", label: "Skills", icon: BookOpen, match: under("/admin/skills") },
+  { href: "/admin/categories", label: "Categories", icon: Tags, match: under("/admin/categories") },
+  { href: "/admin/teachers", label: "Teachers", icon: Presentation, match: under("/admin/teachers") },
+  { href: "/admin/classes", label: "Classes", icon: DoorOpen, match: under("/admin/classes") },
+  { href: "/admin/staff", label: "Staff accounts", icon: KeyRound, match: under("/admin/staff") },
+];
+
+function NavMenu({ items, pathname }: { items: NavItem[]; pathname: string }) {
+  return (
+    <SidebarMenu>
+      {items.map((item) => (
+        <SidebarMenuItem key={item.href}>
+          <SidebarMenuButton asChild isActive={item.match(pathname)}>
+            <Link href={item.href}>
+              <item.icon />
+              <span>{item.label}</span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      ))}
+    </SidebarMenu>
+  );
+}
+
+export function AppSidebar({
+  user,
+}: {
+  user: { name: string; email: string; role: Role; branchName: string | null };
+}) {
+  const pathname = usePathname();
+
+  return (
+    <Sidebar>
+      <SidebarHeader>
+        <div className="flex items-center gap-2 px-2 py-1.5">
+          <div className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <GraduationCap className="size-4" />
+          </div>
+          <span className="font-semibold">College System</span>
+        </div>
+      </SidebarHeader>
+
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Students</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <NavMenu items={studentItems} pathname={pathname} />
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {user.role === "admin" && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Admin</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <NavMenu items={adminItems} pathname={pathname} />
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+      </SidebarContent>
+
+      <SidebarFooter>
+        <div className="px-2 py-1.5 text-sm">
+          <p className="truncate font-medium">{user.name}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            {user.role === "admin" ? "Admin, all branches" : `Staff, ${user.branchName ?? "no branch"}`}
+          </p>
+        </div>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <form action={signOut}>
+              <SidebarMenuButton type="submit">
+                <LogOut />
+                <span>Log out</span>
+              </SidebarMenuButton>
+            </form>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+    </Sidebar>
+  );
+}
