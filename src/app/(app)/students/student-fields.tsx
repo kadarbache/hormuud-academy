@@ -45,7 +45,7 @@ function PhoneField({
     <div className="space-y-2">
       <TextField type="tel" inputMode="tel" onBlur={(event) => check(event.currentTarget.value)} {...props} />
       {matches.length > 0 && (
-        <div className="flex gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+        <div className="flex gap-2 rounded-md border border-warning-border bg-warning p-3 text-sm text-warning-foreground">
           <TriangleAlert className="mt-0.5 size-4 shrink-0" />
           <div>
             <p>This number is already on file. Check it isn&apos;t the same person:</p>

@@ -31,7 +31,7 @@ import {
   type StudentFilters,
 } from "./queries";
 
-const warning = "border-amber-300 bg-amber-50 text-amber-900";
+const warning = "border-warning-border bg-warning text-warning-foreground";
 
 export const metadata: Metadata = { title: "Students" };
 

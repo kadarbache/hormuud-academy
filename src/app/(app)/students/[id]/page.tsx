@@ -95,7 +95,7 @@ function RegistrationFee({
         <div className="flex flex-wrap items-center gap-2">
           <span className="tabular-nums">{formatMoney(fee)}</span>
           {unpaid && (
-            <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-900">
+            <Badge variant="outline" className="border-warning-border bg-warning text-warning-foreground">
               Unpaid
             </Badge>
           )}
@@ -310,7 +310,7 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
                           {formatDate(enrollment.startDate)} to {formatDate(enrollment.endDate)}
                         </div>
                         {pastEnd && (
-                          <Badge variant="outline" className="mt-1 border-amber-300 bg-amber-50 text-amber-900">
+                          <Badge variant="outline" className="mt-1 border-warning-border bg-warning text-warning-foreground">
                             Past end date
                           </Badge>
                         )}
