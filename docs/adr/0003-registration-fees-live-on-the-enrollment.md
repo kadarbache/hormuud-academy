@@ -1,0 +1,3 @@
+# Registration fees live on the enrollment
+
+The registration fee is paid once for each skill a student starts, so each enrollment keeps its own copy of the skill's fee, the day it was paid and who recorded it, the same way it keeps the monthly fee. There is no payments table yet: monthly fee payments will need one, and designing it around a single kind of payment now would mean guessing at needs nobody knows yet. When that table comes, the paid registration fees move into it. Until then a fee is either paid in full or unpaid, the admin can change a fee only while it's unpaid (so what was paid always equals the fee on record), and only the admin can take a recorded payment back.

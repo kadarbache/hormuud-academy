@@ -2,10 +2,10 @@
 
 Student registration and skills for Hormuud Academy, across all its branches.
 
-Phase 1 covers branches, the skill catalog, teachers, classes, staff accounts, student registration and enrollments. Fees, attendance, exams, salaries, expenses and reports come in later phases.
+Phase 1 covers branches, the skill catalog, teachers, classes, staff accounts, student registration, enrollments and registration fees. Monthly fee payments, attendance, exams, salaries, expenses and reports come in later phases.
 
 - [CONTEXT.md](CONTEXT.md) defines the words this project uses: skill, branch skill, class, enrollment and the rest.
-- [docs/adr](docs/adr) records the two decisions everything else depends on.
+- [docs/adr](docs/adr) records the decisions everything else depends on, and why they were made.
 
 ## Stack
 

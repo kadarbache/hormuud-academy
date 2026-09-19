@@ -25,7 +25,7 @@ _Avoid_: Registrar, receptionist, user
 ### What the college teaches
 
 **Skill**:
-Something the college teaches, like Graphic Design or Tailoring, with a duration in months and a monthly fee. One catalog serves every branch.
+Something the college teaches, like Graphic Design or Tailoring, with a duration in months, a registration fee and a monthly fee. One catalog serves every branch.
 _Avoid_: Course, program, subject
 
 **Category**:
@@ -47,6 +47,18 @@ _Avoid_: Instructor, trainer, lecturer
 **Monthly fee**:
 What a skill costs per month, in US dollars.
 _Avoid_: Price, tuition
+
+**Registration fee**:
+What a student pays once for each skill they start, on top of the monthly fee, in US dollars. Each skill sets its own, and zero means none. Despite the name it goes with the enrollment, not the registration: two skills mean two registration fees, and taking a skill again means paying again.
+_Avoid_: Admission fee, enrollment fee, joining fee
+
+**Unpaid**:
+A registration fee above zero with no payment recorded. It stays unpaid until staff record the payment or the admin waives it, whatever the enrollment's status.
+_Avoid_: Outstanding, owing, due
+
+**Waive**:
+Set one student's registration fee for one skill to zero. Only the admin can waive or lower a fee, and only while it's unpaid.
+_Avoid_: Cancel, exempt
 
 ### Students
 
@@ -71,7 +83,7 @@ Adding a new student to the college, along with the first skills they take. Happ
 _Avoid_: Admission, sign-up
 
 **Enrollment**:
-One student taking one branch skill from a start date, keeping the monthly fee from the day they joined. Its status is Active, Finished or Dropped.
+One student taking one branch skill from a start date, keeping the monthly fee and registration fee from the day they joined. Its status is Active, Finished or Dropped.
 _Avoid_: Registration, subscription
 
 **Finished**:
