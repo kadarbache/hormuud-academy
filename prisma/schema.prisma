@@ -1,0 +1,284 @@
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Better Auth tables. The field names follow Better Auth's schema, plus the
+// admin plugin's role/ban fields and our own branchId on the user.
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String   @id
+  name          String
+  email         String
+  emailVerified Boolean  @default(false)
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Admin plugin. Role is "admin" or "staff".
+  role       String?
+  banned     Boolean?  @default(false)
+  banReason  String?
+  banExpires DateTime?
+
+  // Branch staff work at exactly one branch. Admins have none and see every branch.
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id])
+
+  sessions Session[]
+  accounts Account[]
+
+  studentsCreated    Student[]    @relation("StudentCreatedBy")
+  enrollmentsCreated Enrollment[] @relation("EnrollmentCreatedBy")
+
+  @@unique([email])
+  @@index([branchId])
+  @@map("user")
+}
+
+model Session {
+  id             String   @id
+  expiresAt      DateTime
+  token          String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  ipAddress      String?
+  userAgent      String?
+  impersonatedBy String?
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+// ---------------------------------------------------------------------------
+// College
+// ---------------------------------------------------------------------------
+
+model Branch {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  phone     String?
+  address   String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  staff        User[]
+  classrooms   Classroom[]
+  teachers     TeacherBranch[]
+  branchSkills BranchSkill[]
+  homeStudents Student[]
+
+  @@map("branches")
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  skills Skill[]
+
+  @@map("categories")
+}
+
+/// One entry in the college-wide catalog. Head office owns it; every branch
+/// shares it. Branch-specific details (teacher, class) live on BranchSkill.
+model Skill {
+  id             String   @id @default(cuid())
+  name           String   @unique
+  categoryId     String
+  category       Category @relation(fields: [categoryId], references: [id])
+  durationMonths Int
+  monthlyFee     Decimal  @db.Decimal(10, 2)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  branchSkills BranchSkill[]
+  enrollments  Enrollment[]
+
+  @@index([categoryId])
+  @@map("skills")
+}
+
+/// A room at a branch. The screens call it a "Class", which is the college's word for it.
+model Classroom {
+  id        String   @id @default(cuid())
+  name      String
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id])
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  branchSkills BranchSkill[]
+
+  @@unique([branchId, name])
+  @@map("classrooms")
+}
+
+model Teacher {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  branches     TeacherBranch[]
+  branchSkills BranchSkill[]
+
+  @@map("teachers")
+}
+
+/// A teacher can work at several branches without being entered twice.
+model TeacherBranch {
+  teacherId String
+  teacher   Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  branchId  String
+  branch    Branch  @relation(fields: [branchId], references: [id])
+
+  @@id([teacherId, branchId])
+  @@index([branchId])
+  @@map("teacher_branches")
+}
+
+/// A skill as it runs at one branch: one teacher, one class. Students enroll
+/// in this, not in the catalog skill directly.
+model BranchSkill {
+  id          String    @id @default(cuid())
+  skillId     String
+  skill       Skill     @relation(fields: [skillId], references: [id])
+  branchId    String
+  branch      Branch    @relation(fields: [branchId], references: [id])
+  teacherId   String
+  teacher     Teacher   @relation(fields: [teacherId], references: [id])
+  classroomId String
+  classroom   Classroom @relation(fields: [classroomId], references: [id])
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  enrollments Enrollment[]
+
+  @@unique([skillId, branchId])
+  @@index([branchId])
+  @@map("branch_skills")
+}
+
+enum Sex {
+  MALE
+  FEMALE
+}
+
+/// A student belongs to the whole college. The home branch is where they
+/// registered; they can still take skills at any branch.
+model Student {
+  id               String   @id @default(cuid())
+  /// Shown as STU-00001. One sequence for the whole college.
+  number           Int      @unique @default(autoincrement())
+  fullName         String
+  phone            String?
+  sex              Sex
+  /// The responsible person's phone.
+  responsiblePhone String?
+  photoUrl         String?
+  photoPublicId    String?
+  registrationDate DateTime @db.Date
+  homeBranchId     String
+  homeBranch       Branch   @relation(fields: [homeBranchId], references: [id])
+  createdById      String
+  createdBy        User     @relation("StudentCreatedBy", fields: [createdById], references: [id])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  enrollments Enrollment[]
+
+  @@index([homeBranchId])
+  @@index([phone])
+  @@index([responsiblePhone])
+  @@map("students")
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  FINISHED
+  DROPPED
+}
+
+/// One student taking one skill at one branch. A student is Active while any
+/// of their enrollments is ACTIVE; there is no stored student status.
+model Enrollment {
+  id              String           @id @default(cuid())
+  studentId       String
+  student         Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  branchSkillId   String
+  branchSkill     BranchSkill      @relation(fields: [branchSkillId], references: [id])
+  /// Copied from the branch skill so the database itself can refuse a second
+  /// active enrollment in the same skill, even across branches.
+  skillId         String
+  skill           Skill            @relation(fields: [skillId], references: [id])
+  startDate       DateTime         @db.Date
+  /// Start date plus the skill's duration. A guide only: staff mark the
+  /// enrollment Finished themselves.
+  endDate         DateTime         @db.Date
+  /// The skill's monthly fee on the day the student joined.
+  monthlyFee      Decimal          @db.Decimal(10, 2)
+  status          EnrollmentStatus @default(ACTIVE)
+  statusChangedAt DateTime?
+  createdById     String
+  createdBy       User             @relation("EnrollmentCreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([studentId, skillId], where: raw("status = 'ACTIVE'"), map: "enrollments_one_active_per_skill")
+  @@index([studentId])
+  @@index([branchSkillId, status])
+  @@index([skillId])
+  @@map("enrollments")
+}
