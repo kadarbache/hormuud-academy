@@ -9,11 +9,22 @@ import type { BranchSkillOption } from "./types";
 
 export const PAGE_SIZE = 25;
 
+/**
+ * An enrollment whose registration fee is still owed: above zero, with no
+ * payment recorded. It stays that way until staff record the payment or the
+ * admin waives the fee, whatever the enrollment's status.
+ */
+const unpaidRegistrationFee = {
+  registrationFee: { gt: 0 },
+  registrationFeePaidOn: null,
+} satisfies Prisma.EnrollmentWhereInput;
+
 export type StudentFilters = {
   q: string;
   status: "all" | "active" | "inactive";
   skillId: string;
   pastEnd: boolean;
+  unpaid: boolean;
   page: number;
 };
 
@@ -29,6 +40,7 @@ export function readFilters(params: Record<string, string | string[] | undefined
     status: status === "active" || status === "inactive" ? status : "all",
     skillId: one("skill"),
     pastEnd: one("pastEnd") === "1",
+    unpaid: one("unpaid") === "1",
     page: Number.isFinite(page) && page > 0 ? page : 1,
   };
 }
@@ -65,6 +77,9 @@ export async function listStudents(user: CurrentUser, filters: StudentFilters) {
       enrollments: { some: { ...enrollmentScope, status: "ACTIVE", endDate: { lt: today } } },
     });
   }
+  if (filters.unpaid) {
+    conditions.push({ enrollments: { some: { ...enrollmentScope, ...unpaidRegistrationFee } } });
+  }
 
   const where: Prisma.StudentWhereInput = { AND: conditions };
   const [total, rows] = await Promise.all([
@@ -85,6 +100,9 @@ export async function listStudents(user: CurrentUser, filters: StudentFilters) {
             branchSkill: { select: { branchId: true } },
           },
         },
+        _count: {
+          select: { enrollments: { where: { ...enrollmentScope, ...unpaidRegistrationFee } } },
+        },
       },
     }),
   ]);
@@ -98,6 +116,7 @@ export async function listStudents(user: CurrentUser, filters: StudentFilters) {
     photoUrl: student.photoUrl,
     homeBranchName: student.homeBranch.name,
     isActive: student.enrollments.length > 0,
+    unpaidFees: student._count.enrollments,
     // Skills at other branches stay hidden from branch staff.
     skills: student.enrollments
       .filter((e) => user.role === "admin" || e.branchSkill.branchId === user.branchId)
@@ -115,6 +134,13 @@ export function countPastEnd(user: CurrentUser) {
       status: "ACTIVE",
       endDate: { lt: toDbDate(collegeToday()) },
     },
+  });
+}
+
+/** How many registration fees at this user's branches are still unpaid. */
+export function countUnpaidRegistrationFees(user: CurrentUser) {
+  return prisma.enrollment.count({
+    where: { ...visibleEnrollments(user), ...unpaidRegistrationFee },
   });
 }
 

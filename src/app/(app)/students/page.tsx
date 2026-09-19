@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Form from "next/form";
 import Link from "next/link";
-import { CalendarClock, ChevronLeft, ChevronRight, UserPlus, UserRound } from "lucide-react";
+import { Banknote, CalendarClock, ChevronLeft, ChevronRight, UserPlus, UserRound } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,12 +23,15 @@ import { formatStudentNumber } from "@/lib/format";
 import { requireUser } from "@/lib/session";
 import {
   countPastEnd,
+  countUnpaidRegistrationFees,
   listStudents,
   PAGE_SIZE,
   readFilters,
   skillFilterOptions,
   type StudentFilters,
 } from "./queries";
+
+const warning = "border-amber-300 bg-amber-50 text-amber-900";
 
 export const metadata: Metadata = { title: "Students" };
 
@@ -38,6 +41,7 @@ function pageHref(filters: StudentFilters, page: number) {
   if (filters.status !== "all") params.set("status", filters.status);
   if (filters.skillId) params.set("skill", filters.skillId);
   if (filters.pastEnd) params.set("pastEnd", "1");
+  if (filters.unpaid) params.set("unpaid", "1");
   if (page > 1) params.set("page", String(page));
   const query = params.toString();
   return query ? `/students?${query}` : "/students";
@@ -46,13 +50,16 @@ function pageHref(filters: StudentFilters, page: number) {
 export default async function StudentsPage({ searchParams }: PageProps<"/students">) {
   const user = await requireUser();
   const filters = readFilters(await searchParams);
-  const [{ students, total, pageCount }, skills, pastEndCount] = await Promise.all([
+  const [{ students, total, pageCount }, skills, pastEndCount, unpaidCount] = await Promise.all([
     listStudents(user, filters),
     skillFilterOptions(user),
     countPastEnd(user),
+    countUnpaidRegistrationFees(user),
   ]);
 
-  const filtered = Boolean(filters.q || filters.status !== "all" || filters.skillId || filters.pastEnd);
+  const filtered = Boolean(
+    filters.q || filters.status !== "all" || filters.skillId || filters.pastEnd || filters.unpaid,
+  );
   const firstShown = (filters.page - 1) * PAGE_SIZE + 1;
 
   return (
@@ -73,8 +80,22 @@ export default async function StudentsPage({ searchParams }: PageProps<"/student
         </Button>
       </PageHeader>
 
+      {unpaidCount > 0 && !filters.unpaid && (
+        <div className={`flex flex-wrap items-center gap-2 rounded-lg border px-4 py-3 text-sm ${warning}`}>
+          <Banknote className="size-4" />
+          <span>
+            {unpaidCount === 1
+              ? "1 registration fee is unpaid."
+              : `${unpaidCount} registration fees are unpaid.`}
+          </span>
+          <Link href="/students?unpaid=1" className="font-medium underline">
+            Show those students
+          </Link>
+        </div>
+      )}
+
       {pastEndCount > 0 && !filters.pastEnd && (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <div className={`flex flex-wrap items-center gap-2 rounded-lg border px-4 py-3 text-sm ${warning}`}>
           <CalendarClock className="size-4" />
           <span>
             {pastEndCount === 1
@@ -116,6 +137,12 @@ export default async function StudentsPage({ searchParams }: PageProps<"/student
           <Checkbox id="pastEnd" name="pastEnd" value="1" defaultChecked={filters.pastEnd} />
           <Label htmlFor="pastEnd" className="font-normal">
             Past end date
+          </Label>
+        </div>
+        <div className="flex h-9 items-center gap-2">
+          <Checkbox id="unpaid" name="unpaid" value="1" defaultChecked={filters.unpaid} />
+          <Label htmlFor="unpaid" className="font-normal">
+            Registration fee unpaid
           </Label>
         </div>
         <Button type="submit" variant="secondary">
@@ -173,7 +200,7 @@ export default async function StudentsPage({ searchParams }: PageProps<"/student
                           <Badge
                             key={skill.name}
                             variant="outline"
-                            className={skill.pastEnd ? "border-amber-300 bg-amber-50 text-amber-900" : undefined}
+                            className={skill.pastEnd ? warning : undefined}
                             title={skill.pastEnd ? "Past its end date" : undefined}
                           >
                             {skill.name}
@@ -182,13 +209,20 @@ export default async function StudentsPage({ searchParams }: PageProps<"/student
                       </div>
                     </TableCell>
                     <TableCell>
-                      {student.isActive ? (
-                        <Badge variant="secondary">Active</Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-muted-foreground">
-                          Inactive
-                        </Badge>
-                      )}
+                      <div className="flex flex-wrap gap-1">
+                        {student.isActive ? (
+                          <Badge variant="secondary">Active</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-muted-foreground">
+                            Inactive
+                          </Badge>
+                        )}
+                        {student.unpaidFees > 0 && (
+                          <Badge variant="outline" className={warning}>
+                            Fee unpaid
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
