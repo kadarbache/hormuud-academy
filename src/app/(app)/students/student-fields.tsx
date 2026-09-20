@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { SelectField, TextField } from "@/components/form-fields";
 import type { FieldErrors } from "@/lib/action-result";
 import { formatMoney, formatMonths } from "@/lib/format";
+import { paymentMethodOptions } from "../finance/labels";
 import { findStudentsByPhone } from "./actions";
 import type { BranchSkillOption, PhoneMatch, StudentFormValues } from "./types";
 
@@ -259,16 +260,21 @@ export function SkillPicker({
 
 /**
  * A box to tick when the student pays the registration fees for the skills
- * being added straight away. Shows nothing when those skills have no fee.
+ * being added straight away, and how they paid. Shows nothing when those
+ * skills have no fee. Ticking it writes a payment into the books, so the
+ * method has to be asked for.
  */
 export function RegistrationFeePaidField({
   skills,
   description,
+  errors,
 }: {
   skills: Pick<BranchSkillOption, "id" | "skillName" | "registrationFee">[];
   description: string;
+  errors?: string[];
 }) {
   const id = useId();
+  const [paid, setPaid] = useState(false);
   const withFee = skills.filter((skill) => Number(skill.registrationFee) > 0);
   if (withFee.length === 0) return null;
 
@@ -285,17 +291,33 @@ export function RegistrationFeePaidField({
   return (
     // Keyed on the skills, so a tick given for one amount doesn't carry over
     // to a new amount after the skills change.
-    <Field key={withFee.map((skill) => skill.id).join()} orientation="horizontal">
-      <Checkbox id={id} name="registrationFeePaid" />
-      <FieldContent>
-        <FieldLabel htmlFor={id}>
-          Registration {withFee.length > 1 ? "fees" : "fee"} paid: {formatMoney(totalCents / 100)}
-        </FieldLabel>
-        <FieldDescription>
-          {breakdown}
-          {description}
-        </FieldDescription>
-      </FieldContent>
-    </Field>
+    <div key={withFee.map((skill) => skill.id).join()} className="space-y-4">
+      <Field orientation="horizontal">
+        <Checkbox
+          id={id}
+          name="registrationFeePaid"
+          checked={paid}
+          onCheckedChange={(checked) => setPaid(checked === true)}
+        />
+        <FieldContent>
+          <FieldLabel htmlFor={id}>
+            Registration {withFee.length > 1 ? "fees" : "fee"} paid: {formatMoney(totalCents / 100)}
+          </FieldLabel>
+          <FieldDescription>
+            {breakdown}
+            {description}
+          </FieldDescription>
+        </FieldContent>
+      </Field>
+      {paid && (
+        <SelectField
+          label="Paid by"
+          name="registrationFeeMethod"
+          options={paymentMethodOptions}
+          placeholder="Pick one"
+          errors={errors}
+        />
+      )}
+    </div>
   );
 }

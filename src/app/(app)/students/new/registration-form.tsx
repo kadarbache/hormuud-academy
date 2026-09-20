@@ -125,6 +125,7 @@ export function RegistrationForm({
             <RegistrationFeePaidField
               skills={pickedOptions}
               description="Tick it if the student paid now. It's recorded as paid on the registration date. If they'll pay later, record it on their page once they do."
+              errors={fieldErrors.registrationFeeMethod}
             />
           </FieldGroup>
         </CardContent>

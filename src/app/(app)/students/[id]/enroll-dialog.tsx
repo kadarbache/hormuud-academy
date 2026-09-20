@@ -68,6 +68,7 @@ export function EnrollDialog({
             <RegistrationFeePaidField
               skills={[selected]}
               description="Tick it if the student paid now. If they'll pay later, record it on this page once they do."
+              errors={errors.registrationFeeMethod}
             />
           )}
         </>

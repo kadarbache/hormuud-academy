@@ -35,9 +35,11 @@ model User {
   sessions Session[]
   accounts Account[]
 
-  studentsCreated          Student[]    @relation("StudentCreatedBy")
-  enrollmentsCreated       Enrollment[] @relation("EnrollmentCreatedBy")
-  registrationFeesRecorded Enrollment[] @relation("RegistrationFeeRecordedBy")
+  studentsCreated    Student[]       @relation("StudentCreatedBy")
+  enrollmentsCreated Enrollment[]    @relation("EnrollmentCreatedBy")
+  paymentsRecorded   Payment[]       @relation("PaymentRecordedBy")
+  expensesRecorded   Expense[]       @relation("ExpenseRecordedBy")
+  budgetsSaved       MonthlyBudget[] @relation("BudgetSavedBy")
 
   @@unique([email])
   @@index([branchId])
@@ -111,6 +113,9 @@ model Branch {
   teachers     TeacherBranch[]
   branchSkills BranchSkill[]
   homeStudents Student[]
+  payments     Payment[]
+  expenses     Expense[]
+  budgets      MonthlyBudget[]
 
   @@map("branches")
 }
@@ -166,15 +171,25 @@ model Classroom {
 }
 
 model Teacher {
-  id        String   @id @default(cuid())
-  name      String
-  phone     String?
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String     @id @default(cuid())
+  name           String
+  phone          String?
+  /// How this teacher is paid. FIXED uses fixedSalary; PERCENTAGE earns a
+  /// share of every monthly fee paid for the skills they teach.
+  salaryType     SalaryType @default(FIXED)
+  /// What a FIXED teacher is paid each month. Null for a PERCENTAGE teacher.
+  fixedSalary    Decimal?   @db.Decimal(10, 2)
+  /// A PERCENTAGE teacher's share, as a percentage: 30 means 30%. Null for
+  /// a FIXED teacher.
+  percentageRate Decimal?   @db.Decimal(5, 2)
+  active         Boolean    @default(true)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 
   branches     TeacherBranch[]
   branchSkills BranchSkill[]
+  payments     Payment[]
+  payouts      Expense[]
 
   @@map("teachers")
 }
@@ -241,6 +256,7 @@ model Student {
   updatedAt        DateTime @updatedAt
 
   enrollments Enrollment[]
+  payments    Payment[]
 
   @@index([homeBranchId])
   @@index([phone])
@@ -257,40 +273,203 @@ enum EnrollmentStatus {
 /// One student taking one skill at one branch. A student is Active while any
 /// of their enrollments is ACTIVE; there is no stored student status.
 model Enrollment {
-  id                          String           @id @default(cuid())
-  studentId                   String
-  student                     Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  branchSkillId               String
-  branchSkill                 BranchSkill      @relation(fields: [branchSkillId], references: [id])
+  id              String           @id @default(cuid())
+  studentId       String
+  student         Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  branchSkillId   String
+  branchSkill     BranchSkill      @relation(fields: [branchSkillId], references: [id])
   /// Copied from the branch skill so the database itself can refuse a second
   /// active enrollment in the same skill, even across branches.
-  skillId                     String
-  skill                       Skill            @relation(fields: [skillId], references: [id])
-  startDate                   DateTime         @db.Date
+  skillId         String
+  skill           Skill            @relation(fields: [skillId], references: [id])
+  startDate       DateTime         @db.Date
   /// Start date plus the skill's duration. A guide only: staff mark the
   /// enrollment Finished themselves.
-  endDate                     DateTime         @db.Date
+  endDate         DateTime         @db.Date
   /// The skill's monthly fee on the day the student joined.
-  monthlyFee                  Decimal          @db.Decimal(10, 2)
+  monthlyFee      Decimal          @db.Decimal(10, 2)
   /// The skill's registration fee on the day the student joined, unless the
   /// admin lowered or waived it since. Zero means there's nothing to pay.
-  registrationFee             Decimal          @db.Decimal(10, 2)
-  /// The day the student paid the registration fee. Empty while it's unpaid.
-  /// The admin can change the fee only while it's unpaid, so what was paid
-  /// is always the fee above.
-  registrationFeePaidOn       DateTime?        @db.Date
-  registrationFeeRecordedById String?
-  registrationFeeRecordedBy   User?            @relation("RegistrationFeeRecordedBy", fields: [registrationFeeRecordedById], references: [id])
-  status                      EnrollmentStatus @default(ACTIVE)
-  statusChangedAt             DateTime?
-  createdById                 String
-  createdBy                   User             @relation("EnrollmentCreatedBy", fields: [createdById], references: [id])
-  createdAt                   DateTime         @default(now())
-  updatedAt                   DateTime         @updatedAt
+  /// Whether it was paid is the payment in the ledger, not a field here.
+  registrationFee Decimal          @db.Decimal(10, 2)
+  status          EnrollmentStatus @default(ACTIVE)
+  statusChangedAt DateTime?
+  createdById     String
+  createdBy       User             @relation("EnrollmentCreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  payments Payment[]
 
   @@unique([studentId, skillId], where: raw("status = 'ACTIVE'"), map: "enrollments_one_active_per_skill")
   @@index([studentId])
   @@index([branchSkillId, status])
   @@index([skillId])
   @@map("enrollments")
+}
+
+// ---------------------------------------------------------------------------
+// Money
+//
+// Every dollar the college takes in is one Payment; every dollar it spends is
+// one Expense. Both name the branch they happened at and the day they
+// happened, which is what the daily and monthly figures are built from.
+// ---------------------------------------------------------------------------
+
+/// How money changed hands. ZAAD and eDahab are the mobile money services.
+enum PaymentMethod {
+  CASH
+  ZAAD
+  EDAHAB
+  BANK
+}
+
+/// What a payment was for. The first two are tied to an enrollment and are
+/// recorded from the student's page; the rest are entered on their own.
+enum IncomeCategory {
+  REGISTRATION_FEE
+  MONTHLY_FEE
+  BOOKS
+  EXAMINATION_FEE
+  OTHER
+}
+
+enum ExpenseCategory {
+  RENT
+  ELECTRICITY
+  TEACHER_SALARY
+  STAFF_SALARY
+  INTERNET
+  STATIONERY
+  TRANSPORTATION
+  MAINTENANCE
+  OTHER
+}
+
+enum SalaryType {
+  FIXED
+  PERCENTAGE
+}
+
+/// Money received, whatever it was for. A registration fee is one of these,
+/// and so is each month a student pays for a skill.
+model Payment {
+  id       String         @id @default(cuid())
+  /// Shown on receipts as PAY-00001. One sequence for the whole college.
+  number   Int            @unique @default(autoincrement())
+  category IncomeCategory
+  method   PaymentMethod
+  amount   Decimal        @db.Decimal(10, 2)
+  /// The college day the money came in. Daily income counts by this, not by
+  /// createdAt: a payment taken on Friday may be entered on Saturday.
+  paidOn   DateTime       @db.Date
+  /// Where the money was taken. For a fee it's the branch teaching the skill.
+  branchId String
+  branch   Branch         @relation(fields: [branchId], references: [id])
+
+  /// Set for anything a student pays. Null for income with no student behind
+  /// it, like a book sold over the counter.
+  studentId    String?
+  student      Student?    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  /// Set for a registration fee or a monthly fee, which are always for one skill.
+  enrollmentId String?
+  enrollment   Enrollment? @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  /// The month a MONTHLY_FEE covers, as that month's first day. This is what
+  /// says September is paid and October isn't, whenever the money arrived.
+  forMonth     DateTime?   @db.Date
+
+  /// The teacher this payment earned a share for, set only when the skill's
+  /// teacher is paid by percentage. The rate and the share are worked out
+  /// once, here, so a later rate change never rewrites what was earned.
+  teacherId           String?
+  teacher             Teacher? @relation(fields: [teacherId], references: [id])
+  teacherSharePercent Decimal? @db.Decimal(5, 2)
+  teacherShare        Decimal? @db.Decimal(10, 2)
+
+  note         String?
+  recordedById String
+  recordedBy   User     @relation("PaymentRecordedBy", fields: [recordedById], references: [id])
+  createdAt    DateTime @default(now())
+
+  /// A registration fee is paid once per enrollment, and a monthly fee once
+  /// per month per enrollment. The database refuses a second one, so a
+  /// double click can't charge a student twice.
+  @@unique([enrollmentId], where: raw("category = 'REGISTRATION_FEE'"), map: "payments_one_registration_fee")
+  @@unique([enrollmentId, forMonth], where: raw("category = 'MONTHLY_FEE'"), map: "payments_one_monthly_fee_per_month")
+  @@index([paidOn])
+  @@index([branchId, paidOn])
+  @@index([category, paidOn])
+  @@index([studentId])
+  @@index([enrollmentId])
+  @@index([teacherId])
+  @@map("payments")
+}
+
+/// Money spent. A teacher's salary and a percentage teacher's payout are both
+/// expenses in the TEACHER_SALARY category, with the teacher named.
+model Expense {
+  id       String          @id @default(cuid())
+  number   Int             @unique @default(autoincrement())
+  category ExpenseCategory
+  method   PaymentMethod
+  amount   Decimal         @db.Decimal(10, 2)
+  /// The college day the money went out.
+  spentOn  DateTime        @db.Date
+  branchId String
+  branch   Branch          @relation(fields: [branchId], references: [id])
+
+  /// Set on a salary or payout so a teacher's pay can be traced.
+  teacherId String?
+  teacher   Teacher?  @relation(fields: [teacherId], references: [id])
+  /// The month a salary covers, as that month's first day.
+  forMonth  DateTime? @db.Date
+
+  note         String?
+  recordedById String
+  recordedBy   User     @relation("ExpenseRecordedBy", fields: [recordedById], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([spentOn])
+  @@index([branchId, spentOn])
+  @@index([category, spentOn])
+  @@index([teacherId])
+  @@map("expenses")
+}
+
+/// One branch's plan for one month, written before the month is spent. What
+/// actually happened is never stored here: it's counted from the payments and
+/// expenses, so the comparison always matches the ledger.
+model MonthlyBudget {
+  id       String   @id @default(cuid())
+  branchId String
+  branch   Branch   @relation(fields: [branchId], references: [id])
+  /// The month being planned, as that month's first day.
+  month    DateTime @db.Date
+
+  expectedIncome Decimal @db.Decimal(10, 2)
+  note           String?
+
+  savedById String
+  savedBy   User     @relation("BudgetSavedBy", fields: [savedById], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines MonthlyBudgetLine[]
+
+  @@unique([branchId, month])
+  @@index([month])
+  @@map("monthly_budgets")
+}
+
+/// What one expense category was budgeted for in one month. A category with
+/// no line wasn't planned for; spending on it still shows up as unplanned.
+model MonthlyBudgetLine {
+  budgetId String
+  budget   MonthlyBudget   @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  category ExpenseCategory
+  amount   Decimal         @db.Decimal(10, 2)
+
+  @@id([budgetId, category])
+  @@map("monthly_budget_lines")
 }

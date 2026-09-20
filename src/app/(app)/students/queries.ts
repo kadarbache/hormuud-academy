@@ -3,6 +3,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { collegeToday, toDbDate } from "@/lib/dates";
 import { parseStudentLookup } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
+import { one, type SearchParams } from "@/lib/search-params";
 import type { CurrentUser } from "@/lib/session";
 import { browsableStudents, visibleEnrollments } from "./access";
 import type { BranchSkillOption } from "./types";
@@ -11,12 +12,12 @@ export const PAGE_SIZE = 25;
 
 /**
  * An enrollment whose registration fee is still owed: above zero, with no
- * payment recorded. It stays that way until staff record the payment or the
- * admin waives the fee, whatever the enrollment's status.
+ * payment for it in the ledger. It stays that way until staff record the
+ * payment or the admin waives the fee, whatever the enrollment's status.
  */
 const unpaidRegistrationFee = {
   registrationFee: { gt: 0 },
-  registrationFeePaidOn: null,
+  payments: { none: { category: "REGISTRATION_FEE" } },
 } satisfies Prisma.EnrollmentWhereInput;
 
 export type StudentFilters = {
@@ -30,22 +31,18 @@ export type StudentFilters = {
 
 export const ANY_SKILL = "any";
 
-export function readFilters(params: Record<string, string | string[] | undefined>): StudentFilters {
-  const one = (key: string) => {
-    const value = params[key];
-    return (Array.isArray(value) ? value[0] : value) ?? "";
-  };
-  const status = one("status");
+export function readFilters(params: SearchParams): StudentFilters {
+  const status = one(params, "status");
   // The skill picker needs a value for "no skill filter"; an empty one would
   // leave the box blank instead of saying "Any skill".
-  const skill = one("skill");
-  const page = Number.parseInt(one("page"), 10);
+  const skill = one(params, "skill");
+  const page = Number.parseInt(one(params, "page"), 10);
   return {
-    q: one("q").trim(),
+    q: one(params, "q").trim(),
     status: status === "active" || status === "inactive" ? status : "all",
     skillId: skill === ANY_SKILL ? "" : skill,
-    pastEnd: one("pastEnd") === "1",
-    unpaid: one("unpaid") === "1",
+    pastEnd: one(params, "pastEnd") === "1",
+    unpaid: one(params, "unpaid") === "1",
     page: Number.isFinite(page) && page > 0 ? page : 1,
   };
 }
@@ -173,7 +170,12 @@ export async function getStudentProfile(user: CurrentUser, id: string) {
         include: {
           skill: { select: { name: true } },
           createdBy: { select: { name: true } },
-          registrationFeeRecordedBy: { select: { name: true } },
+          // Every fee this student has paid for the skill: the registration
+          // fee, and one row per month of it.
+          payments: {
+            orderBy: [{ forMonth: "asc" }, { paidOn: "asc" }],
+            include: { recordedBy: { select: { name: true } } },
+          },
           branchSkill: {
             select: {
               branchId: true,

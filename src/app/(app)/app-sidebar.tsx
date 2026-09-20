@@ -5,14 +5,20 @@ import { usePathname } from "next/navigation";
 import {
   BookOpen,
   Building2,
+  CalendarRange,
+  ChartNoAxesColumn,
   DoorOpen,
   GraduationCap,
+  HandCoins,
+  HandHelping,
   KeyRound,
   LogOut,
   Presentation,
+  Receipt,
   Tags,
   UserPlus,
   Users,
+  Wallet,
 } from "lucide-react";
 import {
   Sidebar,
@@ -70,7 +76,47 @@ const classesItem: NavItem = {
   match: under("/classes"),
 };
 
-const branchItems: NavItem[] = [teachersItem, classesItem];
+// Branch staff take money at the counter, so they record and read their own
+// branch's income. Expenses, teacher pay and budgets are the admin's alone.
+const incomeItem: NavItem = {
+  href: "/finance/income",
+  label: "Income",
+  icon: Wallet,
+  match: under("/finance/income"),
+};
+
+const owedItem: NavItem = {
+  href: "/finance/owed",
+  label: "Fees owed",
+  icon: HandHelping,
+  match: under("/finance/owed"),
+};
+
+const branchItems: NavItem[] = [incomeItem, owedItem, teachersItem, classesItem];
+
+const financeItems: NavItem[] = [
+  {
+    href: "/finance",
+    label: "Dashboard",
+    icon: ChartNoAxesColumn,
+    match: (pathname) => pathname === "/finance",
+  },
+  incomeItem,
+  owedItem,
+  { href: "/finance/expenses", label: "Expenses", icon: Receipt, match: under("/finance/expenses") },
+  {
+    href: "/finance/teacher-pay",
+    label: "Teacher pay",
+    icon: HandCoins,
+    match: under("/finance/teacher-pay"),
+  },
+  {
+    href: "/finance/budget",
+    label: "Monthly budget",
+    icon: CalendarRange,
+    match: under("/finance/budget"),
+  },
+];
 
 const adminItems: NavItem[] = [
   { href: "/admin/branches", label: "Branches", icon: Building2, match: under("/admin/branches") },
@@ -125,12 +171,21 @@ export function AppSidebar({
         </SidebarGroup>
 
         {user.role === "admin" ? (
-          <SidebarGroup>
-            <SidebarGroupLabel>Admin</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <NavMenu items={adminItems} pathname={pathname} />
-            </SidebarGroupContent>
-          </SidebarGroup>
+          <>
+            <SidebarGroup>
+              <SidebarGroupLabel>Money</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <NavMenu items={financeItems} pathname={pathname} />
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarGroup>
+              <SidebarGroupLabel>Admin</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <NavMenu items={adminItems} pathname={pathname} />
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
         ) : (
           <SidebarGroup>
             <SidebarGroupLabel>Your branch</SidebarGroupLabel>

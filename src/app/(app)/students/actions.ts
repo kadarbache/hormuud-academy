@@ -3,6 +3,7 @@
 import { refresh } from "next/cache";
 import { z } from "zod";
 import type { Prisma } from "@/generated/prisma/client";
+import { canActAtBranch } from "@/lib/access";
 import {
   deleteStudentPhoto,
   MAX_PHOTO_BYTES,
@@ -21,8 +22,16 @@ import {
   type ActionResult,
   type FieldErrors,
 } from "@/lib/action-result";
-import { formObject, isoDate, money, optionalPhone, requiredText } from "@/lib/validation";
-import { canActAtBranch, canEditStudent } from "./access";
+import {
+  formObject,
+  isoDate,
+  money,
+  optionalPhone,
+  paymentMethod,
+  requiredText,
+} from "@/lib/validation";
+import { registrationFeePayment } from "../finance/payments";
+import { canEditStudent } from "./access";
 import type { PhoneMatch } from "./types";
 
 const profileSchema = z.object({
@@ -74,46 +83,74 @@ function readPhoto(formData: FormData): { file: File | null; error?: string } {
   return { file: value };
 }
 
+type BranchSkillForEnrollment = {
+  id: string;
+  skillId: string;
+  branchId: string;
+  skill: { durationMonths: number; registrationFee: Prisma.Decimal; monthlyFee: Prisma.Decimal };
+};
+
+/** The registration fee handed over as the student joins, if it was. */
+type FeePaidNow = { on: string; method: "CASH" | "ZAAD" | "EDAHAB" | "BANK" } | null;
+
 /**
- * Enrollment rows for skills at one branch, starting on one date. `paidOn` is
- * set when the student paid the registration fees there and then.
+ * One enrollment, with its registration fee payment attached when the student
+ * pays there and then. A skill with no registration fee has nothing to pay,
+ * so it gets no payment however the box was ticked.
  */
-function enrollmentRows(
+function enrollmentData(
   studentId: string,
   createdById: string,
   startDate: string,
-  branchSkills: {
-    id: string;
-    skillId: string;
-    skill: { durationMonths: number; registrationFee: Prisma.Decimal; monthlyFee: Prisma.Decimal };
-  }[],
-  paidOn: string | null,
+  bs: BranchSkillForEnrollment,
+  paid: FeePaidNow,
 ) {
-  return branchSkills.map((bs) => {
-    // A skill with no registration fee has nothing to mark paid.
-    const paid = paidOn !== null && bs.skill.registrationFee.gt(0);
-    return {
-      studentId,
-      branchSkillId: bs.id,
-      skillId: bs.skillId,
-      startDate: toDbDate(startDate),
-      endDate: toDbDate(addMonths(startDate, bs.skill.durationMonths)),
-      // Copied now so a later price change doesn't touch what this student joined at.
-      monthlyFee: bs.skill.monthlyFee,
-      registrationFee: bs.skill.registrationFee,
-      registrationFeePaidOn: paid ? toDbDate(paidOn) : null,
-      registrationFeeRecordedById: paid ? createdById : null,
-      createdById,
-    };
-  });
+  const owed = bs.skill.registrationFee.gt(0);
+  return {
+    studentId,
+    branchSkillId: bs.id,
+    skillId: bs.skillId,
+    startDate: toDbDate(startDate),
+    endDate: toDbDate(addMonths(startDate, bs.skill.durationMonths)),
+    // Copied now so a later price change doesn't touch what this student joined at.
+    monthlyFee: bs.skill.monthlyFee,
+    registrationFee: bs.skill.registrationFee,
+    createdById,
+    ...(paid && owed
+      ? {
+          payments: {
+            create: [
+              registrationFeePayment({
+                studentId,
+                branchId: bs.branchId,
+                amount: bs.skill.registrationFee,
+                paidOn: paid.on,
+                method: paid.method,
+                recordedById: createdById,
+              }),
+            ],
+          },
+        }
+      : {}),
+  };
 }
 
-/** An enrollment with what the checks and messages below need. */
-function findEnrollment(id: string) {
-  return prisma.enrollment.findUnique({
-    where: { id },
-    include: { skill: { select: { name: true } }, branchSkill: { select: { branchId: true } } },
-  });
+/**
+ * How the registration fees on this form were paid, when the box says they
+ * were paid now. The method is only asked for once the box is ticked, so an
+ * unticked form has nothing to check.
+ */
+function readFeePaidNow(
+  values: Record<string, string>,
+  paidOn: string,
+): { paid: FeePaidNow; errors: FieldErrors } {
+  if (values.registrationFeePaid !== "on") return { paid: null, errors: {} };
+
+  const method = paymentMethod().safeParse(values.registrationFeeMethod);
+  if (!method.success) {
+    return { paid: null, errors: { registrationFeeMethod: ["Pick how the fee was paid."] } };
+  }
+  return { paid: { on: paidOn, method: method.data }, errors: {} };
 }
 
 export async function registerStudent(formData: FormData): Promise<ActionResult<{ id: string }>> {
@@ -128,12 +165,17 @@ export async function registerStudent(formData: FormData): Promise<ActionResult<
   const photo = readPhoto(formData);
   const homeBranchId = user.role === "admin" ? values.homeBranchId : user.branchId;
 
+  // Paid at registration means paid on the registration date. For a student
+  // entered from the old system, that's their original date, not today.
+  const fee = readFeePaidNow(values, values.registrationDate ?? "");
+
   // Collect every problem at once so the form shows them all together.
   const fieldErrors: FieldErrors = {
     ...profileErrors(values, profile),
     ...(skills.success ? {} : z.flattenError(skills.error).fieldErrors),
     ...(photo.error ? { photo: [photo.error] } : {}),
     ...(homeBranchId ? {} : { homeBranchId: ["Pick the branch the student registers at."] }),
+    ...fee.errors,
   };
   if (!profile.success || !skills.success || !homeBranchId || hasErrors(fieldErrors)) {
     return failure("Check the highlighted fields.", fieldErrors);
@@ -156,9 +198,6 @@ export async function registerStudent(formData: FormData): Promise<ActionResult<
 
   try {
     const { registrationDate, ...details } = profile.data;
-    // Paid at registration means paid on the registration date. For a student
-    // entered from the old system, that's their original date, not today.
-    const paidOn = values.registrationFeePaid === "on" ? registrationDate : null;
     const student = await prisma.$transaction(async (tx) => {
       const created = await tx.student.create({
         data: {
@@ -170,9 +209,19 @@ export async function registerStudent(formData: FormData): Promise<ActionResult<
           photoPublicId: uploaded?.publicId,
         },
       });
-      await tx.enrollment.createMany({
-        data: enrollmentRows(created.id, user.id, skills.data.startDate, branchSkills, paidOn),
-      });
+      // One at a time, not createMany: each enrollment's registration fee
+      // payment needs the id of the enrollment it belongs to.
+      for (const bs of branchSkills) {
+        await tx.enrollment.create({
+          data: enrollmentData(
+            created.id,
+            user.id,
+            skills.data.startDate,
+            { ...bs, branchId: homeBranchId },
+            fee.paid,
+          ),
+        });
+      }
       return created;
     });
 
@@ -272,11 +321,14 @@ export async function enrollStudent(studentId: string, formData: FormData): Prom
   }
 
   // Paid now means paid today, whatever the start date.
-  const paidOn = values.registrationFeePaid === "on" ? collegeToday() : null;
+  const fee = readFeePaidNow(values, collegeToday());
+  if (Object.keys(fee.errors).length > 0) {
+    return failure("Check the highlighted fields.", fee.errors);
+  }
 
   try {
-    await prisma.enrollment.createMany({
-      data: enrollmentRows(student.id, user.id, parsed.data.startDate, [branchSkill], paidOn),
+    await prisma.enrollment.create({
+      data: enrollmentData(student.id, user.id, parsed.data.startDate, branchSkill, fee.paid),
     });
   } catch (error) {
     // The database allows one active enrollment per skill per student, at any branch.
@@ -295,7 +347,10 @@ export async function setEnrollmentStatus(
   status: "ACTIVE" | "FINISHED" | "DROPPED",
 ): Promise<ActionResult> {
   const user = await requireUser();
-  const enrollment = await findEnrollment(enrollmentId);
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { id: enrollmentId },
+    include: { skill: { select: { name: true } }, branchSkill: { select: { branchId: true } } },
+  });
   if (!enrollment) return failure("That skill record no longer exists.");
   if (!canActAtBranch(user, enrollment.branchSkill.branchId)) {
     return failure("Only staff at the skill's branch can change it.");
@@ -323,43 +378,9 @@ export async function setEnrollmentStatus(
 
 // --- Registration fees --------------------------------------------------------
 //
-// Staff at the skill's branch record a payment. Only the admin changes a fee
-// or takes a payment back, so the money a branch takes in stays checkable.
-
-export async function recordRegistrationFee(
-  enrollmentId: string,
-  formData: FormData,
-): Promise<ActionResult> {
-  const user = await requireUser();
-  const parsed = z
-    .object({
-      paidOn: isoDate("Pick the day the student paid.").refine(
-        (value) => value <= collegeToday(),
-        "The payment date can't be in the future.",
-      ),
-    })
-    .safeParse(formObject(formData));
-  if (!parsed.success) return invalid(parsed.error);
-
-  const enrollment = await findEnrollment(enrollmentId);
-  if (!enrollment) return failure("That skill record no longer exists.");
-  if (!canActAtBranch(user, enrollment.branchSkill.branchId)) {
-    return failure("Only staff at the skill's branch can record its payments.");
-  }
-
-  // Only a fee that is still owed changes, so a second click can't record it
-  // twice, and a waiver saved a moment earlier isn't overwritten.
-  const { count } = await prisma.enrollment.updateMany({
-    where: { id: enrollmentId, registrationFee: { gt: 0 }, registrationFeePaidOn: null },
-    data: { registrationFeePaidOn: toDbDate(parsed.data.paidOn), registrationFeeRecordedById: user.id },
-  });
-  if (count === 0) {
-    return failure("This registration fee is already paid or waived. Reload the page to see it.");
-  }
-
-  refresh();
-  return success(`${enrollment.skill.name} registration fee recorded as paid.`);
-}
+// The fee itself lives on the enrollment; whether it was paid is a payment in
+// the ledger, recorded by finance/income/actions.ts. Only the admin lowers or
+// waives a fee, and only while it's unpaid.
 
 /** Lowers or waives one student's fee for one skill. Admin only. */
 export async function changeRegistrationFee(
@@ -372,16 +393,21 @@ export async function changeRegistrationFee(
     .safeParse(formObject(formData));
   if (!parsed.success) return invalid(parsed.error);
 
-  const enrollment = await findEnrollment(enrollmentId);
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { id: enrollmentId },
+    include: { skill: { select: { name: true } } },
+  });
   if (!enrollment) return failure("That skill record no longer exists.");
 
-  // A paid fee stays at what was paid. To change it, undo the payment first.
+  // A paid fee stays at what was paid, so what the books say the student
+  // handed over always matches the fee on record. The check rides along in
+  // the update itself, so a payment recorded this moment still wins.
   const { count } = await prisma.enrollment.updateMany({
-    where: { id: enrollmentId, registrationFeePaidOn: null },
+    where: { id: enrollmentId, payments: { none: { category: "REGISTRATION_FEE" } } },
     data: { registrationFee: parsed.data.registrationFee },
   });
   if (count === 0) {
-    return failure("This registration fee is already paid. Undo the payment first to change it.");
+    return failure("This registration fee is already paid. Remove the payment first to change it.");
   }
 
   refresh();
@@ -391,22 +417,6 @@ export async function changeRegistrationFee(
       ? `${enrollment.skill.name} registration fee waived.`
       : `${enrollment.skill.name} registration fee set to ${formatMoney(fee)}.`,
   );
-}
-
-/** For a payment recorded by mistake: the fee goes back to unpaid. Admin only. */
-export async function undoRegistrationFeePayment(enrollmentId: string): Promise<ActionResult> {
-  await requireAdmin();
-  const enrollment = await findEnrollment(enrollmentId);
-  if (!enrollment) return failure("That skill record no longer exists.");
-  if (!enrollment.registrationFeePaidOn) return success();
-
-  await prisma.enrollment.update({
-    where: { id: enrollmentId },
-    data: { registrationFeePaidOn: null, registrationFeeRecordedById: null },
-  });
-
-  refresh();
-  return success(`${enrollment.skill.name} registration fee is unpaid again.`);
 }
 
 /** For duplicates and typing mistakes. Removes the student and all their skills. */
