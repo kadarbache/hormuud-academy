@@ -1,45 +1,34 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { SelectInput, type Option } from "@/components/select-input";
+
+const themeOptions: Option[] = [
+  { value: "light", label: "Light", icon: <Sun /> },
+  { value: "dark", label: "Dark", icon: <Moon /> },
+  { value: "system", label: "System", icon: <Monitor /> },
+];
+
+/** Nothing to subscribe to: the value only differs between server and browser. */
+const subscribe = () => () => {};
 
 export function ThemeToggle({ className }: { className?: string }) {
   const { theme, setTheme } = useTheme();
+  // The server doesn't know the reader's theme, so show the box empty until
+  // the browser has told us which one it is.
+  const ready = useSyncExternalStore(subscribe, () => true, () => false);
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className={className}>
-          {/* Both icons render so the server HTML matches; CSS shows the right one. */}
-          <Sun className="dark:hidden" />
-          <Moon className="hidden dark:block" />
-          <span className="sr-only">Change theme</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuRadioGroup value={theme} onValueChange={setTheme}>
-          <DropdownMenuRadioItem value="light">
-            <Sun />
-            Light
-          </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="dark">
-            <Moon />
-            Dark
-          </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="system">
-            <Monitor />
-            System
-          </DropdownMenuRadioItem>
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <SelectInput
+      options={themeOptions}
+      value={ready ? theme : undefined}
+      onValueChange={setTheme}
+      placeholder="Theme"
+      size="sm"
+      className={className}
+      aria-label="Theme"
+    />
   );
 }
