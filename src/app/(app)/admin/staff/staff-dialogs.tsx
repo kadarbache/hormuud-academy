@@ -56,7 +56,7 @@ export function StaffAccountDialog({
             name="role"
             options={roleOptions}
             value={role}
-            onChange={(event) => setRole(event.target.value as "admin" | "staff")}
+            onValueChange={(value) => setRole(value as "admin" | "staff")}
             disabled={isSelf}
             description={
               isSelf

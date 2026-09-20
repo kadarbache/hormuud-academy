@@ -66,9 +66,9 @@ export function RegistrationForm({
                 options={branches}
                 placeholder="Pick a branch"
                 value={branchId}
-                onChange={(event) => {
+                onValueChange={(value) => {
                   // Another branch has other skills, so the ticked ones go.
-                  setBranchId(event.target.value);
+                  setBranchId(value);
                   setPicked([]);
                 }}
                 description="The branch the student registers at."

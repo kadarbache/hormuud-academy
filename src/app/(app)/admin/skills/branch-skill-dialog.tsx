@@ -59,7 +59,7 @@ export function BranchSkillDialog({
               options={branches}
               placeholder="Pick a branch"
               value={branchId}
-              onChange={(event) => setBranchId(event.target.value)}
+              onValueChange={setBranchId}
               errors={errors.branchId}
             />
           )}

@@ -28,17 +28,22 @@ export type StudentFilters = {
   page: number;
 };
 
+export const ANY_SKILL = "any";
+
 export function readFilters(params: Record<string, string | string[] | undefined>): StudentFilters {
   const one = (key: string) => {
     const value = params[key];
     return (Array.isArray(value) ? value[0] : value) ?? "";
   };
   const status = one("status");
+  // The skill picker needs a value for "no skill filter"; an empty one would
+  // leave the box blank instead of saying "Any skill".
+  const skill = one("skill");
   const page = Number.parseInt(one("page"), 10);
   return {
     q: one("q").trim(),
     status: status === "active" || status === "inactive" ? status : "all",
-    skillId: one("skill"),
+    skillId: skill === ANY_SKILL ? "" : skill,
     pastEnd: one("pastEnd") === "1",
     unpaid: one("unpaid") === "1",
     page: Number.isFinite(page) && page > 0 ? page : 1,

@@ -46,7 +46,7 @@ export function EnrollDialog({
             }))}
             placeholder="Pick a skill"
             value={selectedId}
-            onChange={(event) => setSelectedId(event.target.value)}
+            onValueChange={setSelectedId}
             errors={errors.branchSkillId}
           />
           <TextField

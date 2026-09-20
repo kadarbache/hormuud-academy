@@ -8,10 +8,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@/components/ui/native-select";
+import { SelectInput, type Option } from "@/components/select-input";
 
 type BaseProps = {
   label: string;
@@ -44,7 +41,7 @@ export function TextField({
   );
 }
 
-export type Option = { value: string; label: string };
+export type { Option };
 
 export function SelectField({
   label,
@@ -54,33 +51,23 @@ export function SelectField({
   options,
   placeholder,
   ...select
-}: BaseProps & {
-  options: Option[];
-  /** Shown as an empty first choice, so nothing is picked by accident. */
-  placeholder?: string;
-} & Omit<React.ComponentProps<typeof NativeSelect>, "name" | "id">) {
+}: BaseProps &
+  Omit<React.ComponentProps<typeof SelectInput>, "name" | "id" | "aria-invalid">) {
   const id = useId();
   const invalid = Boolean(errors?.length);
 
   return (
     <Field data-invalid={invalid || undefined}>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      <NativeSelect
+      <SelectInput
         id={id}
         name={name}
+        options={options}
+        placeholder={placeholder}
         className="w-full"
         aria-invalid={invalid || undefined}
         {...select}
-      >
-        {placeholder !== undefined && (
-          <NativeSelectOption value="">{placeholder}</NativeSelectOption>
-        )}
-        {options.map((option) => (
-          <NativeSelectOption key={option.value} value={option.value}>
-            {option.label}
-          </NativeSelectOption>
-        ))}
-      </NativeSelect>
+      />
       {description && <FieldDescription>{description}</FieldDescription>}
       <FieldError errors={toFieldErrors(errors)} />
     </Field>

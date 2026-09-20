@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import {
   Table,
   TableBody,
@@ -18,10 +17,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PageHeader } from "@/components/page-header";
+import { SelectInput, type Option } from "@/components/select-input";
 import { EmptyRow } from "@/components/status-badge";
 import { formatStudentNumber } from "@/lib/format";
 import { requireUser } from "@/lib/session";
 import {
+  ANY_SKILL,
   countPastEnd,
   countUnpaidRegistrationFees,
   listStudents,
@@ -30,6 +31,12 @@ import {
   skillFilterOptions,
   type StudentFilters,
 } from "./queries";
+
+const statusOptions: Option[] = [
+  { value: "all", label: "All" },
+  { value: "active", label: "Active" },
+  { value: "inactive", label: "Inactive" },
+];
 
 const warning = "border-warning-border bg-warning text-warning-foreground";
 
@@ -116,22 +123,26 @@ export default async function StudentsPage({ searchParams }: PageProps<"/student
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="status">Status</Label>
-          <NativeSelect id="status" name="status" defaultValue={filters.status}>
-            <NativeSelectOption value="all">All</NativeSelectOption>
-            <NativeSelectOption value="active">Active</NativeSelectOption>
-            <NativeSelectOption value="inactive">Inactive</NativeSelectOption>
-          </NativeSelect>
+          <SelectInput
+            id="status"
+            name="status"
+            options={statusOptions}
+            defaultValue={filters.status}
+            className="w-36"
+          />
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="skill">Taking skill</Label>
-          <NativeSelect id="skill" name="skill" defaultValue={filters.skillId}>
-            <NativeSelectOption value="">Any skill</NativeSelectOption>
-            {skills.map((skill) => (
-              <NativeSelectOption key={skill.id} value={skill.id}>
-                {skill.name}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
+          <SelectInput
+            id="skill"
+            name="skill"
+            options={[
+              { value: ANY_SKILL, label: "Any skill" },
+              ...skills.map((skill) => ({ value: skill.id, label: skill.name })),
+            ]}
+            defaultValue={filters.skillId || ANY_SKILL}
+            className="w-52"
+          />
         </div>
         <div className="flex h-9 items-center gap-2">
           <Checkbox id="pastEnd" name="pastEnd" value="1" defaultChecked={filters.pastEnd} />
