@@ -67,3 +67,74 @@ export function formatDate(date: Date | string): string {
     year: "numeric",
   }).format(value);
 }
+
+// Months. The financial screens work in whole months as often as in days: a
+// budget is set for a month, and a monthly fee pays for one. A month is
+// written YYYY-MM, which is what <input type="month"> gives, and stored as
+// that month's first day in a DATE column.
+
+const ISO_MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+/** This month at the college, as YYYY-MM. */
+export function collegeMonth(): string {
+  return collegeToday().slice(0, 7);
+}
+
+/** The month a day falls in. "2026-09-19" -> "2026-09" */
+export function monthOf(isoDate: string): string {
+  return isoDate.slice(0, 7);
+}
+
+export function isIsoMonth(value: string) {
+  return ISO_MONTH.test(value);
+}
+
+/** The first day of a month, as YYYY-MM-DD. */
+export function monthStart(isoMonth: string): string {
+  return `${isoMonth}-01`;
+}
+
+/** The last day of a month, as YYYY-MM-DD. */
+export function monthEnd(isoMonth: string): string {
+  return addDays(addMonths(monthStart(isoMonth), 1), -1);
+}
+
+/** A month as the Date Prisma writes to a DATE column. */
+export function toDbMonth(isoMonth: string): Date {
+  return toDbDate(monthStart(isoMonth));
+}
+
+/** A DATE column holding a month's first day, back to YYYY-MM. */
+export function fromDbMonth(date: Date): string {
+  return fromDbDate(date).slice(0, 7);
+}
+
+/** Adds whole months to a month. "2026-12" plus 1 is "2027-01". */
+export function addMonthsToMonth(isoMonth: string, months: number): string {
+  return monthOf(addMonths(monthStart(isoMonth), months));
+}
+
+/** Every month from one to another, both included. Empty if they're the wrong way round. */
+export function monthsBetween(from: string, to: string): string[] {
+  const months: string[] = [];
+  for (let month = from; month <= to; month = addMonthsToMonth(month, 1)) {
+    months.push(month);
+  }
+  return months;
+}
+
+export function addDays(isoDate: string, days: number): string {
+  const date = toDbDate(isoDate);
+  date.setUTCDate(date.getUTCDate() + days);
+  return fromDbDate(date);
+}
+
+/** Sept 2026 */
+export function formatMonth(month: string | Date): string {
+  const isoMonth = typeof month === "string" ? month : fromDbMonth(month);
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "UTC",
+    month: "short",
+    year: "numeric",
+  }).format(toDbMonth(isoMonth));
+}
