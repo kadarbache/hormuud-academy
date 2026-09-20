@@ -1,12 +1,29 @@
-// Sample branches, classes, teachers, skills and students for trying the app
-// on a local database. Never run this against the college's real database.
+// Sample branches, classes, teachers, skills, students and money for trying
+// the app on a local database. Never run this against the college's real
+// database.
 //
 //   pnpm db:seed && pnpm db:demo
 import "dotenv/config";
 import { randomBytes } from "node:crypto";
 import { auth } from "../src/lib/auth";
-import { addMonths, collegeToday, toDbDate } from "../src/lib/dates";
+import { addMonths, collegeToday, monthOf, toDbDate, toDbMonth } from "../src/lib/dates";
 import { prisma } from "../src/lib/prisma";
+
+type Method = "CASH" | "ZAAD" | "EDAHAB" | "BANK";
+
+/** Spreads the demo payments across the methods so the day's split isn't flat. */
+const methods: Method[] = ["CASH", "ZAAD", "CASH", "EDAHAB", "CASH", "BANK"];
+const methodFor = (n: number) => methods[n % methods.length];
+
+/** The months from a start date up to this month, both included. */
+function monthsUpToNow(startDate: string, months: number, today: string) {
+  const last = [monthOf(addMonths(startDate, months - 1)), monthOf(today)].sort()[0];
+  const list: string[] = [];
+  for (let month = monthOf(startDate); month <= last; month = monthOf(addMonths(`${month}-01`, 1))) {
+    list.push(month);
+  }
+  return list;
+}
 
 async function main() {
   if (await prisma.branch.count()) {
@@ -33,15 +50,20 @@ async function main() {
     prisma.classroom.create({ data: { name: "Room B", branchId: second.id } }),
   ]);
 
-  const teacher = (name: string, branchIds: string[]) =>
+  // Two teachers on a fixed salary, two on a share of the fees they bring in.
+  const teacher = (
+    name: string,
+    branchIds: string[],
+    pay: { salaryType: "FIXED"; fixedSalary: string } | { salaryType: "PERCENTAGE"; percentageRate: string },
+  ) =>
     prisma.teacher.create({
-      data: { name, branches: { create: branchIds.map((branchId) => ({ branchId })) } },
+      data: { name, ...pay, branches: { create: branchIds.map((branchId) => ({ branchId })) } },
     });
   const [t1, t2, t3, t4] = await Promise.all([
-    teacher("Demo Teacher 1", [main.id]),
-    teacher("Demo Teacher 2", [main.id]),
-    teacher("Demo Teacher 3", [main.id, second.id]),
-    teacher("Demo Teacher 4", [second.id]),
+    teacher("Demo Teacher 1", [main.id], { salaryType: "FIXED", fixedSalary: "200" }),
+    teacher("Demo Teacher 2", [main.id], { salaryType: "PERCENTAGE", percentageRate: "30" }),
+    teacher("Demo Teacher 3", [main.id, second.id], { salaryType: "PERCENTAGE", percentageRate: "25" }),
+    teacher("Demo Teacher 4", [second.id], { salaryType: "FIXED", fixedSalary: "150" }),
   ]);
 
   const skill = (
@@ -81,16 +103,24 @@ async function main() {
 
   const today = collegeToday();
   const monthsAgo = (months: number) => addMonths(today, -months);
+
   type Offer = typeof mainComputer & {
     durationMonths: number;
     registrationFee: string;
     fee: string;
+    /** The percentage the teacher earns, or null when they're on a salary. */
+    rate: string | null;
   };
-  const withSkill = (bs: typeof mainComputer, s: typeof computer): Offer => ({
+  const withSkill = (
+    bs: typeof mainComputer,
+    s: typeof computer,
+    teach: typeof t1,
+  ): Offer => ({
     ...bs,
     durationMonths: s.durationMonths,
     registrationFee: s.registrationFee.toString(),
     fee: s.monthlyFee.toString(),
+    rate: teach.salaryType === "PERCENTAGE" ? (teach.percentageRate?.toString() ?? null) : null,
   });
 
   const students: {
@@ -100,8 +130,15 @@ async function main() {
     responsiblePhone?: string;
     homeBranchId: string;
     registered: string;
-    /** `paid` means the registration fee was paid on the start date. */
-    skills: { offer: Offer; start: string; paid: boolean; status?: "FINISHED" | "DROPPED" }[];
+    skills: {
+      offer: Offer;
+      start: string;
+      /** `paid` means the registration fee was paid on the start date. */
+      paid: boolean;
+      /** How many months of fees have been paid, oldest first. */
+      monthsPaid: number;
+      status?: "FINISHED" | "DROPPED";
+    }[];
   }[] = [
     {
       fullName: "Demo Student One",
@@ -110,8 +147,18 @@ async function main() {
       homeBranchId: main.id,
       registered: monthsAgo(1),
       skills: [
-        { offer: withSkill(mainComputer, computer), start: monthsAgo(1), paid: true },
-        { offer: withSkill(mainTailoring, tailoring), start: monthsAgo(1), paid: true },
+        {
+          offer: withSkill(mainComputer, computer, t1),
+          start: monthsAgo(1),
+          paid: true,
+          monthsPaid: 2,
+        },
+        {
+          offer: withSkill(mainTailoring, tailoring, t3),
+          start: monthsAgo(1),
+          paid: true,
+          monthsPaid: 1,
+        },
       ],
     },
     {
@@ -121,8 +168,15 @@ async function main() {
       homeBranchId: main.id,
       registered: monthsAgo(5),
       // Started five months ago on a four-month skill: past its end date.
-      // Never paid the registration fee.
-      skills: [{ offer: withSkill(mainDesign, design), start: monthsAgo(5), paid: false }],
+      // Never paid the registration fee, and two months are still owed.
+      skills: [
+        {
+          offer: withSkill(mainDesign, design, t2),
+          start: monthsAgo(5),
+          paid: false,
+          monthsPaid: 2,
+        },
+      ],
     },
     {
       fullName: "Demo Student Three",
@@ -133,8 +187,18 @@ async function main() {
       // Registered at the second branch, also taking a skill at the main one,
       // whose registration fee is still unpaid.
       skills: [
-        { offer: withSkill(secondElectrical, electrical), start: monthsAgo(2), paid: true },
-        { offer: withSkill(mainDesign, design), start: monthsAgo(1), paid: false },
+        {
+          offer: withSkill(secondElectrical, electrical, t3),
+          start: monthsAgo(2),
+          paid: true,
+          monthsPaid: 3,
+        },
+        {
+          offer: withSkill(mainDesign, design, t2),
+          start: monthsAgo(1),
+          paid: false,
+          monthsPaid: 1,
+        },
       ],
     },
     {
@@ -145,17 +209,19 @@ async function main() {
       registered: monthsAgo(8),
       skills: [
         {
-          offer: withSkill(secondComputer, computer),
+          offer: withSkill(secondComputer, computer, t4),
           start: monthsAgo(8),
           paid: true,
+          monthsPaid: 3,
           status: "FINISHED",
         },
       ],
     },
   ];
 
+  let payments = 0;
   for (const student of students) {
-    await prisma.student.create({
+    const created = await prisma.student.create({
       data: {
         fullName: student.fullName,
         sex: student.sex,
@@ -164,26 +230,159 @@ async function main() {
         homeBranchId: student.homeBranchId,
         registrationDate: toDbDate(student.registered),
         createdById: admin.id,
-        enrollments: {
-          create: student.skills.map(({ offer, start, paid, status }) => ({
-            branchSkillId: offer.id,
-            skillId: offer.skillId,
-            startDate: toDbDate(start),
-            endDate: toDbDate(addMonths(start, offer.durationMonths)),
-            monthlyFee: offer.fee,
-            registrationFee: offer.registrationFee,
-            registrationFeePaidOn: paid ? toDbDate(start) : null,
-            registrationFeeRecordedById: paid ? admin.id : null,
-            status: status ?? "ACTIVE",
-            statusChangedAt: status ? new Date() : null,
-            createdById: admin.id,
-          })),
+      },
+    });
+
+    for (const { offer, start, paid, monthsPaid, status } of student.skills) {
+      // Created one at a time, not with createMany, because each fee payment
+      // needs the id of the enrollment it belongs to.
+      const enrollment = await prisma.enrollment.create({
+        data: {
+          studentId: created.id,
+          branchSkillId: offer.id,
+          skillId: offer.skillId,
+          startDate: toDbDate(start),
+          endDate: toDbDate(addMonths(start, offer.durationMonths)),
+          monthlyFee: offer.fee,
+          registrationFee: offer.registrationFee,
+          status: status ?? "ACTIVE",
+          statusChangedAt: status ? new Date() : null,
+          createdById: admin.id,
         },
+      });
+
+      if (paid) {
+        await prisma.payment.create({
+          data: {
+            category: "REGISTRATION_FEE",
+            method: methodFor(payments++),
+            amount: offer.registrationFee,
+            paidOn: toDbDate(start),
+            branchId: offer.branchId,
+            studentId: created.id,
+            enrollmentId: enrollment.id,
+            recordedById: admin.id,
+          },
+        });
+      }
+
+      // The oldest months are the ones that have been paid; whatever is left
+      // shows on the student's page as owed.
+      for (const month of monthsUpToNow(start, offer.durationMonths, today).slice(0, monthsPaid)) {
+        const share = offer.rate
+          ? ((Math.round(Number(offer.fee) * 100 * Number(offer.rate)) / 100) / 100).toFixed(2)
+          : null;
+        await prisma.payment.create({
+          data: {
+            category: "MONTHLY_FEE",
+            method: methodFor(payments++),
+            amount: offer.fee,
+            paidOn: toDbDate(`${month}-05` <= today ? `${month}-05` : today),
+            forMonth: toDbMonth(month),
+            branchId: offer.branchId,
+            studentId: created.id,
+            enrollmentId: enrollment.id,
+            recordedById: admin.id,
+            ...(share
+              ? { teacherId: offer.teacherId, teacherSharePercent: offer.rate, teacherShare: share }
+              : {}),
+          },
+        });
+      }
+    }
+  }
+
+  // Books sold over the counter, with no student behind them.
+  await prisma.payment.create({
+    data: {
+      category: "BOOKS",
+      method: "CASH",
+      amount: "30",
+      paidOn: toDbDate(today),
+      branchId: main.id,
+      note: "Two design textbooks",
+      recordedById: admin.id,
+    },
+  });
+
+  // Running costs for this month and last, so the budget has something to
+  // compare against.
+  const expense = (
+    branchId: string,
+    category: "RENT" | "ELECTRICITY" | "INTERNET" | "STATIONERY",
+    amount: string,
+    month: string,
+  ) =>
+    prisma.expense.create({
+      data: {
+        category,
+        method: "CASH",
+        amount,
+        spentOn: toDbDate(`${month}-03` <= today ? `${month}-03` : today),
+        branchId,
+        recordedById: admin.id,
+      },
+    });
+  for (const month of [monthOf(monthsAgo(1)), monthOf(today)]) {
+    await expense(main.id, "RENT", "300", month);
+    await expense(main.id, "ELECTRICITY", "60", month);
+    await expense(main.id, "INTERNET", "35", month);
+    await expense(second.id, "RENT", "200", month);
+    await expense(second.id, "ELECTRICITY", "40", month);
+  }
+  await expense(main.id, "STATIONERY", "25", monthOf(today));
+
+  // Last month's salaries went out; this month's haven't yet.
+  const lastMonth = monthOf(monthsAgo(1));
+  for (const [teach, branchId, amount] of [
+    [t1, main.id, "200"],
+    [t4, second.id, "150"],
+  ] as const) {
+    await prisma.expense.create({
+      data: {
+        category: "TEACHER_SALARY",
+        method: "CASH",
+        amount,
+        spentOn: toDbDate(`${lastMonth}-28` <= today ? `${lastMonth}-28` : today),
+        forMonth: toDbMonth(lastMonth),
+        branchId,
+        teacherId: teach.id,
+        recordedById: admin.id,
       },
     });
   }
 
+  // A plan for this month at each branch, to compare against.
+  const thisMonth = monthOf(today);
+  const plan = (branchId: string, expectedIncome: string, lines: [string, string][]) =>
+    prisma.monthlyBudget.create({
+      data: {
+        branchId,
+        month: toDbMonth(thisMonth),
+        expectedIncome,
+        savedById: admin.id,
+        lines: {
+          create: lines.map(([category, amount]) => ({
+            category: category as "RENT",
+            amount,
+          })),
+        },
+      },
+    });
+  await plan(main.id, "600", [
+    ["RENT", "300"],
+    ["ELECTRICITY", "70"],
+    ["INTERNET", "35"],
+    ["TEACHER_SALARY", "250"],
+  ]);
+  await plan(second.id, "400", [
+    ["RENT", "200"],
+    ["ELECTRICITY", "40"],
+    ["TEACHER_SALARY", "150"],
+  ]);
+
   console.log("Demo data added: 2 branches, 4 skills, 4 teachers, 4 students.");
+  console.log(`Money: ${payments + 1} payments, expenses for two months, and this month's budget.`);
   console.log(`Branch staff login for Main Branch: staff@college.local / ${staffPassword}`);
 }
 
