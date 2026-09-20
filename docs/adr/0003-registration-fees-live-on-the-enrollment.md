@@ -1,3 +1,5 @@
 # Registration fees live on the enrollment
 
 The registration fee is paid once for each skill a student starts, so each enrollment keeps its own copy of the skill's fee, the day it was paid and who recorded it, the same way it keeps the monthly fee. There is no payments table yet: monthly fee payments will need one, and designing it around a single kind of payment now would mean guessing at needs nobody knows yet. When that table comes, the paid registration fees move into it. Until then a fee is either paid in full or unpaid, the admin can change a fee only while it's unpaid (so what was paid always equals the fee on record), and only the admin can take a recorded payment back.
+
+**Superseded in part by [0004](0004-one-ledger-for-every-payment.md).** The payments table now exists and the paid registration fees have moved into it, as this decision anticipated. What stays true: the fee itself still lives on the enrollment, one per skill the student starts, a fee is paid in full or unpaid, the admin can change one only while it's unpaid, and only the admin can take a recorded payment back.

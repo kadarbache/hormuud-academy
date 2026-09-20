@@ -2,8 +2,11 @@
 
 Student registration and skills for Hormuud Academy, across all its branches.
 
-Phase 1 covers branches, the skill catalog, teachers, classes, staff accounts, student registration, enrollments and registration fees. Monthly fee payments, attendance, exams, salaries, expenses and reports come in later phases.
+Phase 1 covers branches, the skill catalog, teachers, classes, staff accounts, student registration, enrollments and registration fees.
 
+Phase 2 is the money: every payment in one ledger, monthly fees tracked a month at a time, income by day and by category, a list of everyone who still owes, expenses per branch, teachers paid a fixed salary or a share of the fees they bring in, and a budget per branch per month to compare against. Attendance, exams and certificates come later.
+
+- [docs/system-guide.md](docs/system-guide.md) explains the whole system from the start: the stack, every library, the architecture, the database and every screen.
 - [CONTEXT.md](CONTEXT.md) defines the words this project uses: skill, branch skill, class, enrollment and the rest.
 - [docs/adr](docs/adr) records the decisions everything else depends on, and why they were made.
 
@@ -77,5 +80,6 @@ Leave `DATABASE_POOL_MAX` and `SHADOW_DATABASE_URL` unset in production.
 - `src/app/(app)/students` has the student list, registration, profile and edit screens.
 - `src/app/(app)/admin` has the admin-only setup screens: branches, skills, categories and staff accounts.
 - `src/app/(app)/teachers` and `src/app/(app)/classes` are open to everyone. Admins manage them; branch staff see their own branch's, read-only.
-- `src/app/(app)/students/access.ts` decides which students and enrollments each staff member can see.
-- `src/lib` holds auth, the signed-in user checks, date helpers (dates follow East Africa Time) and formatting.
+- `src/app/(app)/finance` has the money screens: the dashboard, income, fees owed, expenses, teacher pay and the monthly budget. Branch staff get Income and Fees owed for their own branch; the rest is admin-only.
+- `src/app/(app)/students/access.ts` and `src/app/(app)/finance/access.ts` decide what each staff member can see.
+- `src/lib` holds auth, the signed-in user checks, the branch rule every screen shares, date and month helpers (dates follow East Africa Time), money arithmetic and formatting.

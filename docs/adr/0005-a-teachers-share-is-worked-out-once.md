@@ -1,0 +1,5 @@
+# A teacher's share is worked out once, when the payment is recorded
+
+A teacher is paid either a fixed monthly salary or a percentage of the monthly fees their students pay, never both. For a percentage teacher, the share is worked out the moment a monthly fee is recorded and kept on that payment along with the rate it was worked out at. Raising a teacher's rate therefore changes what they earn from that day on and never rewrites what they earned before, and the payments that made up their earnings are simply the payments carrying their name.
+
+What they are owed is everything they have earned minus everything paid to them, counted fresh each time, so removing a payment recorded by mistake takes its share back out on its own and no stored total can drift. Only monthly fees earn a share: a registration fee is the college's charge for admitting a student, and books and examination fees aren't teaching. Paying a teacher — a salary or a settlement of what they've earned — is an expense in the Teacher salary category naming them and the month it covers, so their pay shows up in the month's spending like every other cost.

@@ -106,3 +106,65 @@ A student with at least one Active enrollment, at any branch. Every other studen
 **Deactivate**:
 Take a branch, category, skill, branch skill, teacher, class or staff account out of new use while keeping its history. Deleting is only for records nothing uses yet.
 _Avoid_: Archive, disable
+
+### Money
+
+**Payment**:
+Money the college received, recorded once with the day it came in, the branch that took it, what it was for and how it was paid. Registration fees and monthly fees are payments, and so is a book sold over the counter.
+_Avoid_: Receipt, transaction, income record
+
+**Payment method**:
+How the money changed hands: Cash, ZAAD, eDahab, or Bank / other. ZAAD and eDahab are the mobile money services.
+_Avoid_: Channel, mode, wallet
+
+**Income category**:
+What a payment was for: Registration fee, Monthly fee, Books, Examination fee or Other income. The first two always belong to one enrollment; the rest are entered on their own.
+_Avoid_: Income type, source
+
+**Fee month**:
+The month a monthly fee pays for, not the day the money arrived. September stays paid whether it was settled in August or in November.
+_Avoid_: Billing period, cycle
+
+**Monthly fee payment**:
+One fee month of one enrollment, paid. A month is paid in full or not at all, the same way a registration fee is; the amount can be lowered for a discount, and whatever is recorded settles that month.
+_Avoid_: Instalment, invoice, bill
+
+**Owed**:
+A registration fee above zero, or a fee month the enrollment has reached, with no payment against it.
+_Avoid_: Arrears, balance, debt, outstanding
+
+**Expense**:
+Money the college spent, recorded with the day it went out, the branch it was spent for, and a category. Every expense names a branch, so what each one costs to run can be checked against what it takes in.
+_Avoid_: Cost, outgoing, bill
+
+**Expense category**:
+What the money went on: Rent, Electricity, Teacher salary, Staff salary, Internet, Stationery, Transportation, Maintenance or Other expenses.
+_Avoid_: Expense type, account
+
+**Salary type**:
+How a teacher is paid: a Fixed salary every month, or a Percentage of the monthly fees their students pay. Never both.
+_Avoid_: Pay type, contract
+
+**Percentage rate**:
+The share of every monthly fee a percentage-paid teacher earns, written as a percentage: 30 means 30%.
+_Avoid_: Commission, cut
+
+**Teacher share**:
+What one monthly fee payment earned one teacher, worked out and kept on the payment when it's recorded. Raising a teacher's rate changes what they earn from then on and never rewrites what they earned before.
+_Avoid_: Commission, accrual
+
+**Owed to a teacher**:
+Everything a percentage teacher has earned, minus everything the college has paid them. Nobody sets this by hand.
+_Avoid_: Balance, accrued earnings
+
+**Teacher pay**:
+An expense in the Teacher salary category naming the teacher and the month it covers: a fixed salary for that month, or a settlement of what a percentage teacher has earned.
+_Avoid_: Payroll, payout, wages
+
+**Monthly budget**:
+One branch's plan for one month: the income it expects and what it means to spend on each expense category. Written before the month is spent, and compared against what actually happened.
+_Avoid_: Forecast, target, projection
+
+**Net balance**:
+Income minus expenses over a day, a month or a branch. Negative means the college spent more than it took.
+_Avoid_: Profit, surplus, bottom line
