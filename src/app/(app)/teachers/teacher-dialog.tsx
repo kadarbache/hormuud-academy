@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { useId, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Field,
@@ -10,8 +10,9 @@ import {
   FieldSet,
 } from "@/components/ui/field";
 import { FormDialog } from "@/components/form-dialog";
-import { TextField, type Option } from "@/components/form-fields";
+import { SelectField, TextField, type Option } from "@/components/form-fields";
 import type { ActionResult } from "@/lib/action-result";
+import { salaryTypeOptions } from "../finance/labels";
 
 function BranchCheckboxes({
   branches,
@@ -54,9 +55,18 @@ export function TeacherDialog({
 }: {
   action: (formData: FormData) => Promise<ActionResult>;
   branches: Option[];
-  teacher?: { name: string; phone: string | null; branchIds: string[] };
+  teacher?: {
+    name: string;
+    phone: string | null;
+    branchIds: string[];
+    salaryType: string;
+    fixedSalary: string;
+    percentageRate: string;
+  };
   trigger: React.ReactNode;
 }) {
+  const [salaryType, setSalaryType] = useState(teacher?.salaryType ?? "FIXED");
+
   return (
     <FormDialog
       title={teacher ? "Edit teacher" : "Add teacher"}
@@ -79,6 +89,37 @@ export function TeacherDialog({
             checked={teacher?.branchIds ?? []}
             errors={errors.branchIds}
           />
+          <SelectField
+            label="How they're paid"
+            name="salaryType"
+            options={salaryTypeOptions}
+            value={salaryType}
+            onValueChange={setSalaryType}
+            errors={errors.salaryType}
+          />
+          {salaryType === "FIXED" ? (
+            <TextField
+              label="Monthly salary (USD)"
+              name="fixedSalary"
+              inputMode="decimal"
+              defaultValue={teacher?.fixedSalary ?? ""}
+              placeholder="200"
+              description="Paid every month whatever their students pay."
+              required
+              errors={errors.fixedSalary}
+            />
+          ) : (
+            <TextField
+              label="Percentage of monthly fees"
+              name="percentageRate"
+              inputMode="decimal"
+              defaultValue={teacher?.percentageRate ?? ""}
+              placeholder="30"
+              description="30 means they earn 30% of every monthly fee their students pay. Changing it only affects what they earn from now on."
+              required
+              errors={errors.percentageRate}
+            />
+          )}
         </>
       )}
     </FormDialog>

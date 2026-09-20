@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,8 +13,10 @@ import {
 import { ActionButton } from "@/components/action-button";
 import { PageHeader } from "@/components/page-header";
 import { ActiveBadge, EmptyRow } from "@/components/status-badge";
+import { formatMoney } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
+import { salaryTypeLabels } from "../finance/labels";
 import { TeacherDialog } from "./teacher-dialog";
 import { createTeacher, deleteTeacher, setTeacherActive, updateTeacher } from "./actions";
 
@@ -91,6 +94,7 @@ export default async function TeachersPage() {
               <TableRow>
                 <TableHead>Teacher</TableHead>
                 {isAdmin && <TableHead>Branches</TableHead>}
+                {isAdmin && <TableHead>Paid</TableHead>}
                 <TableHead>Teaches</TableHead>
                 <TableHead>Status</TableHead>
                 {isAdmin && (
@@ -122,6 +126,23 @@ export default async function TeachersPage() {
                         {teacher.branches.map((link) => link.branch.name).join(", ")}
                       </TableCell>
                     )}
+                    {isAdmin && (
+                      <TableCell>
+                        <Link
+                          href={`/finance/teacher-pay/${teacher.id}`}
+                          className="hover:underline"
+                        >
+                          {salaryTypeLabels[teacher.salaryType]}
+                        </Link>
+                        <div className="text-xs text-muted-foreground">
+                          {teacher.salaryType === "PERCENTAGE"
+                            ? teacher.percentageRate
+                              ? `${teacher.percentageRate.toString()}% of monthly fees`
+                              : "No rate set"
+                            : `${formatMoney(teacher.fixedSalary?.toString() ?? "0")} a month`}
+                        </div>
+                      </TableCell>
+                    )}
                     <TableCell className="max-w-72 whitespace-normal text-muted-foreground">
                       {teacher.branchSkills
                         .map((bs) =>
@@ -140,7 +161,14 @@ export default async function TeachersPage() {
                           <TeacherDialog
                             action={updateTeacher.bind(null, teacher.id)}
                             branches={branchOptions}
-                            teacher={{ name: teacher.name, phone: teacher.phone, branchIds }}
+                            teacher={{
+                              name: teacher.name,
+                              phone: teacher.phone,
+                              branchIds,
+                              salaryType: teacher.salaryType,
+                              fixedSalary: teacher.fixedSalary?.toString() ?? "",
+                              percentageRate: teacher.percentageRate?.toString() ?? "",
+                            }}
                             trigger={
                               <Button variant="ghost" size="sm">
                                 Edit
