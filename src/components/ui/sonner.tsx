@@ -11,6 +11,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
+      // Green for success and red for errors, so a toast stands out from the
+      // white page instead of blending into it.
+      richColors
       icons={{
         success: (
           <CircleCheckIcon className="size-4" />
@@ -30,6 +33,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
       }}
       style={
         {
+          // Sonner sets its own system font on the toaster; use the app's.
+          fontFamily: "var(--font-sans)",
           "--normal-bg": "var(--popover)",
           "--normal-text": "var(--popover-foreground)",
           "--normal-border": "var(--border)",
@@ -38,7 +43,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
       }
       toastOptions={{
         classNames: {
-          toast: "cn-toast",
+          // Sonner's own styles win over plain classes, hence the "!".
+          toast: "cn-toast text-sm! shadow-lg!",
         },
       }}
       {...props}
