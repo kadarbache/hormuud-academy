@@ -252,15 +252,35 @@ export async function recordIncome(formData: FormData): Promise<ActionResult> {
 /**
  * Takes a payment back out of the books. Only the admin can, and only for
  * money recorded by mistake: the day's income changes when they do, and so
- * does the share it earned a teacher.
+ * does the share it earned a teacher. A refund is refused once that teacher
+ * has been paid for the month, so a teacher is never left owing the college.
  */
 export async function deletePayment(id: string): Promise<ActionResult> {
   await requireAdmin();
   const payment = await prisma.payment.findUnique({
     where: { id },
-    include: { enrollment: { select: { skill: { select: { name: true } } } } },
+    include: {
+      enrollment: { select: { skill: { select: { name: true } } } },
+      teacher: { select: { name: true } },
+    },
   });
   if (!payment) return failure("That payment no longer exists.");
+
+  // Teachers are paid at the end of the month, so once one has been paid for
+  // the month a payment was taken in, the share it earned them has gone out
+  // and the college doesn't take that money back.
+  if (payment.teacherId) {
+    const month = fromDbMonth(payment.paidOn);
+    const paid = await prisma.expense.findFirst({
+      where: { category: "TEACHER_SALARY", teacherId: payment.teacherId, forMonth: toDbMonth(month) },
+      select: { id: true },
+    });
+    if (paid) {
+      return failure(
+        `${payment.teacher?.name ?? "The teacher"} has already been paid for ${formatMonth(month)}, so this payment can't be removed.`,
+      );
+    }
+  }
 
   await prisma.payment.delete({ where: { id } });
   refresh();

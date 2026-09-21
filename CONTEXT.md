@@ -154,7 +154,7 @@ The share of every monthly fee a percentage-paid teacher earns, written as a per
 _Avoid_: Commission, cut
 
 **Teacher share**:
-What one monthly fee payment earned one teacher, worked out and kept on the payment when it's recorded. Raising a teacher's rate changes what they earn from then on and never rewrites what they earned before.
+What one monthly fee payment earned one teacher, worked out and kept on the payment when it's recorded. Raising a teacher's rate changes what they earn from then on and never rewrites what they earned before. Teachers are paid at the end of the month, and once one has been paid for a month, a payment taken in that month can't be removed: the college doesn't refund money whose share has already gone to the teacher.
 _Avoid_: Commission, accrual
 
 **Owed to a teacher**:
