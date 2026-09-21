@@ -173,6 +173,10 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
   const isAdmin = user.role === "admin";
   const canEdit = canEditStudent(user, student);
   const today = collegeToday();
+  // The admin sees every enrollment, so this is the student's whole record.
+  const paidAMonthlyFee = student.enrollments.some((enrollment) =>
+    enrollment.payments.some((payment) => payment.category === "MONTHLY_FEE"),
+  );
   const enrollOptions = (
     await enrollableBranchSkills(isAdmin ? undefined : (user.branchId ?? undefined))
   ).filter((option) => !activeSkillIds.includes(option.skillId));
@@ -278,6 +282,12 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
           {isAdmin && (
             <ActionButton
               variant="destructive"
+              disabled={paidAMonthlyFee}
+              title={
+                paidAMonthlyFee
+                  ? "This student has paid monthly fees, so they can't be deleted. Drop their skills instead and they show as Inactive."
+                  : undefined
+              }
               action={deleteStudent.bind(null, student.id)}
               redirectTo="/students"
               confirm={{

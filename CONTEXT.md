@@ -105,7 +105,7 @@ An Active enrollment whose end date has gone by, waiting for staff to mark it Fi
 _Avoid_: Overdue, expired
 
 **Active student**:
-A student with at least one Active enrollment, at any branch. Every other student is an Inactive student. Nobody sets this by hand.
+A student with at least one Active enrollment, at any branch. Every other student is an Inactive student. Nobody sets this by hand: to take a student out of their classes, drop their skills. A student who has paid even one monthly fee can never be deleted, so dropping is the only way out; deleting is for duplicates and typing mistakes.
 
 **Deactivate**:
 Take a branch, category, skill, branch skill, teacher, class or staff account out of new use while keeping its history. Deleting is only for records nothing uses yet.

@@ -422,11 +422,24 @@ export async function changeRegistrationFee(
   );
 }
 
-/** For duplicates and typing mistakes. Removes the student and all their skills. */
+/**
+ * For duplicates and typing mistakes. Removes the student and all their
+ * skills. A student who has paid even one monthly fee can't be deleted: the
+ * fee is income, and a percentage teacher may already have been paid a share
+ * of it, so the record stays and the student is dropped from their skills
+ * instead, which shows them as Inactive.
+ */
 export async function deleteStudent(id: string): Promise<ActionResult> {
   await requireAdmin();
   const student = await prisma.student.findUnique({ where: { id } });
   if (!student) return failure("That student no longer exists.");
+
+  const monthsPaid = await prisma.payment.count({ where: { studentId: id, category: "MONTHLY_FEE" } });
+  if (monthsPaid > 0) {
+    return failure(
+      `${formatStudentNumber(student.number)} has paid monthly fees, so they can't be deleted. Drop their skills instead and they show as Inactive.`,
+    );
+  }
 
   await prisma.student.delete({ where: { id } });
   if (student.photoPublicId) await deleteStudentPhoto(student.photoPublicId).catch(() => {});
