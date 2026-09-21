@@ -168,3 +168,41 @@ export async function getTeacherPay(id: string) {
     })),
   };
 }
+
+/**
+ * What a percentage teacher is owed right now: everything they've earned minus
+ * everything paid to them. Pass the payout being edited to leave it out, so
+ * changing an amount is checked against what was owed before it was paid.
+ */
+export async function percentageOwed(teacherId: string, leaveOut?: string): Promise<string> {
+  const [earned, paid] = await Promise.all([
+    prisma.payment.aggregate({ where: { teacherId }, _sum: { teacherShare: true } }),
+    prisma.expense.aggregate({
+      where: {
+        teacherId,
+        category: "TEACHER_SALARY",
+        ...(leaveOut ? { id: { not: leaveOut } } : {}),
+      },
+      _sum: { amount: true },
+    }),
+  ]);
+  return subtractMoney(earned._sum.teacherShare?.toString() ?? 0, paid._sum.amount?.toString() ?? 0);
+}
+
+/** What a teacher has been paid for one month, leaving out the payout being edited. */
+export async function paidForMonth(
+  teacherId: string,
+  month: string,
+  leaveOut?: string,
+): Promise<string> {
+  const { _sum } = await prisma.expense.aggregate({
+    where: {
+      teacherId,
+      category: "TEACHER_SALARY",
+      forMonth: toDbMonth(month),
+      ...(leaveOut ? { id: { not: leaveOut } } : {}),
+    },
+    _sum: { amount: true },
+  });
+  return fromCents(toCents(_sum.amount?.toString() ?? 0));
+}

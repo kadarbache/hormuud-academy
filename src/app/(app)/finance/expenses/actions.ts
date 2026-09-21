@@ -5,7 +5,7 @@ import { z } from "zod";
 import { failure, invalid, success, type ActionResult } from "@/lib/action-result";
 import { collegeToday, formatMonth, toDbDate, toDbMonth } from "@/lib/dates";
 import { formatMoney } from "@/lib/format";
-import { isPositiveMoney } from "@/lib/money";
+import { isPositiveMoney, subtractMoney, toCents } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
 import {
@@ -17,6 +17,7 @@ import {
   paymentMethod,
 } from "@/lib/validation";
 import { expenseCategoryLabels } from "../labels";
+import { paidForMonth, percentageOwed } from "../teacher-pay/queries";
 
 // Money out. Expenses are the admin's alone: a branch shouldn't be able to
 // read what the college pays its rent or its people.
@@ -68,7 +69,46 @@ function readTeacherPay(values: Record<string, string>, category: Parsed["catego
   return { ok: true as const, teacherId: values.teacherId, forMonth: month.data };
 }
 
-async function checkedFields(values: Record<string, string>) {
+/**
+ * A teacher is never paid more than they're due. A percentage teacher can be
+ * paid up to what they've earned and not yet been paid; a fixed teacher up to
+ * their monthly salary for the month the pay covers, across every payment
+ * made for it. Returns a message for the amount box, or null when it's fine.
+ */
+async function overpaymentMessage(
+  teacher: {
+    id: string;
+    name: string;
+    salaryType: string;
+    fixedSalary: { toString(): string } | null;
+  },
+  amount: string,
+  forMonth: string,
+  leaveOut?: string,
+): Promise<string | null> {
+  if (teacher.salaryType === "PERCENTAGE") {
+    const owed = await percentageOwed(teacher.id, leaveOut);
+    if (toCents(amount) <= toCents(owed)) return null;
+    return isPositiveMoney(owed)
+      ? `${teacher.name} is owed ${formatMoney(owed)}. Pay that or less.`
+      : `${teacher.name} isn't owed anything, so there's nothing to pay.`;
+  }
+
+  const salary = teacher.fixedSalary?.toString() ?? "0";
+  if (!isPositiveMoney(salary)) {
+    return `${teacher.name} has no monthly salary set. Set it on the Teachers page first.`;
+  }
+  const paid = await paidForMonth(teacher.id, forMonth, leaveOut);
+  if (toCents(paid) + toCents(amount) <= toCents(salary)) return null;
+
+  const left = subtractMoney(salary, paid);
+  return isPositiveMoney(left)
+    ? `${teacher.name} has been paid ${formatMoney(paid)} of ${formatMoney(salary)} for ${formatMonth(forMonth)}. Pay ${formatMoney(left)} or less.`
+    : `${teacher.name}'s ${formatMoney(salary)} for ${formatMonth(forMonth)} is already paid in full.`;
+}
+
+/** `editing` is the expense being changed, so its old amount isn't counted twice. */
+async function checkedFields(values: Record<string, string>, editing?: string) {
   const parsed = expenseSchema.safeParse(values);
   if (!parsed.success) return { ok: false as const, result: invalid(parsed.error) };
   if (!isPositiveMoney(parsed.data.amount)) {
@@ -86,8 +126,20 @@ async function checkedFields(values: Record<string, string>) {
   if (!(await prisma.branch.findUnique({ where: { id: parsed.data.branchId } }))) {
     return { ok: false as const, result: failure("That branch no longer exists.") };
   }
-  if (pay.teacherId && !(await prisma.teacher.findUnique({ where: { id: pay.teacherId } }))) {
-    return { ok: false as const, result: failure("That teacher no longer exists.") };
+  if (pay.teacherId && pay.forMonth) {
+    const teacher = await prisma.teacher.findUnique({
+      where: { id: pay.teacherId },
+      select: { id: true, name: true, salaryType: true, fixedSalary: true },
+    });
+    if (!teacher) return { ok: false as const, result: failure("That teacher no longer exists.") };
+
+    const tooMuch = await overpaymentMessage(teacher, parsed.data.amount, pay.forMonth, editing);
+    if (tooMuch) {
+      return {
+        ok: false as const,
+        result: failure("Check the highlighted fields.", { amount: [tooMuch] }),
+      };
+    }
   }
 
   return {
@@ -124,7 +176,7 @@ export async function updateExpense(id: string, formData: FormData): Promise<Act
     return failure("That expense no longer exists.");
   }
 
-  const checked = await checkedFields(formObject(formData));
+  const checked = await checkedFields(formObject(formData), id);
   if (!checked.ok) return checked.result;
 
   await prisma.expense.update({ where: { id }, data: checked.data });

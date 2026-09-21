@@ -162,7 +162,7 @@ Everything a percentage teacher has earned, minus everything the college has pai
 _Avoid_: Balance, accrued earnings
 
 **Teacher pay**:
-An expense in the Teacher salary category naming the teacher and the month it covers: a fixed salary for that month, or a settlement of what a percentage teacher has earned.
+An expense in the Teacher salary category naming the teacher and the month it covers: a fixed salary for that month, or a settlement of what a percentage teacher has earned. A teacher is never paid more than they're due: a percentage teacher up to what they're owed, a fixed teacher up to their monthly salary for that month across every payment made for it. The app refuses more, whether it's recorded or edited later.
 _Avoid_: Payroll, payout, wages
 
 **Monthly budget**:
