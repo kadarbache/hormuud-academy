@@ -97,8 +97,11 @@ export function TeacherDialog({
             onValueChange={setSalaryType}
             errors={errors.salaryType}
           />
+          {/* Each box has its own key, so switching how they're paid starts a
+              fresh box instead of carrying over what was typed in the other. */}
           {salaryType === "FIXED" ? (
             <TextField
+              key="fixedSalary"
               label="Monthly salary (USD)"
               name="fixedSalary"
               inputMode="decimal"
@@ -110,6 +113,7 @@ export function TeacherDialog({
             />
           ) : (
             <TextField
+              key="percentageRate"
               label="Percentage of monthly fees"
               name="percentageRate"
               inputMode="decimal"
