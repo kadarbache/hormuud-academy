@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/page-header";
 import { photoUploadEnabled } from "@/lib/cloudinary";
 import { collegeToday, fromDbDate } from "@/lib/dates";
 import { formatStudentNumber } from "@/lib/format";
+import { phoneEntry } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { canEditStudent } from "../../access";
@@ -39,8 +40,8 @@ export default async function EditStudentPage({ params }: PageProps<"/students/[
         defaults={{
           fullName: student.fullName,
           sex: student.sex,
-          phone: student.phone ?? "",
-          responsiblePhone: student.responsiblePhone ?? "",
+          phone: phoneEntry(student.phone),
+          responsiblePhone: phoneEntry(student.responsiblePhone),
           registrationDate: fromDbDate(student.registrationDate),
           homeBranchId: student.homeBranchId,
           photoUrl: student.photoUrl,

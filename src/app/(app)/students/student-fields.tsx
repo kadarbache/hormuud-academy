@@ -16,7 +16,7 @@ import {
   FieldTitle,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { SelectField, TextField } from "@/components/form-fields";
+import { PhoneField, SelectField, TextField } from "@/components/form-fields";
 import type { FieldErrors } from "@/lib/action-result";
 import { formatMoney, formatMonths } from "@/lib/format";
 import { paymentMethodOptions } from "../finance/labels";
@@ -32,10 +32,10 @@ const sexOptions = [
  * A phone field that warns, without blocking, when another student already
  * has the number. Families often share one phone, so it's only a hint.
  */
-function PhoneField({
+function CheckedPhoneField({
   excludeId,
   ...props
-}: React.ComponentProps<typeof TextField> & { excludeId?: string }) {
+}: React.ComponentProps<typeof PhoneField> & { excludeId?: string }) {
   const [matches, setMatches] = useState<PhoneMatch[]>([]);
 
   async function check(value: string) {
@@ -44,7 +44,7 @@ function PhoneField({
 
   return (
     <div className="space-y-2">
-      <TextField type="tel" inputMode="tel" onBlur={(event) => check(event.currentTarget.value)} {...props} />
+      <PhoneField onBlur={(event) => check(event.currentTarget.value)} {...props} />
       {matches.length > 0 && (
         <div className="flex gap-2 rounded-md border border-warning-border bg-warning p-3 text-sm text-warning-foreground">
           <TriangleAlert className="mt-0.5 size-4 shrink-0" />
@@ -156,14 +156,14 @@ export function StudentProfileFields({
         errors={errors.sex}
       />
       <div className="grid gap-4 sm:grid-cols-2">
-        <PhoneField
+        <CheckedPhoneField
           label="Phone"
           name="phone"
           defaultValue={defaults.phone}
           excludeId={studentId}
           errors={errors.phone}
         />
-        <PhoneField
+        <CheckedPhoneField
           label="Responsible person's phone"
           name="responsiblePhone"
           defaultValue={defaults.responsiblePhone}

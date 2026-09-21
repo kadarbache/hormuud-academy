@@ -1,8 +1,9 @@
 "use client";
 
 import { FormDialog } from "@/components/form-dialog";
-import { TextField } from "@/components/form-fields";
+import { PhoneField, TextField } from "@/components/form-fields";
 import type { ActionResult } from "@/lib/action-result";
+import { phoneEntry } from "@/lib/phone";
 
 export function BranchDialog({
   action,
@@ -23,11 +24,10 @@ export function BranchDialog({
       {(errors) => (
         <>
           <TextField label="Name" name="name" defaultValue={branch?.name} required errors={errors.name} />
-          <TextField
+          <PhoneField
             label="Phone"
             name="phone"
-            type="tel"
-            defaultValue={branch?.phone ?? ""}
+            defaultValue={phoneEntry(branch?.phone)}
             errors={errors.phone}
           />
           <TextField label="Address" name="address" defaultValue={branch?.address ?? ""} errors={errors.address} />

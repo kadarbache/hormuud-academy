@@ -14,6 +14,7 @@ import { ActionButton } from "@/components/action-button";
 import { PageHeader } from "@/components/page-header";
 import { ActiveBadge, EmptyRow } from "@/components/status-badge";
 import { formatMoney } from "@/lib/format";
+import { formatPhone } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { salaryTypeLabels } from "../finance/labels";
@@ -118,7 +119,7 @@ export default async function TeachersPage() {
                     <TableCell>
                       <div className="font-medium">{teacher.name}</div>
                       {teacher.phone && (
-                        <div className="text-xs text-muted-foreground">{teacher.phone}</div>
+                        <div className="text-xs text-muted-foreground">{formatPhone(teacher.phone)}</div>
                       )}
                     </TableCell>
                     {isAdmin && (

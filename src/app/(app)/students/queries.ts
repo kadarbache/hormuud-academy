@@ -58,7 +58,12 @@ export async function listStudents(user: CurrentUser, filters: StudentFilters) {
   if (lookup?.kind === "number") {
     conditions.push({ number: lookup.number });
   } else if (lookup?.kind === "phone") {
-    conditions.push({ OR: [{ phone: lookup.phone }, { responsiblePhone: lookup.phone }] });
+    conditions.push({
+      OR: [
+        { phone: { endsWith: lookup.phone } },
+        { responsiblePhone: { endsWith: lookup.phone } },
+      ],
+    });
   } else {
     conditions.push(browsableStudents(user));
     if (lookup?.kind === "name") {

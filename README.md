@@ -82,4 +82,4 @@ Leave `DATABASE_POOL_MAX` and `SHADOW_DATABASE_URL` unset in production.
 - `src/app/(app)/teachers` and `src/app/(app)/classes` are open to everyone. Admins manage them; branch staff see their own branch's, read-only.
 - `src/app/(app)/finance` has the money screens: the dashboard, income, fees owed, expenses, teacher pay and the monthly budget. Branch staff get Income and Fees owed for their own branch; the rest is admin-only.
 - `src/app/(app)/students/access.ts` and `src/app/(app)/finance/access.ts` decide what each staff member can see.
-- `src/lib` holds auth, the signed-in user checks, the branch rule every screen shares, date and month helpers (dates follow East Africa Time), money arithmetic and formatting.
+- `src/lib` holds auth, the signed-in user checks, the branch rule every screen shares, date and month helpers (dates follow East Africa Time), money arithmetic and formatting, and the phone rule: numbers are kept as `252611111111`, the form WhatsApp takes, and typed as the nine digits after `+252`, like `61 1111111`.

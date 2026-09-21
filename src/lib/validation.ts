@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { isIsoDate, isIsoMonth } from "@/lib/dates";
-import { normalizePhone } from "@/lib/format";
+import { isBlankEntry, NATIONAL_DIGITS, PHONE_PREFIX, toStoredPhone } from "@/lib/phone";
 
 /** Text the user must fill in. */
 export const requiredText = (message: string, max = 120) =>
@@ -19,15 +19,20 @@ export const optionalText = (max = 200) =>
     .optional()
     .transform((value) => (value ? value : null));
 
-/** A phone number that may be left empty. Spaces and dashes are removed. */
+/**
+ * A phone number that may be left empty. The form asks for the nine digits
+ * after "+252" and the database keeps the whole number, so this puts the two
+ * halves together. A box holding nothing but the 6 it starts with counts as
+ * empty, because nobody typed it.
+ */
 export const optionalPhone = z
   .string()
   .optional()
-  .transform((value) => (value ? normalizePhone(value) : ""))
-  .refine((value) => value === "" || /^\+?\d{6,15}$/.test(value), {
-    message: "Enter 6 to 15 digits, with an optional + in front.",
+  .transform((value) => (value && !isBlankEntry(value) ? value.trim() : ""))
+  .refine((value) => value === "" || toStoredPhone(value) !== null, {
+    message: `Enter the ${NATIONAL_DIGITS} digits after ${PHONE_PREFIX}, like 61 1111111.`,
   })
-  .transform((value) => (value ? value : null));
+  .transform((value) => (value ? toStoredPhone(value) : null));
 
 /** A calendar day from an <input type="date">. */
 export const isoDate = (message = "Pick a date.") =>

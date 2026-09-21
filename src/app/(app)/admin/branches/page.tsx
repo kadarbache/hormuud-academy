@@ -12,6 +12,7 @@ import {
 import { ActionButton } from "@/components/action-button";
 import { PageHeader } from "@/components/page-header";
 import { ActiveBadge, EmptyRow } from "@/components/status-badge";
+import { formatPhone } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
 import { BranchDialog } from "./branch-dialog";
 import { createBranch, deleteBranch, setBranchActive, updateBranch } from "./actions";
@@ -73,7 +74,7 @@ export default async function BranchesPage() {
                         <div className="text-xs text-muted-foreground">{branch.address}</div>
                       )}
                     </TableCell>
-                    <TableCell>{branch.phone ?? "—"}</TableCell>
+                    <TableCell>{formatPhone(branch.phone) || "—"}</TableCell>
                     <TableCell className="text-right tabular-nums">{branch._count.homeStudents}</TableCell>
                     <TableCell className="text-right tabular-nums">{branch._count.branchSkills}</TableCell>
                     <TableCell>

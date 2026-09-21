@@ -10,8 +10,9 @@ import {
   FieldSet,
 } from "@/components/ui/field";
 import { FormDialog } from "@/components/form-dialog";
-import { SelectField, TextField, type Option } from "@/components/form-fields";
+import { PhoneField, SelectField, TextField, type Option } from "@/components/form-fields";
 import type { ActionResult } from "@/lib/action-result";
+import { phoneEntry } from "@/lib/phone";
 import { salaryTypeOptions } from "../finance/labels";
 
 function BranchCheckboxes({
@@ -77,11 +78,10 @@ export function TeacherDialog({
       {(errors) => (
         <>
           <TextField label="Name" name="name" defaultValue={teacher?.name} required errors={errors.name} />
-          <TextField
+          <PhoneField
             label="Phone"
             name="phone"
-            type="tel"
-            defaultValue={teacher?.phone ?? ""}
+            defaultValue={phoneEntry(teacher?.phone)}
             errors={errors.phone}
           />
           <BranchCheckboxes

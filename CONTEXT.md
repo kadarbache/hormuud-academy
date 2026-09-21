@@ -78,6 +78,10 @@ _Avoid_: Owning branch
 The person the college contacts about a student, recorded by phone number.
 _Avoid_: Guardian, parent
 
+**Phone number**:
+A Somali mobile, kept as digits with the country code and nothing else: 252611111111. That is the form WhatsApp takes, so a number is ready to message as it stands. Forms print "+252" in a box of its own and take the nine digits after it, grouped as they are read out (61 1111111); the box starts at 6 because most numbers do, and that digit can be changed. Screens print the whole number back as +252 61 1111111.
+_Avoid_: Mobile, contact, msisdn
+
 **Registration**:
 Adding a new student to the college, along with the first skills they take. Happens once per student.
 _Avoid_: Admission, sign-up

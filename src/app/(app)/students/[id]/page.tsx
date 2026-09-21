@@ -27,6 +27,7 @@ import {
   toCollegeDate,
 } from "@/lib/dates";
 import { formatMoney, formatStudentNumber } from "@/lib/format";
+import { formatPhone } from "@/lib/phone";
 import { sumMoney } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
@@ -300,8 +301,10 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
         <CardContent>
           <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Detail label="Sex">{student.sex === "MALE" ? "Male" : "Female"}</Detail>
-            <Detail label="Phone">{student.phone ?? "Not given"}</Detail>
-            <Detail label="Responsible person's phone">{student.responsiblePhone ?? "Not given"}</Detail>
+            <Detail label="Phone">{formatPhone(student.phone) || "Not given"}</Detail>
+            <Detail label="Responsible person's phone">
+              {formatPhone(student.responsiblePhone) || "Not given"}
+            </Detail>
             <Detail label="Home branch">{student.homeBranch.name}</Detail>
             <Detail label="Registration date">{formatDate(student.registrationDate)}</Detail>
             <Detail label="Registered by">

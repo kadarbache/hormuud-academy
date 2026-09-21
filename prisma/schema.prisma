@@ -102,6 +102,7 @@ model Verification {
 model Branch {
   id        String   @id @default(cuid())
   name      String   @unique
+  /// Digits only, in WhatsApp's form: see Student.phone.
   phone     String?
   address   String?
   active    Boolean  @default(true)
@@ -173,6 +174,7 @@ model Classroom {
 model Teacher {
   id             String     @id @default(cuid())
   name           String
+  /// Digits only, in WhatsApp's form: see Student.phone.
   phone          String?
   /// How this teacher is paid. FIXED uses fixedSalary; PERCENTAGE earns a
   /// share of every monthly fee paid for the skills they teach.
@@ -241,9 +243,11 @@ model Student {
   /// Shown as STU-00001. One sequence for the whole college.
   number           Int      @unique @default(autoincrement())
   fullName         String
+  /// Digits only, country code and all, the way WhatsApp takes a number:
+  /// "252611111111". The screens print it as +252 61 1111111.
   phone            String?
   sex              Sex
-  /// The responsible person's phone.
+  /// The responsible person's phone, in the same form.
   responsiblePhone String?
   photoUrl         String?
   photoPublicId    String?

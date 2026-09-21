@@ -19,6 +19,7 @@ import { SelectInput } from "@/components/select-input";
 import { EmptyRow } from "@/components/status-badge";
 import { formatMonth } from "@/lib/dates";
 import { formatMoney, formatStudentNumber } from "@/lib/format";
+import { formatPhone } from "@/lib/phone";
 import { requireUser } from "@/lib/session";
 import { StatCard, StatRow } from "../figures";
 import { ANY, withAnyOption } from "../labels";
@@ -167,7 +168,7 @@ export default async function OwedPage({ searchParams }: PageProps<"/finance/owe
                         {formatStudentNumber(student.number)}
                       </div>
                     </TableCell>
-                    <TableCell>{student.phone ?? "—"}</TableCell>
+                    <TableCell>{formatPhone(student.phone) || "—"}</TableCell>
                     {isAdmin && <TableCell>{student.homeBranchName}</TableCell>}
                     <TableCell className="max-w-96 whitespace-normal">
                       <div className="space-y-1">

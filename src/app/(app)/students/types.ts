@@ -19,6 +19,7 @@ export type BranchSkillOption = {
 export type StudentFormValues = {
   fullName: string;
   sex: "MALE" | "FEMALE" | "";
+  /** The nine digits after "+252", the way the box holds them: "61 1111111". */
   phone: string;
   responsiblePhone: string;
   registrationDate: string;

@@ -37,10 +37,10 @@ async function main() {
   const hand = await prisma.category.findUniqueOrThrow({ where: { name: "Hand Skills" } });
 
   const main = await prisma.branch.create({
-    data: { name: "Main Branch", phone: "0610000001", address: "Head office" },
+    data: { name: "Main Branch", phone: "252610000001", address: "Head office" },
   });
   const second = await prisma.branch.create({
-    data: { name: "Second Branch", phone: "0610000002" },
+    data: { name: "Second Branch", phone: "252610000002" },
   });
 
   const [lab, room1, roomA, roomB] = await Promise.all([
@@ -143,7 +143,7 @@ async function main() {
     {
       fullName: "Demo Student One",
       sex: "FEMALE",
-      phone: "0611111111",
+      phone: "252611111111",
       homeBranchId: main.id,
       registered: monthsAgo(1),
       skills: [
@@ -181,7 +181,7 @@ async function main() {
     {
       fullName: "Demo Student Three",
       sex: "FEMALE",
-      phone: "0613333333",
+      phone: "252613333333",
       homeBranchId: second.id,
       registered: monthsAgo(2),
       // Registered at the second branch, also taking a skill at the main one,
@@ -204,7 +204,7 @@ async function main() {
     {
       fullName: "Demo Student Four",
       sex: "MALE",
-      phone: "0614444444",
+      phone: "252614444444",
       homeBranchId: second.id,
       registered: monthsAgo(8),
       skills: [

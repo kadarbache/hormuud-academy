@@ -11,7 +11,8 @@ import {
   uploadStudentPhoto,
 } from "@/lib/cloudinary";
 import { addMonths, collegeToday, toDbDate } from "@/lib/dates";
-import { formatMoney, formatStudentNumber, normalizePhone } from "@/lib/format";
+import { formatMoney, formatStudentNumber } from "@/lib/format";
+import { isBlankEntry, toStoredPhone } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, requireUser } from "@/lib/session";
 import {
@@ -55,7 +56,9 @@ function profileErrors(
   result: ReturnType<typeof profileSchema.safeParse>,
 ): FieldErrors {
   const errors: FieldErrors = result.success ? {} : { ...z.flattenError(result.error).fieldErrors };
-  if (!values.phone?.trim() && !values.responsiblePhone?.trim()) {
+  // A phone box already holds the 6 it starts at, so "filled in" means digits
+  // beyond that, not merely text in the box.
+  if (isBlankEntry(values.phone ?? "") && isBlankEntry(values.responsiblePhone ?? "")) {
     errors.phone = [
       ...(errors.phone ?? []),
       "Enter the student's phone or the responsible person's phone.",
@@ -438,12 +441,12 @@ export async function deleteStudent(id: string): Promise<ActionResult> {
  */
 export async function findStudentsByPhone(phone: string, excludeId?: string): Promise<PhoneMatch[]> {
   await requireUser();
-  const normalized = normalizePhone(phone);
-  if (!/^\+?\d{6,15}$/.test(normalized)) return [];
+  const stored = toStoredPhone(phone);
+  if (!stored) return [];
 
   const matches = await prisma.student.findMany({
     where: {
-      OR: [{ phone: normalized }, { responsiblePhone: normalized }],
+      OR: [{ phone: stored }, { responsiblePhone: stored }],
       ...(excludeId ? { id: { not: excludeId } } : {}),
     },
     take: 5,

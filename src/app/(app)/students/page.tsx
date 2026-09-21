@@ -20,6 +20,7 @@ import { PageHeader } from "@/components/page-header";
 import { SelectInput, type Option } from "@/components/select-input";
 import { EmptyRow } from "@/components/status-badge";
 import { formatStudentNumber } from "@/lib/format";
+import { formatPhone } from "@/lib/phone";
 import { requireUser } from "@/lib/session";
 import {
   ANY_SKILL,
@@ -202,7 +203,7 @@ export default async function StudentsPage({ searchParams }: PageProps<"/student
                         </div>
                       </Link>
                     </TableCell>
-                    <TableCell>{student.phone ?? "—"}</TableCell>
+                    <TableCell>{formatPhone(student.phone) || "—"}</TableCell>
                     <TableCell>{student.homeBranchName}</TableCell>
                     <TableCell className="max-w-72 whitespace-normal">
                       <div className="flex flex-wrap gap-1">

@@ -59,7 +59,12 @@ export function incomeWhere(user: CurrentUser, filters: IncomeFilters): Prisma.P
       conditions.push({ student: { number: lookup.number } });
     } else if (lookup.kind === "phone") {
       conditions.push({
-        student: { OR: [{ phone: lookup.phone }, { responsiblePhone: lookup.phone }] },
+        student: {
+          OR: [
+            { phone: { endsWith: lookup.phone } },
+            { responsiblePhone: { endsWith: lookup.phone } },
+          ],
+        },
       });
     } else {
       conditions.push({ student: { fullName: { contains: lookup.text, mode: "insensitive" } } });
