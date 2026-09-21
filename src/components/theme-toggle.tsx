@@ -17,13 +17,15 @@ const subscribe = () => () => {};
 export function ThemeToggle({ className }: { className?: string }) {
   const { theme, setTheme } = useTheme();
   // The server doesn't know the reader's theme, so show the box empty until
-  // the browser has told us which one it is.
+  // the browser has told us which one it is. It stays controlled throughout —
+  // no option has an empty value, so "" is the empty box and React never sees
+  // the box change hands.
   const ready = useSyncExternalStore(subscribe, () => true, () => false);
 
   return (
     <SelectInput
       options={themeOptions}
-      value={ready ? theme : undefined}
+      value={ready ? (theme ?? "") : ""}
       onValueChange={setTheme}
       placeholder="Theme"
       size="sm"
