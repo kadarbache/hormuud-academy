@@ -29,8 +29,8 @@ export function SkillDialog({
       title={skill ? "Edit skill" : "Add skill"}
       description={
         skill
-          ? "A new fee or duration applies to students who join from now on. Current students keep theirs."
-          : "The skill is shared by every branch. You pick each branch's teacher and class next."
+          ? "The fees and duration are defaults for branches you add from now on. Branches that teach it already keep their own."
+          : "The skill is shared by every branch. The fees and duration are defaults: each branch can change them when you add it."
       }
       trigger={trigger}
       action={async (formData) => {
@@ -61,7 +61,7 @@ export function SkillDialog({
               errors={errors.categoryId}
             />
             <TextField
-              label="Duration in months"
+              label="Default duration in months"
               name="durationMonths"
               type="number"
               inputMode="numeric"
@@ -75,7 +75,7 @@ export function SkillDialog({
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <TextField
-              label="Registration fee (USD)"
+              label="Default registration fee (USD)"
               name="registrationFee"
               inputMode="decimal"
               placeholder="10.00"
@@ -85,7 +85,7 @@ export function SkillDialog({
               errors={errors.registrationFee}
             />
             <TextField
-              label="Monthly fee (USD)"
+              label="Default monthly fee (USD)"
               name="monthlyFee"
               inputMode="decimal"
               placeholder="20.00"

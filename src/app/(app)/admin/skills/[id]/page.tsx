@@ -104,6 +104,11 @@ export default async function SkillPage({ params }: PageProps<"/admin/skills/[id
   const registration = skill.registrationFee.gt(0)
     ? `${formatMoney(skill.registrationFee.toString())} to register`
     : "no registration fee";
+  const defaults = {
+    durationMonths: skill.durationMonths,
+    registrationFee: skill.registrationFee.toString(),
+    monthlyFee: skill.monthlyFee.toString(),
+  };
 
   return (
     <>
@@ -121,7 +126,7 @@ export default async function SkillPage({ params }: PageProps<"/admin/skills/[id
             <ActiveBadge active={skill.active} />
           </span>
         }
-        description={`${skill.category.name} · ${formatMonths(skill.durationMonths)} · ${registration} · ${formatMoney(skill.monthlyFee.toString())} a month`}
+        description={`${skill.category.name} · Defaults for a new branch: ${formatMonths(skill.durationMonths)}, ${registration}, ${formatMoney(skill.monthlyFee.toString())} a month`}
       >
         <SkillDialog
           action={updateSkill.bind(null, skill.id)}
@@ -129,9 +134,7 @@ export default async function SkillPage({ params }: PageProps<"/admin/skills/[id
           skill={{
             name: skill.name,
             categoryId: skill.categoryId,
-            durationMonths: skill.durationMonths,
-            registrationFee: skill.registrationFee.toString(),
-            monthlyFee: skill.monthlyFee.toString(),
+            ...defaults,
           }}
           trigger={<Button variant="outline">Edit skill</Button>}
         />
@@ -159,7 +162,7 @@ export default async function SkillPage({ params }: PageProps<"/admin/skills/[id
           <div>
             <h2 className="text-lg font-semibold">Branches that teach it</h2>
             <p className="text-sm text-muted-foreground">
-              Each branch has its own teacher and class for this skill.
+              Each branch has its own teacher, class, fees and duration for this skill.
             </p>
           </div>
           <BranchSkillDialog
@@ -167,6 +170,7 @@ export default async function SkillPage({ params }: PageProps<"/admin/skills/[id
             branches={openBranches}
             teachers={teacherOptions}
             classrooms={classroomOptions}
+            pricing={defaults}
             trigger={
               <Button disabled={openBranches.length === 0}>
                 <Plus />
@@ -186,6 +190,9 @@ export default async function SkillPage({ params }: PageProps<"/admin/skills/[id
                   <TableHead>Branch</TableHead>
                   <TableHead>Teacher</TableHead>
                   <TableHead>Class</TableHead>
+                  <TableHead>Duration</TableHead>
+                  <TableHead className="text-right">Registration fee</TableHead>
+                  <TableHead className="text-right">Monthly fee</TableHead>
                   <TableHead className="text-right">Active students</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">
@@ -201,6 +208,13 @@ export default async function SkillPage({ params }: PageProps<"/admin/skills/[id
                       <TableCell className="font-medium">{bs.branch.name}</TableCell>
                       <TableCell>{bs.teacher.name}</TableCell>
                       <TableCell>{bs.classroom.name}</TableCell>
+                      <TableCell>{formatMonths(bs.durationMonths)}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatMoney(bs.registrationFee.toString())}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatMoney(bs.monthlyFee.toString())}
+                      </TableCell>
                       <TableCell className="text-right tabular-nums">{counts.active}</TableCell>
                       <TableCell>
                         <ActiveBadge active={bs.active} />
@@ -217,6 +231,11 @@ export default async function SkillPage({ params }: PageProps<"/admin/skills/[id
                               branchName: bs.branch.name,
                               teacherId: bs.teacherId,
                               classroomId: bs.classroomId,
+                            }}
+                            pricing={{
+                              durationMonths: bs.durationMonths,
+                              registrationFee: bs.registrationFee.toString(),
+                              monthlyFee: bs.monthlyFee.toString(),
                             }}
                             trigger={
                               <Button variant="ghost" size="sm">

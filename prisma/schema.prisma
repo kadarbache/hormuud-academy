@@ -134,7 +134,9 @@ model Category {
 }
 
 /// One entry in the college-wide catalog. Head office owns it; every branch
-/// shares it. Branch-specific details (teacher, class) live on BranchSkill.
+/// shares it. Branch-specific details (teacher, class, fees, duration) live on
+/// BranchSkill. The duration and fees here are only the defaults a branch
+/// starts from when the skill is added to it.
 model Skill {
   id              String   @id @default(cuid())
   name            String   @unique
@@ -208,21 +210,26 @@ model TeacherBranch {
   @@map("teacher_branches")
 }
 
-/// A skill as it runs at one branch: one teacher, one class. Students enroll
-/// in this, not in the catalog skill directly.
+/// A skill as it runs at one branch: one teacher, one class, and the fees and
+/// duration that branch charges. A branch in a poorer city can charge less.
+/// Students enroll in this, not in the catalog skill directly.
 model BranchSkill {
-  id          String    @id @default(cuid())
-  skillId     String
-  skill       Skill     @relation(fields: [skillId], references: [id])
-  branchId    String
-  branch      Branch    @relation(fields: [branchId], references: [id])
-  teacherId   String
-  teacher     Teacher   @relation(fields: [teacherId], references: [id])
-  classroomId String
-  classroom   Classroom @relation(fields: [classroomId], references: [id])
-  active      Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  skillId         String
+  skill           Skill     @relation(fields: [skillId], references: [id])
+  branchId        String
+  branch          Branch    @relation(fields: [branchId], references: [id])
+  teacherId       String
+  teacher         Teacher   @relation(fields: [teacherId], references: [id])
+  classroomId     String
+  classroom       Classroom @relation(fields: [classroomId], references: [id])
+  durationMonths  Int
+  /// Paid once for every enrollment here, on top of the monthly fee.
+  registrationFee Decimal   @db.Decimal(10, 2)
+  monthlyFee      Decimal   @db.Decimal(10, 2)
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   enrollments Enrollment[]
 
@@ -287,12 +294,12 @@ model Enrollment {
   skillId         String
   skill           Skill            @relation(fields: [skillId], references: [id])
   startDate       DateTime         @db.Date
-  /// Start date plus the skill's duration. A guide only: staff mark the
+  /// Start date plus the branch skill's duration. A guide only: staff mark the
   /// enrollment Finished themselves.
   endDate         DateTime         @db.Date
-  /// The skill's monthly fee on the day the student joined.
+  /// The branch skill's monthly fee on the day the student joined.
   monthlyFee      Decimal          @db.Decimal(10, 2)
-  /// The skill's registration fee on the day the student joined, unless the
+  /// The branch skill's registration fee on the day the student joined, unless the
   /// admin lowered or waived it since. Zero means there's nothing to pay.
   /// Whether it was paid is the payment in the ledger, not a field here.
   registrationFee Decimal          @db.Decimal(10, 2)

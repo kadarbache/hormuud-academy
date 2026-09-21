@@ -80,14 +80,32 @@ async function main() {
     skill("Electrical Installation", hand.id, 6, "10", "25"),
   ]);
 
-  const offer = (skillId: string, branchId: string, teacherId: string, classroomId: string) =>
-    prisma.branchSkill.create({ data: { skillId, branchId, teacherId, classroomId } });
+  // A branch starts from the skill's fees and duration unless it charges differently.
+  const offer = (
+    s: typeof computer,
+    branchId: string,
+    teacherId: string,
+    classroomId: string,
+    pricing: { registrationFee?: string; monthlyFee?: string } = {},
+  ) =>
+    prisma.branchSkill.create({
+      data: {
+        skillId: s.id,
+        branchId,
+        teacherId,
+        classroomId,
+        durationMonths: s.durationMonths,
+        registrationFee: pricing.registrationFee ?? s.registrationFee,
+        monthlyFee: pricing.monthlyFee ?? s.monthlyFee,
+      },
+    });
   const [mainComputer, mainDesign, mainTailoring, secondComputer, secondElectrical] = await Promise.all([
-    offer(computer.id, main.id, t1.id, lab.id),
-    offer(design.id, main.id, t2.id, lab.id),
-    offer(tailoring.id, main.id, t3.id, room1.id),
-    offer(computer.id, second.id, t4.id, roomA.id),
-    offer(electrical.id, second.id, t3.id, roomB.id),
+    offer(computer, main.id, t1.id, lab.id),
+    offer(design, main.id, t2.id, lab.id),
+    offer(tailoring, main.id, t3.id, room1.id),
+    // The second branch is in a smaller town and charges less.
+    offer(computer, second.id, t4.id, roomA.id, { registrationFee: "5", monthlyFee: "12" }),
+    offer(electrical, second.id, t3.id, roomB.id),
   ]);
 
   const staffPassword = randomBytes(9).toString("base64url");
@@ -104,22 +122,16 @@ async function main() {
   const today = collegeToday();
   const monthsAgo = (months: number) => addMonths(today, -months);
 
-  type Offer = typeof mainComputer & {
-    durationMonths: number;
+  type Offer = Omit<typeof mainComputer, "registrationFee" | "monthlyFee"> & {
     registrationFee: string;
     fee: string;
     /** The percentage the teacher earns, or null when they're on a salary. */
     rate: string | null;
   };
-  const withSkill = (
-    bs: typeof mainComputer,
-    s: typeof computer,
-    teach: typeof t1,
-  ): Offer => ({
+  const withTeacher = (bs: typeof mainComputer, teach: typeof t1): Offer => ({
     ...bs,
-    durationMonths: s.durationMonths,
-    registrationFee: s.registrationFee.toString(),
-    fee: s.monthlyFee.toString(),
+    registrationFee: bs.registrationFee.toString(),
+    fee: bs.monthlyFee.toString(),
     rate: teach.salaryType === "PERCENTAGE" ? (teach.percentageRate?.toString() ?? null) : null,
   });
 
@@ -148,13 +160,13 @@ async function main() {
       registered: monthsAgo(1),
       skills: [
         {
-          offer: withSkill(mainComputer, computer, t1),
+          offer: withTeacher(mainComputer, t1),
           start: monthsAgo(1),
           paid: true,
           monthsPaid: 2,
         },
         {
-          offer: withSkill(mainTailoring, tailoring, t3),
+          offer: withTeacher(mainTailoring, t3),
           start: monthsAgo(1),
           paid: true,
           monthsPaid: 1,
@@ -171,7 +183,7 @@ async function main() {
       // Never paid the registration fee, and two months are still owed.
       skills: [
         {
-          offer: withSkill(mainDesign, design, t2),
+          offer: withTeacher(mainDesign, t2),
           start: monthsAgo(5),
           paid: false,
           monthsPaid: 2,
@@ -188,13 +200,13 @@ async function main() {
       // whose registration fee is still unpaid.
       skills: [
         {
-          offer: withSkill(secondElectrical, electrical, t3),
+          offer: withTeacher(secondElectrical, t3),
           start: monthsAgo(2),
           paid: true,
           monthsPaid: 3,
         },
         {
-          offer: withSkill(mainDesign, design, t2),
+          offer: withTeacher(mainDesign, t2),
           start: monthsAgo(1),
           paid: false,
           monthsPaid: 1,
@@ -209,7 +221,7 @@ async function main() {
       registered: monthsAgo(8),
       skills: [
         {
-          offer: withSkill(secondComputer, computer, t4),
+          offer: withTeacher(secondComputer, t4),
           start: monthsAgo(8),
           paid: true,
           monthsPaid: 3,

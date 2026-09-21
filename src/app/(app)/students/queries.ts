@@ -226,9 +226,6 @@ export async function enrollableBranchSkills(branchId?: string): Promise<BranchS
       skill: {
         select: {
           name: true,
-          durationMonths: true,
-          registrationFee: true,
-          monthlyFee: true,
           category: { select: { name: true } },
         },
       },
@@ -244,8 +241,8 @@ export async function enrollableBranchSkills(branchId?: string): Promise<BranchS
     categoryName: row.skill.category.name,
     teacherName: row.teacher.name,
     classroomName: row.classroom.name,
-    durationMonths: row.skill.durationMonths,
-    registrationFee: row.skill.registrationFee.toString(),
-    monthlyFee: row.skill.monthlyFee.toString(),
+    durationMonths: row.durationMonths,
+    registrationFee: row.registrationFee.toString(),
+    monthlyFee: row.monthlyFee.toString(),
   }));
 }

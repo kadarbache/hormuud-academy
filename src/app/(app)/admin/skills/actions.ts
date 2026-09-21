@@ -16,9 +16,8 @@ import { formObject, money, requiredId, requiredText } from "@/lib/validation";
 
 // --- The catalog skill -------------------------------------------------------
 
-const skillSchema = z.object({
-  name: requiredText("Enter the skill name.", 100),
-  categoryId: requiredId("Pick a category."),
+/** Duration and fees, set on the skill as defaults and on each branch skill. */
+const pricingSchema = z.object({
   durationMonths: z.coerce
     .number({ error: "Enter the number of months." })
     .int("Use whole months.")
@@ -26,6 +25,11 @@ const skillSchema = z.object({
     .max(60, "At most 60 months."),
   registrationFee: money("Enter the registration fee, or 0 if there's none."),
   monthlyFee: money("Enter the monthly fee."),
+});
+
+const skillSchema = pricingSchema.extend({
+  name: requiredText("Enter the skill name.", 100),
+  categoryId: requiredId("Pick a category."),
 });
 
 const skillNameTaken = failure("Check the highlighted fields.", {
@@ -56,8 +60,8 @@ export async function createSkill(formData: FormData): Promise<ActionResult<{ id
 }
 
 /**
- * Changing a fee or the duration only affects students who join from now on.
- * Each enrollment keeps the fees and end date it was created with.
+ * The fees and duration here are only defaults for branches added from now on.
+ * Branches that already teach the skill keep their own.
  */
 export async function updateSkill(id: string, formData: FormData): Promise<ActionResult> {
   await requireAdmin();
@@ -109,7 +113,7 @@ export async function deleteSkill(id: string): Promise<ActionResult> {
 
 // --- The skill at one branch -------------------------------------------------
 
-const placementSchema = z.object({
+const branchSkillSchema = pricingSchema.extend({
   teacherId: requiredId("Pick the teacher."),
   classroomId: requiredId("Pick the class."),
 });
@@ -140,7 +144,7 @@ async function checkPlacement(branchId: string, teacherId: string, classroomId: 
 export async function addBranchSkill(skillId: string, formData: FormData): Promise<ActionResult> {
   await requireAdmin();
   const values = formObject(formData);
-  const parsed = placementSchema
+  const parsed = branchSkillSchema
     .extend({ branchId: requiredId("Pick the branch.") })
     .safeParse(values);
   if (!parsed.success) return invalid(parsed.error);
@@ -152,7 +156,7 @@ export async function addBranchSkill(skillId: string, formData: FormData): Promi
   if (placementProblem) return placementProblem;
 
   try {
-    await prisma.branchSkill.create({ data: { skillId, branchId, teacherId, classroomId } });
+    await prisma.branchSkill.create({ data: { skillId, ...parsed.data } });
   } catch (error) {
     if (isUniqueViolation(error)) {
       return failure("Check the highlighted fields.", {
@@ -166,9 +170,13 @@ export async function addBranchSkill(skillId: string, formData: FormData): Promi
   return success(`${branch.name} now teaches this skill.`);
 }
 
+/**
+ * A new fee or duration only affects students who join from now on. Each
+ * enrollment keeps the fees and end date it was created with.
+ */
 export async function updateBranchSkill(id: string, formData: FormData): Promise<ActionResult> {
   await requireAdmin();
-  const parsed = placementSchema.safeParse(formObject(formData));
+  const parsed = branchSkillSchema.safeParse(formObject(formData));
   if (!parsed.success) return invalid(parsed.error);
 
   const branchSkill = await prisma.branchSkill.findUnique({ where: { id } });
@@ -182,7 +190,7 @@ export async function updateBranchSkill(id: string, formData: FormData): Promise
 
   await prisma.branchSkill.update({ where: { id }, data: parsed.data });
   refresh();
-  return success("Teacher and class saved.");
+  return success("Branch setup saved.");
 }
 
 export async function setBranchSkillActive(id: string, active: boolean): Promise<ActionResult> {

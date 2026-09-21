@@ -90,7 +90,9 @@ type BranchSkillForEnrollment = {
   id: string;
   skillId: string;
   branchId: string;
-  skill: { durationMonths: number; registrationFee: Prisma.Decimal; monthlyFee: Prisma.Decimal };
+  durationMonths: number;
+  registrationFee: Prisma.Decimal;
+  monthlyFee: Prisma.Decimal;
 };
 
 /** The registration fee handed over as the student joins, if it was. */
@@ -108,16 +110,16 @@ function enrollmentData(
   bs: BranchSkillForEnrollment,
   paid: FeePaidNow,
 ) {
-  const owed = bs.skill.registrationFee.gt(0);
+  const owed = bs.registrationFee.gt(0);
   return {
     studentId,
     branchSkillId: bs.id,
     skillId: bs.skillId,
     startDate: toDbDate(startDate),
-    endDate: toDbDate(addMonths(startDate, bs.skill.durationMonths)),
+    endDate: toDbDate(addMonths(startDate, bs.durationMonths)),
     // Copied now so a later price change doesn't touch what this student joined at.
-    monthlyFee: bs.skill.monthlyFee,
-    registrationFee: bs.skill.registrationFee,
+    monthlyFee: bs.monthlyFee,
+    registrationFee: bs.registrationFee,
     createdById,
     ...(paid && owed
       ? {
@@ -126,7 +128,7 @@ function enrollmentData(
               registrationFeePayment({
                 studentId,
                 branchId: bs.branchId,
-                amount: bs.skill.registrationFee,
+                amount: bs.registrationFee,
                 paidOn: paid.on,
                 method: paid.method,
                 recordedById: createdById,
@@ -190,7 +192,6 @@ export async function registerStudent(formData: FormData): Promise<ActionResult<
   const branchSkillIds = [...new Set(skills.data.branchSkillIds)];
   const branchSkills = await prisma.branchSkill.findMany({
     where: { id: { in: branchSkillIds }, branchId: homeBranchId, active: true, skill: { active: true } },
-    include: { skill: { select: { durationMonths: true, registrationFee: true, monthlyFee: true } } },
   });
   if (branchSkills.length !== branchSkillIds.length) {
     return failure("One of the skills is no longer open at this branch. Reload the page and pick again.");
