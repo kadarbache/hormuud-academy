@@ -28,9 +28,16 @@ export function BranchDialog({
             label="Phone"
             name="phone"
             defaultValue={phoneEntry(branch?.phone)}
+            description="Optional. The number people call to reach this branch."
             errors={errors.phone}
           />
-          <TextField label="Address" name="address" defaultValue={branch?.address ?? ""} errors={errors.address} />
+          <TextField
+            label="Address"
+            name="address"
+            defaultValue={branch?.address ?? ""}
+            description="Optional."
+            errors={errors.address}
+          />
         </>
       )}
     </FormDialog>
