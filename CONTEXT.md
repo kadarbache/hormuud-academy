@@ -126,7 +126,7 @@ What a payment was for: Registration fee, Monthly fee, Books, Examination fee or
 _Avoid_: Income type, source
 
 **Fee month**:
-The month a monthly fee pays for, not the day the money arrived. September stays paid whether it was settled in August or in November.
+The month a monthly fee pays for, not the day the money arrived. September stays paid whether it was settled in August or in November. A skill has as many fee months as it lasts months, starting with the month the student joined: four months joining in April is April to July.
 _Avoid_: Billing period, cycle
 
 **Monthly fee payment**:

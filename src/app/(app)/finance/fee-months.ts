@@ -1,4 +1,4 @@
-import { monthOf, monthsBetween } from "@/lib/dates";
+import { addMonthsToMonth, monthOf, monthsBetween } from "@/lib/dates";
 
 /** The parts of an enrollment that decide which months it owes a fee for. */
 export type FeeMonthsInput = {
@@ -16,9 +16,16 @@ export type FeeMonthsInput = {
  * the skill's last month, the month the student stopped, or this month.
  * Nobody owes for a month that hasn't happened, and a student who dropped in
  * March doesn't owe for April.
+ *
+ * A skill lasting four months is four fee months, so it owes exactly its
+ * duration times the monthly fee. The end date is the start date plus the
+ * duration, which lands in the month after the last one taught, so that month
+ * isn't charged: joining on 19 April a 4-month skill ends 19 August and
+ * owes April to July.
  */
 export function feeMonths(enrollment: FeeMonthsInput, today: string): string[] {
-  const ends = [monthOf(enrollment.endDate), monthOf(today)];
+  const lastTaught = addMonthsToMonth(monthOf(enrollment.endDate), -1);
+  const ends = [lastTaught, monthOf(today)];
   if (enrollment.status !== "ACTIVE" && enrollment.statusChangedOn) {
     ends.push(monthOf(enrollment.statusChangedOn));
   }
