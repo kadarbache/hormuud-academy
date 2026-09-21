@@ -19,6 +19,20 @@ import { createSkill } from "./actions";
 
 export const metadata: Metadata = { title: "Skills" };
 
+/** "$5.00" when every branch agrees, "$5.00 to $10.00" when they differ. */
+function moneyRange(values: number[]) {
+  const low = Math.min(...values);
+  const high = Math.max(...values);
+  return low === high ? formatMoney(low) : `${formatMoney(low)} to ${formatMoney(high)}`;
+}
+
+/** "4 months" when every branch agrees, "3 to 4 months" when they differ. */
+function monthsRange(values: number[]) {
+  const low = Math.min(...values);
+  const high = Math.max(...values);
+  return low === high ? formatMonths(low) : `${low} to ${high} months`;
+}
+
 export default async function SkillsPage() {
   const [skills, categories, activeCounts] = await Promise.all([
     prisma.skill.findMany({
@@ -27,7 +41,12 @@ export default async function SkillsPage() {
         category: { select: { name: true } },
         branchSkills: {
           where: { active: true },
-          select: { branch: { select: { name: true } } },
+          select: {
+            durationMonths: true,
+            registrationFee: true,
+            monthlyFee: true,
+            branch: { select: { name: true } },
+          },
           orderBy: { branch: { name: "asc" } },
         },
       },
@@ -47,7 +66,7 @@ export default async function SkillsPage() {
     <>
       <PageHeader
         title="Skills"
-        description="The skill catalog for the whole college. Open a skill to set its teacher and class at each branch."
+        description="The skill catalog for the whole college. Open a skill to set its teacher, class and fees at each branch."
       >
         <SkillDialog
           action={createSkill}
@@ -85,36 +104,41 @@ export default async function SkillsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {skills.map((skill) => (
-                <TableRow key={skill.id}>
-                  <TableCell>
-                    <Link href={`/admin/skills/${skill.id}`} className="font-medium hover:underline">
-                      {skill.name}
-                    </Link>
-                  </TableCell>
-                  <TableCell>{skill.category.name}</TableCell>
-                  <TableCell>{formatMonths(skill.durationMonths)}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatMoney(skill.registrationFee.toString())}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatMoney(skill.monthlyFee.toString())}
-                  </TableCell>
-                  <TableCell className="max-w-56 whitespace-normal">
-                    {skill.branchSkills.length > 0 ? (
-                      skill.branchSkills.map((bs) => bs.branch.name).join(", ")
-                    ) : (
-                      <Link href={`/admin/skills/${skill.id}`} className="text-muted-foreground underline">
-                        No branch yet
+              {skills.map((skill) => {
+                // What the branches teaching it charge, or the skill's defaults
+                // while no branch does.
+                const rows = skill.branchSkills.length > 0 ? skill.branchSkills : [skill];
+                return (
+                  <TableRow key={skill.id}>
+                    <TableCell>
+                      <Link href={`/admin/skills/${skill.id}`} className="font-medium hover:underline">
+                        {skill.name}
                       </Link>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">{activeBySkill.get(skill.id) ?? 0}</TableCell>
-                  <TableCell>
-                    <ActiveBadge active={skill.active} />
-                  </TableCell>
-                </TableRow>
-              ))}
+                    </TableCell>
+                    <TableCell>{skill.category.name}</TableCell>
+                    <TableCell>{monthsRange(rows.map((row) => row.durationMonths))}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {moneyRange(rows.map((row) => Number(row.registrationFee)))}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {moneyRange(rows.map((row) => Number(row.monthlyFee)))}
+                    </TableCell>
+                    <TableCell className="max-w-56 whitespace-normal">
+                      {skill.branchSkills.length > 0 ? (
+                        skill.branchSkills.map((bs) => bs.branch.name).join(", ")
+                      ) : (
+                        <Link href={`/admin/skills/${skill.id}`} className="text-muted-foreground underline">
+                          No branch yet
+                        </Link>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{activeBySkill.get(skill.id) ?? 0}</TableCell>
+                    <TableCell>
+                      <ActiveBadge active={skill.active} />
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
