@@ -11,7 +11,7 @@ Hormuud Academy, the one organisation this system runs. There is no second colle
 _Avoid_: Tenant, organisation, school
 
 **Branch**:
-One location of the college. Classes, teachers and branch staff belong to a branch; the skill catalog and students belong to the whole college.
+One location of the college, often in its own city. Classes, teachers and branch staff belong to a branch; the skill catalog and students belong to the whole college. What a skill costs is set per branch, because a branch in a poorer city charges less.
 _Avoid_: Campus, sub-college, site
 
 **Admin**:
@@ -25,7 +25,7 @@ _Avoid_: Registrar, receptionist, user
 ### What the college teaches
 
 **Skill**:
-Something the college teaches, like Graphic Design or Tailoring, with a duration in months, a registration fee and a monthly fee. One catalog serves every branch.
+Something the college teaches, like Graphic Design or Tailoring. One catalog serves every branch. A skill carries a default duration, registration fee and monthly fee, which a branch starts from when the skill is added to it. Changing a default touches no branch that teaches the skill already.
 _Avoid_: Course, program, subject
 
 **Category**:
@@ -33,7 +33,7 @@ A group of skills, like Technology Skills or Hand Skills.
 _Avoid_: Type, department
 
 **Branch skill**:
-A skill as taught at one branch, with that branch's teacher and class. A skill taught at three branches has three branch skills.
+A skill as taught at one branch, with that branch's teacher, class, duration, registration fee and monthly fee. A skill taught at three branches has three branch skills, and each can charge a different amount. Only the admin sets them.
 _Avoid_: Offering, section, course run
 
 **Class**:
@@ -45,11 +45,11 @@ A person who teaches skills at one or more branches. Not a staff account.
 _Avoid_: Instructor, trainer, lecturer
 
 **Monthly fee**:
-What a skill costs per month, in US dollars.
+What a branch skill costs per month, in US dollars.
 _Avoid_: Price, tuition
 
 **Registration fee**:
-What a student pays once for each skill they start, on top of the monthly fee, in US dollars. Each skill sets its own, and zero means none. Despite the name it goes with the enrollment, not the registration: two skills mean two registration fees, and taking a skill again means paying again.
+What a student pays once for each skill they start, on top of the monthly fee, in US dollars. Each branch skill sets its own, and zero means none. Despite the name it goes with the enrollment, not the registration: two skills mean two registration fees, and taking a skill again means paying again.
 _Avoid_: Admission fee, enrollment fee, joining fee
 
 **Unpaid**:
@@ -98,7 +98,7 @@ The student stopped coming before completing the skill.
 _Avoid_: Cancelled, withdrawn
 
 **End date**:
-An enrollment's start date plus the skill's duration. A guide for staff; it never finishes an enrollment by itself.
+An enrollment's start date plus the branch skill's duration, as it was on the day the student joined. A guide for staff; it never finishes an enrollment by itself.
 
 **Past end date**:
 An Active enrollment whose end date has gone by, waiting for staff to mark it Finished or keep it going.
