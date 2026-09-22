@@ -95,6 +95,18 @@ model Verification {
   @@map("verification")
 }
 
+// Rate limit counters, shared by Better Auth's /api/auth routes and our own
+// sign-in action (src/lib/rate-limit.ts). lastRequest is a Unix time in ms.
+model RateLimit {
+  id          String @id
+  key         String
+  count       Int
+  lastRequest BigInt
+
+  @@unique([key])
+  @@map("rateLimit")
+}
+
 // ---------------------------------------------------------------------------
 // College
 // ---------------------------------------------------------------------------
