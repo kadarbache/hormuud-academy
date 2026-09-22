@@ -127,10 +127,13 @@ Better Auth handles everything about logging in:
 - It checks emails and passwords and stores only a hash of each password, never the password itself.
 - It creates a **session** when someone logs in, stores it in the `session` table, and gives the browser a `better-auth.session_token` cookie. A login lasts 7 days and is extended while the person keeps using the app.
 - The **admin plugin** adds roles (`admin` and `staff`), lets an admin create accounts and set passwords, and **bans** accounts. In this app, "Deactivate" on a staff account is a ban. A ban also ends the person's open sessions.
+- It **rate-limits** its own `/api/auth` endpoints and keeps the counts in the `rateLimit` table. Its default store is the server's memory, which doesn't work on Vercel, where each copy of the app has its own memory and loses it often. Better Auth only applies these limits in production.
 - The `nextCookies()` plugin lets server actions set the login cookie.
 - Sign-up is switched off (`disableSignUp: true`). The seed script creates the first admin, and after that only admins create accounts.
 
 The configuration is in `src/lib/auth.ts`. Better Auth's web endpoints are served at `/api/auth/...` by `src/app/api/auth/[...all]/route.ts`. The screens don't call them directly, because the login and logout forms use server actions.
+
+A server action calls Better Auth's functions directly, without going through `/api/auth`, so Better Auth's rate limit never sees it. That's why the login action checks its own limit first, with `consumeRateLimit()` from `src/lib/rate-limit.ts`, in the same `rateLimit` table.
 
 ### Zod
 
@@ -267,7 +270,7 @@ hormuud-academy/
 │   │   └── *.tsx                Shared pieces: FormDialog, ActionButton, fields, badges
 │   ├── hooks/                   useFormAction and useIsMobile
 │   ├── lib/                     auth, session, prisma, access, dates, money, teacher-share,
-│   │                            format, validation, search-params, cloudinary
+│   │                            format, validation, search-params, cloudinary, rate-limit
 │   └── generated/prisma/        The generated Prisma client (not in git)
 ├── docs/                        This guide and the decision records
 ├── CONTEXT.md                   The glossary
@@ -375,6 +378,8 @@ sequenceDiagram
 - Passwords are stored as hashes. Nobody, including the admin, can read a password back. An admin can only set a new one.
 - There is no sign-up page.
 - Deactivating an account stops the login and ends every open session straight away.
+- Setting a new password also ends every open session for that person, because a reset often means someone else knew the old password. An admin who resets their own password stays logged in on the device they're using.
+- The login form allows 5 tries per email and 20 tries per computer (IP address) each minute. After that it shows "Too many login attempts" and how many seconds to wait. This stops anyone guessing a password by trying thousands.
 
 ### Dates and the time zone
 
@@ -669,6 +674,8 @@ A student has no status column. They are Active when at least one of their enrol
 
 **Session**, **Account**, **Verification** (`session`, `account`, `verification`). Better Auth's tables. A session is one login on one device. An account row holds the password hash for email logins. Verification is unused for now; Better Auth uses it for things like email confirmation links.
 
+**RateLimit** (`rateLimit`). Counts recent login attempts. `key` says what's being counted, such as `action:sign-in:email:amina@example.com`, `count` is the attempts so far, and `lastRequest` is when the count started, in milliseconds. Rows older than a minute are deleted as new attempts come in.
+
 ### Rules the database enforces itself
 
 These hold even if a bug slips into the code:
@@ -691,6 +698,7 @@ The app adds its own checks on top. Names are compared ignoring upper and lower 
 | `20260920104500_financial_system` | Adds payments, expenses, budgets and budget lines, and the teacher's salary type. Moves every registration fee already recorded as paid into `payments`, then drops the two columns that held it. The moved rows land under Cash with a note saying the method wasn't asked for back then, rather than pretending the college knows |
 | `20260921120000_whatsapp_phone_numbers` | Rewrites every phone number already in the database into WhatsApp's form. `0611111111`, `611111111`, `+252 61 1111111` and `00252611111111` all become `252611111111`. Anything that isn't a Somali mobile is left alone for a person to look at |
 | `20260921180000_branch_skill_pricing` | Gives each branch skill its own duration, registration fee and monthly fee, copied from its skill so nothing changes until the admin edits a branch |
+| `20260922090000_rate_limit` | Adds the `rateLimit` table, which counts login attempts so someone can't guess a password by trying thousands |
 
 ### Looking at the data yourself
 
@@ -733,7 +741,7 @@ A staff account that has no branch set sees a notice asking them to contact the 
 
 ### Logging in and out
 
-Go to the app's address. Anyone not logged in lands on the login page. Log in with the email and password the admin gave you. A wrong password shows "Wrong email or password.", and a deactivated account shows "This account has been deactivated."
+Go to the app's address. Anyone not logged in lands on the login page. Log in with the email and password the admin gave you. A wrong password shows "Wrong email or password.", and a deactivated account shows "This account has been deactivated." After 5 wrong tries in a minute, the form makes you wait before you can try again.
 
 To log out, use **Log out** at the bottom of the sidebar.
 
@@ -800,7 +808,7 @@ On a **skill's page** you can:
 
 - **Add staff account.** Enter a name, an email, a role and, for branch staff, their branch, then choose a password of at least 8 characters. There's no email sending, so you tell the person their password yourself.
 - **Edit** changes the name, role or branch. The email can't be changed. You can't change your own role, so the college can't be left without an admin.
-- **New password** sets a new password when someone forgets theirs.
+- **New password** sets a new password when someone forgets theirs. It also logs them out everywhere, so they log in again with the new one.
 - **Deactivate** logs the person out everywhere and blocks their login. Their students and records stay. **Turn back on** reverses it. You can't deactivate yourself.
 
 Accounts can't be deleted, because students and enrollments record who created them.
