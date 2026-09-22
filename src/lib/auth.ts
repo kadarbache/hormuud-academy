@@ -15,6 +15,15 @@ export const auth = betterAuth({
     disableSignUp: true,
     minPasswordLength: 8,
   },
+  // Only covers requests to /api/auth. The login form signs in through a
+  // server action, which checks its own limits (src/lib/rate-limit.ts). Kept
+  // in the database because Vercel's function instances don't share memory.
+  rateLimit: {
+    storage: "database",
+    customRules: {
+      "/sign-in/email": { window: 60, max: 5 },
+    },
+  },
   user: {
     additionalFields: {
       // Set by the admin only, never from a sign-in form.
