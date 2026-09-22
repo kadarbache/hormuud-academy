@@ -106,16 +106,25 @@ export async function updateStaffAccount(id: string, formData: FormData): Promis
 }
 
 export async function resetStaffPassword(id: string, formData: FormData): Promise<ActionResult> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const parsed = z.object({ password }).safeParse(formObject(formData));
   if (!parsed.success) return invalid(parsed.error);
 
+  const requestHeaders = await headers();
   await auth.api.setUserPassword({
     body: { userId: id, newPassword: parsed.data.password },
-    headers: await headers(),
+    headers: requestHeaders,
   });
+  // A reset often means someone else knows the old password, so end every
+  // session that was opened with it. An admin resetting their own password
+  // keeps the session they're using.
+  if (id === admin.id) {
+    await auth.api.revokeOtherSessions({ headers: requestHeaders });
+  } else {
+    await auth.api.revokeUserSessions({ body: { userId: id }, headers: requestHeaders });
+  }
 
-  return success("Password changed. Give the new password to the person.");
+  return success("Password changed and the person was logged out. Give them the new password.");
 }
 
 /** Deactivating bans the account in Better Auth, which also logs it out everywhere. */
