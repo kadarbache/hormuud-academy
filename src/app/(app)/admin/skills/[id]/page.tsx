@@ -3,15 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { ActionButton } from "@/components/action-button";
+import { DataTable } from "@/components/data-table";
 import { PageHeader } from "@/components/page-header";
 import { ActiveBadge, EmptyRow } from "@/components/status-badge";
 import { formatMoney, formatMonths } from "@/lib/format";
@@ -183,97 +176,86 @@ export default async function SkillPage({ params }: PageProps<"/admin/skills/[id
         {skill.branchSkills.length === 0 ? (
           <EmptyRow message="No branch teaches this skill yet, so nobody can enroll in it." />
         ) : (
-          <div className="rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Branch</TableHead>
-                  <TableHead>Teacher</TableHead>
-                  <TableHead>Class</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead className="text-right">Registration fee</TableHead>
-                  <TableHead className="text-right">Monthly fee</TableHead>
-                  <TableHead className="text-right">Active students</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">
-                    <span className="sr-only">Actions</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {skill.branchSkills.map((bs) => {
-                  const counts = countsFor(bs.id);
-                  return (
-                    <TableRow key={bs.id}>
-                      <TableCell className="font-medium">{bs.branch.name}</TableCell>
-                      <TableCell>{bs.teacher.name}</TableCell>
-                      <TableCell>{bs.classroom.name}</TableCell>
-                      <TableCell>{formatMonths(bs.durationMonths)}</TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatMoney(bs.registrationFee.toString())}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatMoney(bs.monthlyFee.toString())}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{counts.active}</TableCell>
-                      <TableCell>
-                        <ActiveBadge active={bs.active} />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex justify-end gap-1">
-                          <BranchSkillDialog
-                            action={updateBranchSkill.bind(null, bs.id)}
-                            branches={[]}
-                            teachers={teacherOptions}
-                            classrooms={classroomOptions}
-                            current={{
-                              branchId: bs.branchId,
-                              branchName: bs.branch.name,
-                              teacherId: bs.teacherId,
-                              classroomId: bs.classroomId,
-                            }}
-                            pricing={{
-                              durationMonths: bs.durationMonths,
-                              registrationFee: bs.registrationFee.toString(),
-                              monthlyFee: bs.monthlyFee.toString(),
-                            }}
-                            trigger={
-                              <Button variant="ghost" size="sm">
-                                Change
-                              </Button>
-                            }
-                          />
-                          <ActionButton
-                            variant="ghost"
-                            size="sm"
-                            action={setBranchSkillActive.bind(null, bs.id, !bs.active)}
-                          >
-                            {bs.active ? "Deactivate" : "Activate"}
-                          </ActionButton>
-                          {counts.total === 0 && (
-                            <ActionButton
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive"
-                              action={deleteBranchSkill.bind(null, bs.id)}
-                              confirm={{
-                                title: `Remove ${skill.name} from ${bs.branch.name}?`,
-                                description: "No student has taken it at this branch, so it can be removed for good.",
-                                confirmLabel: "Remove",
-                                destructive: true,
-                              }}
-                            >
-                              Remove
-                            </ActionButton>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+          <DataTable
+            columns={[
+              { label: "Branch", className: "font-medium" },
+              { label: "Teacher" },
+              { label: "Class" },
+              { label: "Duration" },
+              { label: "Registration fee", className: "text-right tabular-nums" },
+              { label: "Monthly fee", className: "text-right tabular-nums" },
+              { label: "Active students", className: "text-right tabular-nums" },
+              { label: "Status" },
+              { label: "Actions", actions: true, className: "text-right" },
+            ]}
+            rows={skill.branchSkills.map((bs) => {
+              const counts = countsFor(bs.id);
+              return {
+                key: bs.id,
+                title: bs.branch.name,
+                description: `${skill.name} with ${bs.teacher.name}`,
+                cells: {
+                  Branch: bs.branch.name,
+                  Teacher: bs.teacher.name,
+                  Class: bs.classroom.name,
+                  Duration: formatMonths(bs.durationMonths),
+                  "Registration fee": formatMoney(bs.registrationFee.toString()),
+                  "Monthly fee": formatMoney(bs.monthlyFee.toString()),
+                  "Active students": counts.active,
+                  Status: <ActiveBadge active={bs.active} />,
+                  Actions: (
+                    <div className="flex justify-end gap-1">
+                      <BranchSkillDialog
+                        action={updateBranchSkill.bind(null, bs.id)}
+                        branches={[]}
+                        teachers={teacherOptions}
+                        classrooms={classroomOptions}
+                        current={{
+                          branchId: bs.branchId,
+                          branchName: bs.branch.name,
+                          teacherId: bs.teacherId,
+                          classroomId: bs.classroomId,
+                        }}
+                        pricing={{
+                          durationMonths: bs.durationMonths,
+                          registrationFee: bs.registrationFee.toString(),
+                          monthlyFee: bs.monthlyFee.toString(),
+                        }}
+                        trigger={
+                          <Button variant="ghost" size="sm">
+                            Change
+                          </Button>
+                        }
+                      />
+                      <ActionButton
+                        variant="ghost"
+                        size="sm"
+                        action={setBranchSkillActive.bind(null, bs.id, !bs.active)}
+                      >
+                        {bs.active ? "Deactivate" : "Activate"}
+                      </ActionButton>
+                      {counts.total === 0 && (
+                        <ActionButton
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive"
+                          action={deleteBranchSkill.bind(null, bs.id)}
+                          confirm={{
+                            title: `Remove ${skill.name} from ${bs.branch.name}?`,
+                            description: "No student has taken it at this branch, so it can be removed for good.",
+                            confirmLabel: "Remove",
+                            destructive: true,
+                          }}
+                        >
+                          Remove
+                        </ActionButton>
+                      )}
+                    </div>
+                  ),
+                },
+              };
+            })}
+          />
         )}
       </section>
     </>

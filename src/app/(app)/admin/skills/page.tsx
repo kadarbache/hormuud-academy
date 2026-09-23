@@ -2,14 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable } from "@/components/data-table";
 import { PageHeader } from "@/components/page-header";
 import { ActiveBadge, EmptyRow } from "@/components/status-badge";
 import { formatMoney, formatMonths } from "@/lib/format";
@@ -89,59 +82,49 @@ export default async function SkillsPage() {
           }
         />
       ) : (
-        <div className="rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Skill</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Duration</TableHead>
-                <TableHead className="text-right">Registration fee</TableHead>
-                <TableHead className="text-right">Monthly fee</TableHead>
-                <TableHead>Taught at</TableHead>
-                <TableHead className="text-right">Active students</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {skills.map((skill) => {
-                // What the branches teaching it charge, or the skill's defaults
-                // while no branch does.
-                const rows = skill.branchSkills.length > 0 ? skill.branchSkills : [skill];
-                return (
-                  <TableRow key={skill.id}>
-                    <TableCell>
-                      <Link href={`/admin/skills/${skill.id}`} className="font-medium hover:underline">
-                        {skill.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell>{skill.category.name}</TableCell>
-                    <TableCell>{monthsRange(rows.map((row) => row.durationMonths))}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {moneyRange(rows.map((row) => Number(row.registrationFee)))}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {moneyRange(rows.map((row) => Number(row.monthlyFee)))}
-                    </TableCell>
-                    <TableCell className="max-w-56 whitespace-normal">
-                      {skill.branchSkills.length > 0 ? (
-                        skill.branchSkills.map((bs) => bs.branch.name).join(", ")
-                      ) : (
-                        <Link href={`/admin/skills/${skill.id}`} className="text-muted-foreground underline">
-                          No branch yet
-                        </Link>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{activeBySkill.get(skill.id) ?? 0}</TableCell>
-                    <TableCell>
-                      <ActiveBadge active={skill.active} />
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable
+          columns={[
+            { label: "Skill" },
+            { label: "Category" },
+            { label: "Duration" },
+            { label: "Registration fee", className: "text-right tabular-nums" },
+            { label: "Monthly fee", className: "text-right tabular-nums" },
+            { label: "Taught at", className: "max-w-56 whitespace-normal" },
+            { label: "Active students", className: "text-right tabular-nums" },
+            { label: "Status" },
+          ]}
+          rows={skills.map((skill) => {
+            // What the branches teaching it charge, or the skill's defaults
+            // while no branch does.
+            const rows = skill.branchSkills.length > 0 ? skill.branchSkills : [skill];
+            return {
+              key: skill.id,
+              title: skill.name,
+              description: skill.category.name,
+              cells: {
+                Skill: (
+                  <Link href={`/admin/skills/${skill.id}`} className="font-medium hover:underline">
+                    {skill.name}
+                  </Link>
+                ),
+                Category: skill.category.name,
+                Duration: monthsRange(rows.map((row) => row.durationMonths)),
+                "Registration fee": moneyRange(rows.map((row) => Number(row.registrationFee))),
+                "Monthly fee": moneyRange(rows.map((row) => Number(row.monthlyFee))),
+                "Taught at":
+                  skill.branchSkills.length > 0 ? (
+                    skill.branchSkills.map((bs) => bs.branch.name).join(", ")
+                  ) : (
+                    <Link href={`/admin/skills/${skill.id}`} className="text-muted-foreground underline">
+                      No branch yet
+                    </Link>
+                  ),
+                "Active students": activeBySkill.get(skill.id) ?? 0,
+                Status: <ActiveBadge active={skill.active} />,
+              },
+            };
+          })}
+        />
       )}
     </>
   );
