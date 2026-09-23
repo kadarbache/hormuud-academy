@@ -2,15 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { ActionButton } from "@/components/action-button";
+import { DataTable } from "@/components/data-table";
 import { PageHeader } from "@/components/page-header";
 import { ActiveBadge, EmptyRow } from "@/components/status-badge";
 import { formatMoney } from "@/lib/format";
@@ -89,126 +82,109 @@ export default async function TeachersPage() {
           }
         />
       ) : (
-        <div className="rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Teacher</TableHead>
-                {isAdmin && <TableHead>Branches</TableHead>}
-                {isAdmin && <TableHead>Paid</TableHead>}
-                <TableHead>Teaches</TableHead>
-                <TableHead>Status</TableHead>
-                {isAdmin && (
-                  <TableHead className="text-right">
-                    <span className="sr-only">Actions</span>
-                  </TableHead>
-                )}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {teachers.map((teacher) => {
-                const branchIds = teacher.branches.map((link) => link.branchId);
-                // Keep a branch the teacher is linked to in the list even if
-                // it's inactive, so saving the form doesn't silently drop it.
-                const branchOptions = branches
-                  .filter((branch) => branch.active || branchIds.includes(branch.id))
-                  .map((branch) => ({ value: branch.id, label: branch.name }));
+        <DataTable
+          columns={[
+            { label: "Teacher" },
+            ...(isAdmin ? [{ label: "Branches", className: "whitespace-normal" }] : []),
+            ...(isAdmin ? [{ label: "Paid" }] : []),
+            { label: "Teaches", className: "max-w-72 whitespace-normal text-muted-foreground" },
+            { label: "Status" },
+            ...(isAdmin ? [{ label: "Actions", actions: true, className: "text-right" }] : []),
+          ]}
+          rows={teachers.map((teacher) => {
+            const branchIds = teacher.branches.map((link) => link.branchId);
+            // Keep a branch the teacher is linked to in the list even if
+            // it's inactive, so saving the form doesn't silently drop it.
+            const branchOptions = branches
+              .filter((branch) => branch.active || branchIds.includes(branch.id))
+              .map((branch) => ({ value: branch.id, label: branch.name }));
 
-                return (
-                  <TableRow key={teacher.id}>
-                    <TableCell>
-                      <div className="font-medium">{teacher.name}</div>
-                      {teacher.phone && (
-                        <div className="text-xs text-muted-foreground">{formatPhone(teacher.phone)}</div>
-                      )}
-                    </TableCell>
-                    {isAdmin && (
-                      <TableCell className="whitespace-normal">
-                        {teacher.branches.map((link) => link.branch.name).join(", ")}
-                      </TableCell>
+            return {
+              key: teacher.id,
+              title: teacher.name,
+              description: teacher.phone ? formatPhone(teacher.phone) : undefined,
+              cells: {
+                Teacher: (
+                  <>
+                    <div className="font-medium">{teacher.name}</div>
+                    {teacher.phone && (
+                      <div className="text-xs text-muted-foreground">{formatPhone(teacher.phone)}</div>
                     )}
-                    {isAdmin && (
-                      <TableCell>
-                        <Link
-                          href={`/finance/teacher-pay/${teacher.id}`}
-                          className="hover:underline"
-                        >
-                          {salaryTypeLabels[teacher.salaryType]}
-                        </Link>
-                        <div className="text-xs text-muted-foreground">
-                          {teacher.salaryType === "PERCENTAGE"
-                            ? teacher.percentageRate
-                              ? `${teacher.percentageRate.toString()}% of monthly fees`
-                              : "No rate set"
-                            : `${formatMoney(teacher.fixedSalary?.toString() ?? "0")} a month`}
-                        </div>
-                      </TableCell>
+                  </>
+                ),
+                Branches: teacher.branches.map((link) => link.branch.name).join(", "),
+                Paid: (
+                  <>
+                    <Link href={`/finance/teacher-pay/${teacher.id}`} className="hover:underline">
+                      {salaryTypeLabels[teacher.salaryType]}
+                    </Link>
+                    <div className="text-xs text-muted-foreground">
+                      {teacher.salaryType === "PERCENTAGE"
+                        ? teacher.percentageRate
+                          ? `${teacher.percentageRate.toString()}% of monthly fees`
+                          : "No rate set"
+                        : `${formatMoney(teacher.fixedSalary?.toString() ?? "0")} a month`}
+                    </div>
+                  </>
+                ),
+                Teaches:
+                  teacher.branchSkills
+                    .map((bs) =>
+                      isAdmin
+                        ? `${bs.skill.name} (${bs.branch.name})`
+                        : `${bs.skill.name} in ${bs.classroom.name}`,
+                    )
+                    .join(", ") || "Nothing yet",
+                Status: <ActiveBadge active={teacher.active} />,
+                Actions: (
+                  <div className="flex justify-end gap-1">
+                    <TeacherDialog
+                      action={updateTeacher.bind(null, teacher.id)}
+                      branches={branchOptions}
+                      teacher={{
+                        name: teacher.name,
+                        phone: teacher.phone,
+                        branchIds,
+                        salaryType: teacher.salaryType,
+                        fixedSalary: teacher.fixedSalary?.toString() ?? "",
+                        percentageRate: teacher.percentageRate?.toString() ?? "",
+                      }}
+                      trigger={
+                        <Button variant="ghost" size="sm">
+                          Edit
+                        </Button>
+                      }
+                    />
+                    <ActionButton
+                      variant="ghost"
+                      size="sm"
+                      action={setTeacherActive.bind(null, teacher.id, !teacher.active)}
+                    >
+                      {teacher.active ? "Deactivate" : "Activate"}
+                    </ActionButton>
+                    {teacher.branchSkills.length === 0 && (
+                      <ActionButton
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive"
+                        action={deleteTeacher.bind(null, teacher.id)}
+                        confirm={{
+                          title: `Delete ${teacher.name}?`,
+                          description:
+                            "This teacher isn't set on any skill, so they can be deleted for good.",
+                          confirmLabel: "Delete teacher",
+                          destructive: true,
+                        }}
+                      >
+                        Delete
+                      </ActionButton>
                     )}
-                    <TableCell className="max-w-72 whitespace-normal text-muted-foreground">
-                      {teacher.branchSkills
-                        .map((bs) =>
-                          isAdmin
-                            ? `${bs.skill.name} (${bs.branch.name})`
-                            : `${bs.skill.name} in ${bs.classroom.name}`,
-                        )
-                        .join(", ") || "Nothing yet"}
-                    </TableCell>
-                    <TableCell>
-                      <ActiveBadge active={teacher.active} />
-                    </TableCell>
-                    {isAdmin && (
-                      <TableCell>
-                        <div className="flex justify-end gap-1">
-                          <TeacherDialog
-                            action={updateTeacher.bind(null, teacher.id)}
-                            branches={branchOptions}
-                            teacher={{
-                              name: teacher.name,
-                              phone: teacher.phone,
-                              branchIds,
-                              salaryType: teacher.salaryType,
-                              fixedSalary: teacher.fixedSalary?.toString() ?? "",
-                              percentageRate: teacher.percentageRate?.toString() ?? "",
-                            }}
-                            trigger={
-                              <Button variant="ghost" size="sm">
-                                Edit
-                              </Button>
-                            }
-                          />
-                          <ActionButton
-                            variant="ghost"
-                            size="sm"
-                            action={setTeacherActive.bind(null, teacher.id, !teacher.active)}
-                          >
-                            {teacher.active ? "Deactivate" : "Activate"}
-                          </ActionButton>
-                          {teacher.branchSkills.length === 0 && (
-                            <ActionButton
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive"
-                              action={deleteTeacher.bind(null, teacher.id)}
-                              confirm={{
-                                title: `Delete ${teacher.name}?`,
-                                description:
-                                  "This teacher isn't set on any skill, so they can be deleted for good.",
-                                confirmLabel: "Delete teacher",
-                                destructive: true,
-                              }}
-                            >
-                              Delete
-                            </ActionButton>
-                          )}
-                        </div>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
+                  </div>
+                ),
+              },
+            };
+          })}
+        />
       )}
     </>
   );

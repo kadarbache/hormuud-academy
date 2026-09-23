@@ -8,14 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable } from "@/components/data-table";
 import { PageHeader } from "@/components/page-header";
 import { SelectInput, type Option } from "@/components/select-input";
 import { EmptyRow } from "@/components/status-badge";
@@ -173,74 +166,73 @@ export default async function StudentsPage({ searchParams }: PageProps<"/student
         />
       ) : (
         <>
-          <div className="rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Home branch</TableHead>
-                  <TableHead>Skills</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {students.map((student) => (
-                  <TableRow key={student.id}>
-                    <TableCell>
-                      <Link href={`/students/${student.id}`} className="flex items-center gap-3">
-                        <Avatar className="size-8">
-                          <AvatarImage src={student.photoUrl ?? undefined} alt="" className="object-cover" />
-                          <AvatarFallback>
-                            <UserRound className="size-4 text-muted-foreground" />
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <div className="font-medium hover:underline">{student.fullName}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {formatStudentNumber(student.number)} · {student.sex === "MALE" ? "Male" : "Female"}
-                          </div>
-                        </div>
-                      </Link>
-                    </TableCell>
-                    <TableCell>{formatPhone(student.phone) || "—"}</TableCell>
-                    <TableCell>{student.homeBranchName}</TableCell>
-                    <TableCell className="max-w-72 whitespace-normal">
-                      <div className="flex flex-wrap gap-1">
-                        {student.skills.length === 0 && <span className="text-muted-foreground">None active</span>}
-                        {student.skills.map((skill) => (
-                          <Badge
-                            key={skill.name}
-                            variant="outline"
-                            className={skill.pastEnd ? warning : undefined}
-                            title={skill.pastEnd ? "Past its end date" : undefined}
-                          >
-                            {skill.name}
-                          </Badge>
-                        ))}
+          <DataTable
+            columns={[
+              { label: "Student" },
+              { label: "Phone" },
+              { label: "Home branch" },
+              { label: "Skills", className: "max-w-72 whitespace-normal" },
+              { label: "Status" },
+            ]}
+            rows={students.map((student) => ({
+              key: student.id,
+              title: student.fullName,
+              description: `${formatStudentNumber(student.number)} · ${student.sex === "MALE" ? "Male" : "Female"}`,
+              cells: {
+                Student: (
+                  <Link href={`/students/${student.id}`} className="flex items-center gap-3">
+                    <Avatar className="size-8">
+                      <AvatarImage src={student.photoUrl ?? undefined} alt="" className="object-cover" />
+                      <AvatarFallback>
+                        <UserRound className="size-4 text-muted-foreground" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <div className="font-medium hover:underline">{student.fullName}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {formatStudentNumber(student.number)} · {student.sex === "MALE" ? "Male" : "Female"}
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {student.isActive ? (
-                          <Badge variant="secondary">Active</Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-muted-foreground">
-                            Inactive
-                          </Badge>
-                        )}
-                        {student.unpaidFees > 0 && (
-                          <Badge variant="outline" className={warning}>
-                            Fee unpaid
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                    </div>
+                  </Link>
+                ),
+                Phone: formatPhone(student.phone) || "—",
+                "Home branch": student.homeBranchName,
+                Skills: (
+                  <div className="flex flex-wrap gap-1">
+                    {student.skills.length === 0 && (
+                      <span className="text-muted-foreground">None active</span>
+                    )}
+                    {student.skills.map((skill) => (
+                      <Badge
+                        key={skill.name}
+                        variant="outline"
+                        className={skill.pastEnd ? warning : undefined}
+                        title={skill.pastEnd ? "Past its end date" : undefined}
+                      >
+                        {skill.name}
+                      </Badge>
+                    ))}
+                  </div>
+                ),
+                Status: (
+                  <div className="flex flex-wrap gap-1">
+                    {student.isActive ? (
+                      <Badge variant="secondary">Active</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-muted-foreground">
+                        Inactive
+                      </Badge>
+                    )}
+                    {student.unpaidFees > 0 && (
+                      <Badge variant="outline" className={warning}>
+                        Fee unpaid
+                      </Badge>
+                    )}
+                  </div>
+                ),
+              },
+            }))}
+          />
 
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
             <span>

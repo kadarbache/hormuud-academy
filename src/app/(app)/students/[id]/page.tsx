@@ -6,15 +6,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { ActionButton } from "@/components/action-button";
+import { DataTable } from "@/components/data-table";
 import { EmptyRow } from "@/components/status-badge";
 import type { Prisma } from "@/generated/prisma/client";
 import { canActAtBranch } from "@/lib/access";
@@ -335,118 +328,113 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
         {student.enrollments.length === 0 ? (
           <EmptyRow message="No skills here yet." />
         ) : (
-          <div className="rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Skill</TableHead>
-                  <TableHead>Teacher and class</TableHead>
-                  <TableHead>Dates</TableHead>
-                  <TableHead>Registration fee</TableHead>
-                  <TableHead className="text-right">Monthly fee</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">
-                    <span className="sr-only">Actions</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {student.enrollments.map((enrollment) => {
-                  const pastEnd =
-                    enrollment.status === "ACTIVE" && fromDbDate(enrollment.endDate) < today;
-                  const canAct = canActAtBranch(user, enrollment.branchSkill.branchId);
-                  return (
-                    <TableRow key={enrollment.id}>
-                      <TableCell>
-                        <div className="font-medium">{enrollment.skill.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {enrollment.branchSkill.branch.name}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div>{enrollment.branchSkill.teacher.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {enrollment.branchSkill.classroom.name}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          {formatDate(enrollment.startDate)} to {formatDate(enrollment.endDate)}
-                        </div>
-                        {pastEnd && (
-                          <Badge variant="outline" className={`mt-1 ${warning}`}>
-                            Past end date
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <RegistrationFee
-                          enrollment={enrollment}
-                          payment={enrollment.payments.find(
-                            (payment) => payment.category === "REGISTRATION_FEE",
-                          )}
-                          canRecord={canAct}
-                          isAdmin={isAdmin}
-                          today={today}
-                        />
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatMoney(enrollment.monthlyFee.toString())}
-                      </TableCell>
-                      <TableCell>
-                        <EnrollmentStatus status={enrollment.status} />
-                      </TableCell>
-                      <TableCell>
-                        {canAct && (
-                          <div className="flex justify-end gap-1">
-                            {enrollment.status === "ACTIVE" ? (
-                              <>
-                                <ActionButton
-                                  variant="ghost"
-                                  size="sm"
-                                  action={setEnrollmentStatus.bind(null, enrollment.id, "FINISHED")}
-                                >
-                                  Mark finished
-                                </ActionButton>
-                                <ActionButton
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-destructive"
-                                  action={setEnrollmentStatus.bind(null, enrollment.id, "DROPPED")}
-                                  confirm={{
-                                    title: `Drop ${enrollment.skill.name}?`,
-                                    description:
-                                      "Use this when the student stopped coming before finishing. You can set it active again later.",
-                                    confirmLabel: "Drop skill",
-                                    destructive: true,
-                                  }}
-                                >
-                                  Drop
-                                </ActionButton>
-                              </>
-                            ) : (
-                              <ActionButton
-                                variant="ghost"
-                                size="sm"
-                                action={setEnrollmentStatus.bind(null, enrollment.id, "ACTIVE")}
-                                confirm={{
-                                  title: `Set ${enrollment.skill.name} active again?`,
-                                  description: `It's marked ${statusLabel[enrollment.status].toLowerCase()} now. Use this to undo a mistake.`,
-                                  confirmLabel: "Set active",
-                                }}
-                              >
-                                Set active
-                              </ActionButton>
-                            )}
-                          </div>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+          <DataTable
+            columns={[
+              { label: "Skill" },
+              { label: "Teacher and class" },
+              { label: "Dates" },
+              { label: "Registration fee" },
+              { label: "Monthly fee", className: "text-right tabular-nums" },
+              { label: "Status" },
+              { label: "Actions", actions: true, className: "text-right" },
+            ]}
+            rows={student.enrollments.map((enrollment) => {
+              const pastEnd =
+                enrollment.status === "ACTIVE" && fromDbDate(enrollment.endDate) < today;
+              const canAct = canActAtBranch(user, enrollment.branchSkill.branchId);
+              return {
+                key: enrollment.id,
+                title: enrollment.skill.name,
+                description: enrollment.branchSkill.branch.name,
+                cells: {
+                  Skill: (
+                    <>
+                      <div className="font-medium">{enrollment.skill.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {enrollment.branchSkill.branch.name}
+                      </div>
+                    </>
+                  ),
+                  "Teacher and class": (
+                    <>
+                      <div>{enrollment.branchSkill.teacher.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {enrollment.branchSkill.classroom.name}
+                      </div>
+                    </>
+                  ),
+                  Dates: (
+                    <>
+                      <div>
+                        {formatDate(enrollment.startDate)} to {formatDate(enrollment.endDate)}
+                      </div>
+                      {pastEnd && (
+                        <Badge variant="outline" className={`mt-1 ${warning}`}>
+                          Past end date
+                        </Badge>
+                      )}
+                    </>
+                  ),
+                  "Registration fee": (
+                    <RegistrationFee
+                      enrollment={enrollment}
+                      payment={enrollment.payments.find(
+                        (payment) => payment.category === "REGISTRATION_FEE",
+                      )}
+                      canRecord={canAct}
+                      isAdmin={isAdmin}
+                      today={today}
+                    />
+                  ),
+                  "Monthly fee": formatMoney(enrollment.monthlyFee.toString()),
+                  Status: <EnrollmentStatus status={enrollment.status} />,
+                  Actions: canAct && (
+                    <div className="flex justify-end gap-1">
+                      {enrollment.status === "ACTIVE" ? (
+                        <>
+                          <ActionButton
+                            variant="ghost"
+                            size="sm"
+                            action={setEnrollmentStatus.bind(null, enrollment.id, "FINISHED")}
+                          >
+                            Mark finished
+                          </ActionButton>
+                          <ActionButton
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive"
+                            action={setEnrollmentStatus.bind(null, enrollment.id, "DROPPED")}
+                            confirm={{
+                              title: `Drop ${enrollment.skill.name}?`,
+                              description:
+                                "Use this when the student stopped coming before finishing. You can set it active again later.",
+                              confirmLabel: "Drop skill",
+                              destructive: true,
+                            }}
+                          >
+                            Drop
+                          </ActionButton>
+                        </>
+                      ) : (
+                        <ActionButton
+                          variant="ghost"
+                          size="sm"
+                          action={setEnrollmentStatus.bind(null, enrollment.id, "ACTIVE")}
+                          confirm={{
+                            title: `Set ${enrollment.skill.name} active again?`,
+                            description: `It's marked ${statusLabel[enrollment.status].toLowerCase()} now. Use this to undo a mistake.`,
+                            confirmLabel: "Set active",
+                          }}
+                        >
+                          Set active
+                        </ActionButton>
+                      )}
+                    </div>
+                  ),
+                },
+              };
+            })}
+          />
         )}
       </section>
 

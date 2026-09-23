@@ -1,15 +1,8 @@
 import type { Metadata } from "next";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { ActionButton } from "@/components/action-button";
+import { DataTable } from "@/components/data-table";
 import { PageHeader } from "@/components/page-header";
 import { ActiveBadge, EmptyRow } from "@/components/status-badge";
 import { prisma } from "@/lib/prisma";
@@ -78,77 +71,68 @@ export default async function ClassesPage() {
           }
         />
       ) : (
-        <div className="rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Class</TableHead>
-                {isAdmin && <TableHead>Branch</TableHead>}
-                <TableHead>Skills taught here</TableHead>
-                <TableHead>Status</TableHead>
-                {isAdmin && (
-                  <TableHead className="text-right">
-                    <span className="sr-only">Actions</span>
-                  </TableHead>
-                )}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {classrooms.map((classroom) => (
-                <TableRow key={classroom.id}>
-                  <TableCell className="font-medium">{classroom.name}</TableCell>
-                  {isAdmin && <TableCell>{classroom.branch.name}</TableCell>}
-                  <TableCell className="max-w-72 whitespace-normal text-muted-foreground">
-                    {classroom.branchSkills
-                      .map((bs) => `${bs.skill.name} (${bs.teacher.name})`)
-                      .join(", ") || "None"}
-                  </TableCell>
-                  <TableCell>
-                    <ActiveBadge active={classroom.active} />
-                  </TableCell>
-                  {isAdmin && (
-                    <TableCell>
-                      <div className="flex justify-end gap-1">
-                        <RenameClassDialog
-                          action={renameClassroom.bind(null, classroom.id)}
-                          name={classroom.name}
-                          trigger={
-                            <Button variant="ghost" size="sm">
-                              Rename
-                            </Button>
-                          }
-                        />
-                        <ActionButton
-                          variant="ghost"
-                          size="sm"
-                          action={setClassroomActive.bind(null, classroom.id, !classroom.active)}
-                        >
-                          {classroom.active ? "Deactivate" : "Activate"}
-                        </ActionButton>
-                        {classroom.branchSkills.length === 0 && (
-                          <ActionButton
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive"
-                            action={deleteClassroom.bind(null, classroom.id)}
-                            confirm={{
-                              title: `Delete ${classroom.name}?`,
-                              description: "No skill is taught in this class, so it can be deleted for good.",
-                              confirmLabel: "Delete class",
-                              destructive: true,
-                            }}
-                          >
-                            Delete
-                          </ActionButton>
-                        )}
-                      </div>
-                    </TableCell>
+        <DataTable
+          columns={[
+            { label: "Class", className: "font-medium" },
+            ...(isAdmin ? [{ label: "Branch" }] : []),
+            {
+              label: "Skills taught here",
+              className: "max-w-72 whitespace-normal text-muted-foreground",
+            },
+            { label: "Status" },
+            ...(isAdmin ? [{ label: "Actions", actions: true, className: "text-right" }] : []),
+          ]}
+          rows={classrooms.map((classroom) => ({
+            key: classroom.id,
+            title: classroom.name,
+            description: isAdmin ? classroom.branch.name : undefined,
+            cells: {
+              Class: classroom.name,
+              Branch: classroom.branch.name,
+              "Skills taught here":
+                classroom.branchSkills
+                  .map((bs) => `${bs.skill.name} (${bs.teacher.name})`)
+                  .join(", ") || "None",
+              Status: <ActiveBadge active={classroom.active} />,
+              Actions: (
+                <div className="flex justify-end gap-1">
+                  <RenameClassDialog
+                    action={renameClassroom.bind(null, classroom.id)}
+                    name={classroom.name}
+                    trigger={
+                      <Button variant="ghost" size="sm">
+                        Rename
+                      </Button>
+                    }
+                  />
+                  <ActionButton
+                    variant="ghost"
+                    size="sm"
+                    action={setClassroomActive.bind(null, classroom.id, !classroom.active)}
+                  >
+                    {classroom.active ? "Deactivate" : "Activate"}
+                  </ActionButton>
+                  {classroom.branchSkills.length === 0 && (
+                    <ActionButton
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive"
+                      action={deleteClassroom.bind(null, classroom.id)}
+                      confirm={{
+                        title: `Delete ${classroom.name}?`,
+                        description: "No skill is taught in this class, so it can be deleted for good.",
+                        confirmLabel: "Delete class",
+                        destructive: true,
+                      }}
+                    >
+                      Delete
+                    </ActionButton>
                   )}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+                </div>
+              ),
+            },
+          }))}
+        />
       )}
     </>
   );
