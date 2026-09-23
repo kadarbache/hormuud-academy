@@ -6,14 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable } from "@/components/data-table";
 import { PageHeader } from "@/components/page-header";
 import { SelectInput } from "@/components/select-input";
 import { EmptyRow } from "@/components/status-badge";
@@ -143,56 +136,52 @@ export default async function OwedPage({ searchParams }: PageProps<"/finance/owe
         />
       ) : (
         <>
-          <div className="rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Phone</TableHead>
-                  {isAdmin && <TableHead>Home branch</TableHead>}
-                  <TableHead>What&apos;s owed</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {owed.students.map((student) => (
-                  <TableRow key={student.id}>
-                    <TableCell>
-                      <Link
-                        href={`/students/${student.id}`}
-                        className="font-medium hover:underline"
-                      >
-                        {student.fullName}
-                      </Link>
-                      <div className="font-mono text-xs text-muted-foreground">
-                        {formatStudentNumber(student.number)}
+          <DataTable
+            columns={[
+              { label: "Student" },
+              { label: "Phone" },
+              ...(isAdmin ? [{ label: "Home branch" }] : []),
+              { label: "What's owed", className: "max-w-96 whitespace-normal" },
+              { label: "Amount", className: "text-right" },
+            ]}
+            rows={owed.students.map((student) => ({
+              key: student.id,
+              title: student.fullName,
+              description: `${formatStudentNumber(student.number)} owes ${formatMoney(student.owed)}`,
+              cells: {
+                Student: (
+                  <>
+                    <Link href={`/students/${student.id}`} className="font-medium hover:underline">
+                      {student.fullName}
+                    </Link>
+                    <div className="font-mono text-xs text-muted-foreground">
+                      {formatStudentNumber(student.number)}
+                    </div>
+                  </>
+                ),
+                Phone: formatPhone(student.phone) || "—",
+                "Home branch": student.homeBranchName,
+                "What's owed": (
+                  <div className="space-y-1">
+                    {student.skills.map((skill) => (
+                      <div key={skill.enrollmentId}>
+                        <span className="font-medium">{skill.skillName}</span>
+                        {isAdmin && (
+                          <span className="text-muted-foreground"> at {skill.branchName}</span>
+                        )}
+                        <div className="text-xs text-muted-foreground">{owedFor(skill)}</div>
                       </div>
-                    </TableCell>
-                    <TableCell>{formatPhone(student.phone) || "—"}</TableCell>
-                    {isAdmin && <TableCell>{student.homeBranchName}</TableCell>}
-                    <TableCell className="max-w-96 whitespace-normal">
-                      <div className="space-y-1">
-                        {student.skills.map((skill) => (
-                          <div key={skill.enrollmentId}>
-                            <span className="font-medium">{skill.skillName}</span>
-                            {isAdmin && (
-                              <span className="text-muted-foreground"> at {skill.branchName}</span>
-                            )}
-                            <div className="text-xs text-muted-foreground">{owedFor(skill)}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Badge variant="outline" className={`tabular-nums ${warning}`}>
-                        {formatMoney(student.owed)}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                    ))}
+                  </div>
+                ),
+                Amount: (
+                  <Badge variant="outline" className={`tabular-nums ${warning}`}>
+                    {formatMoney(student.owed)}
+                  </Badge>
+                ),
+              },
+            }))}
+          />
 
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
             <span>

@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/table";
 import { ActionButton } from "@/components/action-button";
 import { PageHeader } from "@/components/page-header";
+import { DataTable } from "@/components/data-table";
 import { EmptyRow } from "@/components/status-badge";
 import { collegeMonth, formatMonth, isIsoMonth } from "@/lib/dates";
 import { formatMoney } from "@/lib/format";
@@ -102,74 +103,67 @@ export default async function BudgetPage({ searchParams }: PageProps<"/finance/b
         {branches.length === 0 ? (
           <EmptyRow message="No branches yet. Add one before planning a month." />
         ) : (
-          <div className="rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Branch</TableHead>
-                  <TableHead className="text-right">Income planned</TableHead>
-                  <TableHead className="text-right">Income actual</TableHead>
-                  <TableHead className="text-right">Expenses planned</TableHead>
-                  <TableHead className="text-right">Expenses actual</TableHead>
-                  <TableHead className="text-right">Net balance</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {branches.map((branch) => (
-                  <TableRow key={branch.branchId}>
-                    <TableCell>
-                      <Link
-                        href={`/finance/budget?month=${month}&branch=${branch.branchId}`}
-                        className="font-medium hover:underline"
-                      >
-                        {branch.branchName}
-                      </Link>
-                      {!branch.planned && (
-                        <div className="text-xs text-muted-foreground">No plan yet</div>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {formatMoney(branch.expectedIncome)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatMoney(branch.actualIncome)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {formatMoney(branch.plannedExpenses)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatMoney(branch.actualExpenses)}
-                    </TableCell>
-                    <TableCell
-                      className={`text-right tabular-nums ${isNegative(branch.actualNet) ? "text-destructive" : ""}`}
+          <DataTable
+            columns={[
+              { label: "Branch" },
+              { label: "Income planned", className: "text-right tabular-nums text-muted-foreground" },
+              { label: "Income actual", className: "text-right tabular-nums" },
+              { label: "Expenses planned", className: "text-right tabular-nums text-muted-foreground" },
+              { label: "Expenses actual", className: "text-right tabular-nums" },
+              { label: "Net balance", className: "text-right tabular-nums" },
+            ]}
+            rows={branches.map((branch) => ({
+              key: branch.branchId,
+              title: branch.branchName,
+              description: branch.planned ? undefined : "No plan yet",
+              cells: {
+                Branch: (
+                  <>
+                    <Link
+                      href={`/finance/budget?month=${month}&branch=${branch.branchId}`}
+                      className="font-medium hover:underline"
                     >
-                      {formatMoney(branch.actualNet)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-                <TableRow className="font-medium">
-                  <TableCell>The whole college</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatMoney(totals.expectedIncome)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatMoney(totals.actualIncome)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatMoney(totals.plannedExpenses)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatMoney(totals.actualExpenses)}
-                  </TableCell>
-                  <TableCell
-                    className={`text-right tabular-nums ${isNegative(totals.actualNet) ? "text-destructive" : ""}`}
-                  >
-                    {formatMoney(totals.actualNet)}
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </div>
+                      {branch.branchName}
+                    </Link>
+                    {!branch.planned && (
+                      <div className="text-xs text-muted-foreground">No plan yet</div>
+                    )}
+                  </>
+                ),
+                "Income planned": formatMoney(branch.expectedIncome),
+                "Income actual": formatMoney(branch.actualIncome),
+                "Expenses planned": formatMoney(branch.plannedExpenses),
+                "Expenses actual": formatMoney(branch.actualExpenses),
+                "Net balance": (
+                  <span className={isNegative(branch.actualNet) ? "text-destructive" : undefined}>
+                    {formatMoney(branch.actualNet)}
+                  </span>
+                ),
+              },
+            }))}
+            footer={
+              <TableRow className="font-medium">
+                <TableCell>The whole college</TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {formatMoney(totals.expectedIncome)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {formatMoney(totals.actualIncome)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {formatMoney(totals.plannedExpenses)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {formatMoney(totals.actualExpenses)}
+                </TableCell>
+                <TableCell
+                  className={`text-right tabular-nums ${isNegative(totals.actualNet) ? "text-destructive" : ""}`}
+                >
+                  {formatMoney(totals.actualNet)}
+                </TableCell>
+              </TableRow>
+            }
+          />
         )}
       </>
     );

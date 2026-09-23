@@ -5,15 +5,8 @@ import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { ActionButton } from "@/components/action-button";
+import { DataTable } from "@/components/data-table";
 import { PageHeader } from "@/components/page-header";
 import { SelectInput } from "@/components/select-input";
 import { EmptyRow } from "@/components/status-badge";
@@ -252,106 +245,87 @@ export default async function IncomePage({ searchParams }: PageProps<"/finance/i
           />
         ) : (
           <>
-            <div className="rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Receipt</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Student</TableHead>
-                    <TableHead>For</TableHead>
-                    {isAdmin && <TableHead>Branch</TableHead>}
-                    <TableHead>Paid by</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    {isAdmin && <TableHead className="text-right">Teacher share</TableHead>}
-                    <TableHead>Recorded by</TableHead>
-                    {isAdmin && (
-                      <TableHead className="text-right">
-                        <span className="sr-only">Actions</span>
-                      </TableHead>
-                    )}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((payment) => {
-                    const what = paidFor(payment);
-                    return (
-                      <TableRow key={payment.id}>
-                        <TableCell className="font-mono text-xs text-muted-foreground">
-                          {payment.number}
-                        </TableCell>
-                        <TableCell>{formatDate(payment.paidOn)}</TableCell>
-                        <TableCell>
-                          {payment.student ? (
-                            <Link
-                              href={`/students/${payment.student.id}`}
-                              className="font-medium hover:underline"
-                            >
-                              {payment.student.fullName}
-                            </Link>
-                          ) : (
-                            <span className="text-muted-foreground">Not a student</span>
-                          )}
-                          {payment.student && (
-                            <div className="font-mono text-xs text-muted-foreground">
-                              {formatStudentNumber(payment.student.number)}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div>{what.title}</div>
-                          {what.detail && (
-                            <div className="text-xs text-muted-foreground">{what.detail}</div>
-                          )}
-                        </TableCell>
-                        {isAdmin && <TableCell>{payment.branch.name}</TableCell>}
-                        <TableCell>{paymentMethodLabels[payment.method]}</TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {formatMoney(payment.amount.toString())}
-                        </TableCell>
-                        {isAdmin && (
-                          <TableCell className="text-right tabular-nums">
-                            {payment.teacherShare ? (
-                              <Link
-                                href={`/finance/teacher-pay/${payment.teacherId}`}
-                                className="hover:underline"
-                              >
-                                {formatMoney(payment.teacherShare.toString())}
-                              </Link>
-                            ) : (
-                              <span className="text-muted-foreground">&mdash;</span>
-                            )}
-                          </TableCell>
+            <DataTable
+              columns={[
+                { label: "Receipt", className: "font-mono text-xs text-muted-foreground" },
+                { label: "Date" },
+                { label: "Student" },
+                { label: "For" },
+                ...(isAdmin ? [{ label: "Branch" }] : []),
+                { label: "Paid by" },
+                { label: "Amount", className: "text-right tabular-nums" },
+                ...(isAdmin ? [{ label: "Teacher share", className: "text-right tabular-nums" }] : []),
+                { label: "Recorded by", className: "text-muted-foreground" },
+                ...(isAdmin ? [{ label: "Actions", actions: true }] : []),
+              ]}
+              rows={rows.map((payment) => {
+                const what = paidFor(payment);
+                return {
+                  key: payment.id,
+                  title: `Receipt ${payment.number}`,
+                  description: `${formatMoney(payment.amount.toString())} on ${formatDate(payment.paidOn)}`,
+                  cells: {
+                    Receipt: payment.number,
+                    Date: formatDate(payment.paidOn),
+                    Student: payment.student ? (
+                      <>
+                        <Link
+                          href={`/students/${payment.student.id}`}
+                          className="font-medium hover:underline"
+                        >
+                          {payment.student.fullName}
+                        </Link>
+                        <div className="font-mono text-xs text-muted-foreground">
+                          {formatStudentNumber(payment.student.number)}
+                        </div>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">Not a student</span>
+                    ),
+                    For: (
+                      <>
+                        <div>{what.title}</div>
+                        {what.detail && (
+                          <div className="text-xs text-muted-foreground">{what.detail}</div>
                         )}
-                        <TableCell className="text-muted-foreground">
-                          {payment.recordedBy.name}
-                        </TableCell>
-                        {isAdmin && (
-                          <TableCell>
-                            <div className="flex justify-end">
-                              <ActionButton
-                                variant="ghost"
-                                size="sm"
-                                className="text-destructive"
-                                action={deletePayment.bind(null, payment.id)}
-                                confirm={{
-                                  title: `Remove receipt ${payment.number}?`,
-                                  description: `${formatMoney(payment.amount.toString())} comes out of the books, and out of any teacher's share it earned. Use this only for a payment recorded by mistake.`,
-                                  confirmLabel: "Remove payment",
-                                  destructive: true,
-                                }}
-                              >
-                                Remove
-                              </ActionButton>
-                            </div>
-                          </TableCell>
-                        )}
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                      </>
+                    ),
+                    Branch: payment.branch.name,
+                    "Paid by": paymentMethodLabels[payment.method],
+                    Amount: formatMoney(payment.amount.toString()),
+                    "Teacher share": payment.teacherShare ? (
+                      <Link
+                        href={`/finance/teacher-pay/${payment.teacherId}`}
+                        className="hover:underline"
+                      >
+                        {formatMoney(payment.teacherShare.toString())}
+                      </Link>
+                    ) : (
+                      <span className="text-muted-foreground">&mdash;</span>
+                    ),
+                    "Recorded by": payment.recordedBy.name,
+                    Actions: (
+                      <div className="flex justify-end">
+                        <ActionButton
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive"
+                          action={deletePayment.bind(null, payment.id)}
+                          confirm={{
+                            title: `Remove receipt ${payment.number}?`,
+                            description: `${formatMoney(payment.amount.toString())} comes out of the books, and out of any teacher's share it earned. Use this only for a payment recorded by mistake.`,
+                            confirmLabel: "Remove payment",
+                            destructive: true,
+                          }}
+                        >
+                          Remove
+                        </ActionButton>
+                      </div>
+                    ),
+                  },
+                };
+              })}
+            />
 
             <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
               <span>

@@ -4,15 +4,8 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { ActionButton } from "@/components/action-button";
+import { DataTable } from "@/components/data-table";
 import { PageHeader } from "@/components/page-header";
 import { SelectInput } from "@/components/select-input";
 import { EmptyRow } from "@/components/status-badge";
@@ -203,89 +196,82 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/finance
           />
         ) : (
           <>
-            <div className="rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Spent on</TableHead>
-                    <TableHead>Branch</TableHead>
-                    <TableHead>Paid by</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead>Recorded by</TableHead>
-                    <TableHead className="text-right">
-                      <span className="sr-only">Actions</span>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((expense) => (
-                    <TableRow key={expense.id}>
-                      <TableCell>{formatDate(expense.spentOn)}</TableCell>
-                      <TableCell>
-                        <div>{expenseCategoryLabels[expense.category]}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {expense.teacher
-                            ? `${expense.teacher.name}${expense.forMonth ? `, ${formatMonth(fromDbMonth(expense.forMonth))}` : ""}`
-                            : expense.note}
-                        </div>
-                      </TableCell>
-                      <TableCell>{expense.branch.name}</TableCell>
-                      <TableCell>{paymentMethodLabels[expense.method]}</TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatMoney(expense.amount.toString())}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {expense.recordedBy.name}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex justify-end gap-1">
-                          <ExpenseDialog
-                            action={updateExpense.bind(null, expense.id)}
-                            title="Edit expense"
-                            submitLabel="Save"
-                            branches={branchOptions}
-                            teachers={teachers}
-                            today={today}
-                            defaults={{
-                              category: expense.category,
-                              amount: expense.amount.toString(),
-                              method: expense.method,
-                              spentOn: fromDbDate(expense.spentOn),
-                              branchId: expense.branchId,
-                              teacherId: expense.teacherId ?? "",
-                              forMonth: expense.forMonth
-                                ? fromDbMonth(expense.forMonth)
-                                : collegeMonth(),
-                              note: expense.note ?? "",
-                            }}
-                            trigger={
-                              <Button variant="ghost" size="sm">
-                                Edit
-                              </Button>
-                            }
-                          />
-                          <ActionButton
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive"
-                            action={deleteExpense.bind(null, expense.id)}
-                            confirm={{
-                              title: "Remove this expense?",
-                              description: `${formatMoney(expense.amount.toString())} comes back out of the books. Use this only for something recorded by mistake.`,
-                              confirmLabel: "Remove expense",
-                              destructive: true,
-                            }}
-                          >
-                            Remove
-                          </ActionButton>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            <DataTable
+              columns={[
+                { label: "Date" },
+                { label: "Spent on" },
+                { label: "Branch" },
+                { label: "Paid by" },
+                { label: "Amount", className: "text-right tabular-nums" },
+                { label: "Recorded by", className: "text-muted-foreground" },
+                { label: "Actions", actions: true, className: "text-right" },
+              ]}
+              rows={rows.map((expense) => ({
+                key: expense.id,
+                title: expenseCategoryLabels[expense.category],
+                description: `${formatMoney(expense.amount.toString())} on ${formatDate(expense.spentOn)}`,
+                cells: {
+                  Date: formatDate(expense.spentOn),
+                  "Spent on": (
+                    <>
+                      <div>{expenseCategoryLabels[expense.category]}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {expense.teacher
+                          ? `${expense.teacher.name}${expense.forMonth ? `, ${formatMonth(fromDbMonth(expense.forMonth))}` : ""}`
+                          : expense.note}
+                      </div>
+                    </>
+                  ),
+                  Branch: expense.branch.name,
+                  "Paid by": paymentMethodLabels[expense.method],
+                  Amount: formatMoney(expense.amount.toString()),
+                  "Recorded by": expense.recordedBy.name,
+                  Actions: (
+                    <div className="flex justify-end gap-1">
+                      <ExpenseDialog
+                        action={updateExpense.bind(null, expense.id)}
+                        title="Edit expense"
+                        submitLabel="Save"
+                        branches={branchOptions}
+                        teachers={teachers}
+                        today={today}
+                        defaults={{
+                          category: expense.category,
+                          amount: expense.amount.toString(),
+                          method: expense.method,
+                          spentOn: fromDbDate(expense.spentOn),
+                          branchId: expense.branchId,
+                          teacherId: expense.teacherId ?? "",
+                          forMonth: expense.forMonth
+                            ? fromDbMonth(expense.forMonth)
+                            : collegeMonth(),
+                          note: expense.note ?? "",
+                        }}
+                        trigger={
+                          <Button variant="ghost" size="sm">
+                            Edit
+                          </Button>
+                        }
+                      />
+                      <ActionButton
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive"
+                        action={deleteExpense.bind(null, expense.id)}
+                        confirm={{
+                          title: "Remove this expense?",
+                          description: `${formatMoney(expense.amount.toString())} comes back out of the books. Use this only for something recorded by mistake.`,
+                          confirmLabel: "Remove expense",
+                          destructive: true,
+                        }}
+                      >
+                        Remove
+                      </ActionButton>
+                    </div>
+                  ),
+                },
+              }))}
+            />
 
             <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
               <span>

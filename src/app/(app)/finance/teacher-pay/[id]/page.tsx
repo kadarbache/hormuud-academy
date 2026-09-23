@@ -4,14 +4,7 @@ import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable } from "@/components/data-table";
 import { EmptyRow } from "@/components/status-badge";
 import { collegeMonth, collegeToday, formatDate, formatMonth, fromDbMonth } from "@/lib/dates";
 import { formatMoney, formatStudentNumber } from "@/lib/format";
@@ -143,61 +136,58 @@ export default async function TeacherPayDetailPage({
             }
           />
         ) : (
-          <div className="rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Skill</TableHead>
-                  <TableHead>Month</TableHead>
-                  <TableHead>Branch</TableHead>
-                  <TableHead className="text-right">Student paid</TableHead>
-                  <TableHead className="text-right">Their share</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {payments.map((payment) => (
-                  <TableRow key={payment.id}>
-                    <TableCell>{formatDate(payment.paidOn)}</TableCell>
-                    <TableCell>
-                      {payment.student ? (
-                        <Link
-                          href={`/students/${payment.student.id}`}
-                          className="font-medium hover:underline"
-                        >
-                          {payment.student.fullName}
-                        </Link>
-                      ) : (
-                        <span className="text-muted-foreground">No student</span>
-                      )}
-                      {payment.student && (
-                        <div className="font-mono text-xs text-muted-foreground">
-                          {formatStudentNumber(payment.student.number)}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>{payment.enrollment?.skill.name ?? "—"}</TableCell>
-                    <TableCell>
-                      {payment.forMonth ? formatMonth(fromDbMonth(payment.forMonth)) : "—"}
-                    </TableCell>
-                    <TableCell>{payment.branch.name}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatMoney(payment.amount.toString())}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      <span>{formatMoney(payment.teacherShare?.toString() ?? "0")}</span>
-                      {payment.teacherSharePercent && (
-                        <div className="text-xs text-muted-foreground">
-                          at {payment.teacherSharePercent.toString()}%
-                        </div>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <DataTable
+            columns={[
+              { label: "Date" },
+              { label: "Student" },
+              { label: "Skill" },
+              { label: "Month" },
+              { label: "Branch" },
+              { label: "Student paid", className: "text-right tabular-nums" },
+              { label: "Their share", className: "text-right tabular-nums" },
+            ]}
+            rows={payments.map((payment) => ({
+              key: payment.id,
+              title: formatMoney(payment.teacherShare?.toString() ?? "0"),
+              description: `Their share of ${formatMoney(payment.amount.toString())} on ${formatDate(payment.paidOn)}`,
+              cells: {
+                Date: formatDate(payment.paidOn),
+                Student: (
+                  <>
+                    {payment.student ? (
+                      <Link
+                        href={`/students/${payment.student.id}`}
+                        className="font-medium hover:underline"
+                      >
+                        {payment.student.fullName}
+                      </Link>
+                    ) : (
+                      <span className="text-muted-foreground">No student</span>
+                    )}
+                    {payment.student && (
+                      <div className="font-mono text-xs text-muted-foreground">
+                        {formatStudentNumber(payment.student.number)}
+                      </div>
+                    )}
+                  </>
+                ),
+                Skill: payment.enrollment?.skill.name ?? "—",
+                Month: payment.forMonth ? formatMonth(fromDbMonth(payment.forMonth)) : "—",
+                Branch: payment.branch.name,
+                "Student paid": formatMoney(payment.amount.toString()),
+                "Their share": (
+                  <>
+                    <span>{formatMoney(payment.teacherShare?.toString() ?? "0")}</span>
+                    {payment.teacherSharePercent && (
+                      <div className="text-xs text-muted-foreground">
+                        at {payment.teacherSharePercent.toString()}%
+                      </div>
+                    )}
+                  </>
+                ),
+              },
+            }))}
+          />
         )}
       </section>
 
@@ -207,45 +197,40 @@ export default async function TeacherPayDetailPage({
         {payouts.length === 0 ? (
           <EmptyRow message="Nothing has been paid to this teacher yet." />
         ) : (
-          <div className="rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Paid on</TableHead>
-                  <TableHead>Covers</TableHead>
-                  <TableHead>Branch</TableHead>
-                  <TableHead>Paid by</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead>Recorded by</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {payouts.map((payout) => (
-                  <TableRow key={payout.id}>
-                    <TableCell>{formatDate(payout.spentOn)}</TableCell>
-                    <TableCell>
-                      {payout.forMonth ? (
-                        <Badge variant="secondary">{formatMonth(fromDbMonth(payout.forMonth))}</Badge>
-                      ) : (
-                        <span className="text-muted-foreground">Not said</span>
-                      )}
-                      {payout.note && (
-                        <div className="text-xs text-muted-foreground">{payout.note}</div>
-                      )}
-                    </TableCell>
-                    <TableCell>{payout.branch.name}</TableCell>
-                    <TableCell>{paymentMethodLabels[payout.method]}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatMoney(payout.amount.toString())}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {payout.recordedBy.name}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <DataTable
+            columns={[
+              { label: "Paid on" },
+              { label: "Covers" },
+              { label: "Branch" },
+              { label: "Paid by" },
+              { label: "Amount", className: "text-right tabular-nums" },
+              { label: "Recorded by", className: "text-muted-foreground" },
+            ]}
+            rows={payouts.map((payout) => ({
+              key: payout.id,
+              title: formatMoney(payout.amount.toString()),
+              description: `Paid on ${formatDate(payout.spentOn)}`,
+              cells: {
+                "Paid on": formatDate(payout.spentOn),
+                Covers: (
+                  <>
+                    {payout.forMonth ? (
+                      <Badge variant="secondary">{formatMonth(fromDbMonth(payout.forMonth))}</Badge>
+                    ) : (
+                      <span className="text-muted-foreground">Not said</span>
+                    )}
+                    {payout.note && (
+                      <div className="text-xs text-muted-foreground">{payout.note}</div>
+                    )}
+                  </>
+                ),
+                Branch: payout.branch.name,
+                "Paid by": paymentMethodLabels[payout.method],
+                Amount: formatMoney(payout.amount.toString()),
+                "Recorded by": payout.recordedBy.name,
+              },
+            }))}
+          />
         )}
       </section>
     </>

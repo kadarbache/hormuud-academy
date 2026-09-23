@@ -5,14 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable } from "@/components/data-table";
 import { PageHeader } from "@/components/page-header";
 import { EmptyRow } from "@/components/status-badge";
 import { collegeMonth, collegeToday, formatMonth, isIsoMonth } from "@/lib/dates";
@@ -120,125 +113,116 @@ export default async function TeacherPayPage({ searchParams }: PageProps<"/finan
       {teachers.length === 0 ? (
         <EmptyRow message="No teachers yet. Add them on the Teachers screen." />
       ) : (
-        <div className="rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Teacher</TableHead>
-                <TableHead>Paid</TableHead>
-                <TableHead>Teaches</TableHead>
-                <TableHead className="text-right">Earned {formatMonth(month)}</TableHead>
-                <TableHead className="text-right">Paid for {formatMonth(month)}</TableHead>
-                <TableHead className="text-right">Owed now</TableHead>
-                <TableHead className="text-right">
-                  <span className="sr-only">Actions</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {teachers.map((teacher) => {
-                const byPercentage = teacher.salaryType === "PERCENTAGE";
-                // A fixed teacher is short for the month while what they've
-                // been paid for it is under their salary.
-                const salaryShort =
-                  !byPercentage &&
-                  teacher.active &&
-                  isPositiveMoney(teacher.fixedSalary) &&
-                  Number(teacher.paidForMonth) < Number(teacher.fixedSalary);
+        <DataTable
+          columns={[
+            { label: "Teacher" },
+            { label: "Paid" },
+            { label: "Teaches", className: "max-w-56 whitespace-normal text-muted-foreground" },
+            { label: `Earned ${formatMonth(month)}`, className: "text-right tabular-nums" },
+            { label: `Paid for ${formatMonth(month)}`, className: "text-right tabular-nums" },
+            { label: "Owed now", className: "text-right tabular-nums" },
+            { label: "Actions", actions: true, className: "text-right" },
+          ]}
+          rows={teachers.map((teacher) => {
+            const byPercentage = teacher.salaryType === "PERCENTAGE";
+            // A fixed teacher is short for the month while what they've
+            // been paid for it is under their salary.
+            const salaryShort =
+              !byPercentage &&
+              teacher.active &&
+              isPositiveMoney(teacher.fixedSalary) &&
+              Number(teacher.paidForMonth) < Number(teacher.fixedSalary);
 
-                return (
-                  <TableRow key={teacher.id}>
-                    <TableCell>
-                      <Link
-                        href={`/finance/teacher-pay/${teacher.id}`}
-                        className="font-medium hover:underline"
+            return {
+              key: teacher.id,
+              title: teacher.name,
+              description: teacher.branchNames.join(", ") || "No branch",
+              cells: {
+                Teacher: (
+                  <>
+                    <Link
+                      href={`/finance/teacher-pay/${teacher.id}`}
+                      className="font-medium hover:underline"
+                    >
+                      {teacher.name}
+                    </Link>
+                    <div className="text-xs text-muted-foreground">
+                      {teacher.branchNames.join(", ") || "No branch"}
+                    </div>
+                  </>
+                ),
+                Paid: (
+                  <>
+                    <div>{salaryTypeLabels[teacher.salaryType]}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {byPercentage
+                        ? teacher.percentageRate
+                          ? `${teacher.percentageRate}% of monthly fees`
+                          : "No rate set"
+                        : `${formatMoney(teacher.fixedSalary)} a month`}
+                    </div>
+                  </>
+                ),
+                Teaches: teacher.skillNames.join(", ") || "Nothing yet",
+                [`Earned ${formatMonth(month)}`]: byPercentage ? (
+                  formatMoney(teacher.earnedInMonth)
+                ) : (
+                  <span className="text-muted-foreground">&mdash;</span>
+                ),
+                [`Paid for ${formatMonth(month)}`]: (
+                  <>
+                    <div>{formatMoney(teacher.paidForMonth)}</div>
+                    {salaryShort && (
+                      <Badge
+                        variant="outline"
+                        className="mt-1 border-warning-border bg-warning text-warning-foreground"
                       >
-                        {teacher.name}
-                      </Link>
-                      <div className="text-xs text-muted-foreground">
-                        {teacher.branchNames.join(", ") || "No branch"}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>{salaryTypeLabels[teacher.salaryType]}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {byPercentage
-                          ? teacher.percentageRate
-                            ? `${teacher.percentageRate}% of monthly fees`
-                            : "No rate set"
-                          : `${formatMoney(teacher.fixedSalary)} a month`}
-                      </div>
-                    </TableCell>
-                    <TableCell className="max-w-56 whitespace-normal text-muted-foreground">
-                      {teacher.skillNames.join(", ") || "Nothing yet"}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {byPercentage ? (
-                        formatMoney(teacher.earnedInMonth)
-                      ) : (
-                        <span className="text-muted-foreground">&mdash;</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      <div>{formatMoney(teacher.paidForMonth)}</div>
-                      {salaryShort && (
-                        <Badge
-                          variant="outline"
-                          className="mt-1 border-warning-border bg-warning text-warning-foreground"
-                        >
-                          Salary not paid in full
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {byPercentage ? (
-                        formatMoney(teacher.owed)
-                      ) : (
-                        <span className="text-muted-foreground">&mdash;</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-end">
-                        <ExpenseDialog
-                          action={createExpense}
-                          title={`Pay ${teacher.name}`}
-                          description={
-                            byPercentage
-                              ? `Earned but not yet paid out: ${formatMoney(teacher.owed)}.`
-                              : `Their salary is ${formatMoney(teacher.fixedSalary)} a month.`
-                          }
-                          submitLabel="Record payment"
-                          branches={branchOptions}
-                          teachers={teacherOptions}
-                          today={today}
-                          defaults={{
-                            category: "TEACHER_SALARY",
-                            amount: byPercentage ? teacher.owed : teacher.fixedSalary,
-                            method: "CASH",
-                            spentOn: today,
-                            branchId: branchOptions.length === 1 ? branchOptions[0].value : "",
-                            teacherId: teacher.id,
-                            forMonth: month,
-                            note: "",
-                          }}
-                          trigger={
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={branchOptions.length === 0}
-                            >
-                              Pay
-                            </Button>
-                          }
-                        />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
+                        Salary not paid in full
+                      </Badge>
+                    )}
+                  </>
+                ),
+                "Owed now": byPercentage ? (
+                  formatMoney(teacher.owed)
+                ) : (
+                  <span className="text-muted-foreground">&mdash;</span>
+                ),
+                Actions: (
+                  <div className="flex justify-end">
+                    <ExpenseDialog
+                      action={createExpense}
+                      title={`Pay ${teacher.name}`}
+                      description={
+                        byPercentage
+                          ? `Earned but not yet paid out: ${formatMoney(teacher.owed)}.`
+                          : `Their salary is ${formatMoney(teacher.fixedSalary)} a month.`
+                      }
+                      submitLabel="Record payment"
+                      branches={branchOptions}
+                      teachers={teacherOptions}
+                      today={today}
+                      defaults={{
+                        category: "TEACHER_SALARY",
+                        amount: byPercentage ? teacher.owed : teacher.fixedSalary,
+                        method: "CASH",
+                        spentOn: today,
+                        branchId: branchOptions.length === 1 ? branchOptions[0].value : "",
+                        teacherId: teacher.id,
+                        forMonth: month,
+                        note: "",
+                      }}
+                      trigger={
+                        <Button variant="outline" size="sm" disabled={branchOptions.length === 0}>
+                          Pay
+                        </Button>
+                      }
+                    />
+                  </div>
+                ),
+              },
+            };
+          })}
+        />
       )}
     </>
   );
