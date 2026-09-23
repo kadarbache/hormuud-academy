@@ -267,7 +267,7 @@ hormuud-academy/
 │   │           └── staff/
 │   ├── components/
 │   │   ├── ui/                  shadcn/ui components
-│   │   └── *.tsx                Shared pieces: FormDialog, ActionButton, fields, badges
+│   │   └── *.tsx                Shared pieces: DataTable, FormDialog, ActionButton, fields, badges
 │   ├── hooks/                   useFormAction and useIsMobile
 │   ├── lib/                     auth, session, prisma, access, dates, money, teacher-share,
 │   │                            format, validation, search-params, cloudinary, rate-limit
@@ -365,6 +365,7 @@ sequenceDiagram
 |---|---|---|
 | `ActionResult` | `src/lib/action-result.ts` | What every action returns: `{ ok: true, message }` or `{ ok: false, error, fieldErrors }` |
 | `useFormAction` | `src/hooks/use-form-action.ts` | Sends a form to an action, keeps what you typed when there's an error, shows field errors, shows the success message |
+| `DataTable` | `src/components/data-table.tsx` | Every table of records. The page gives it the columns and, per row, the value for each column. Clicking a row opens a pop-up listing all of them, so a phone doesn't have to scroll sideways to read the far columns |
 | `FormDialog` | `src/components/form-dialog.tsx` | A pop-up with one form. Closes when the action works, and opens with a fresh form each time |
 | `ActionButton` | `src/components/action-button.tsx` | A button that runs an action without a form, like Deactivate or Mark finished. It can ask for confirmation first and can move to another page afterwards |
 | `TextField`, `SelectField` | `src/components/form-fields.tsx` | A labelled input or dropdown with its error message |
@@ -750,6 +751,7 @@ To log out, use **Log out** at the bottom of the sidebar.
 - **The sidebar** on the left. Students (**Students** and **Register student**) is there for everyone. Admins also get Money (**Dashboard**, **Income**, **Fees owed**, **Expenses**, **Teacher pay**, **Monthly budget**) and Admin (**Branches**, **Skills**, **Categories**, **Teachers**, **Classes**, **Staff accounts**). Branch staff get Your branch instead (**Income**, **Fees owed**, **Teachers** and **Classes**), which shows only their own branch; the teachers and classes there can't be changed. The bottom shows your name, your role and your branch.
 - **The header** shows "All branches" for an admin, or your branch's name for branch staff. The button on the left of the header hides and shows the sidebar.
 - **On a phone**, the sidebar folds away. Open it with the button at the top left.
+- **Tables** are wider than a phone, so the last columns sit off the side. Instead of scrolling across, tap a row: a pop-up lists everything in it, one line per column, with that row's buttons at the bottom. Tapping a link inside the row, such as a student's name, still opens that page. The same click works on a computer.
 - After every change, a short message appears at the top of the screen.
 
 ### Setting up the college for the first time
@@ -1067,7 +1069,7 @@ Most new features follow the same steps:
 3. **Create a migration.** Run `pnpm db:migrate --name what_changed`. This writes the SQL into `prisma/migrations` and applies it to your local database. Read the SQL before committing it.
 4. **Write the reading code.** In the feature's `page.tsx`, or in a `queries.ts` when several pages share it.
 5. **Write the server actions** in `actions.ts`, following the five steps: check the user, check the form with Zod, check the rules, save with Prisma, `refresh()`. Remember the branch rules in `students/access.ts`.
-6. **Build the screen.** A server component `page.tsx` for the table, and a client `*-dialog.tsx` that uses `FormDialog` for the form.
+6. **Build the screen.** A server component `page.tsx` that hands its rows to `DataTable`, and a client `*-dialog.tsx` that uses `FormDialog` for the form.
 7. **Add it to the menu** in `src/app/(app)/app-sidebar.tsx`.
 8. **Check it.** Run `pnpm lint` and `pnpm build`, then try the feature in the browser as an admin and as branch staff.
 9. **Record big decisions.** If the feature involved a hard-to-undo trade-off, add a short decision record to `docs/adr`.
