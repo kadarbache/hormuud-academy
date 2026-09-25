@@ -108,7 +108,7 @@ _Avoid_: Overdue, expired
 A student with at least one Active enrollment, at any branch. Every other student is an Inactive student. Nobody sets this by hand: to take a student out of their classes, drop their skills. A student who has paid even one monthly fee can never be deleted, so dropping is the only way out; deleting is for duplicates and typing mistakes.
 
 **Deactivate**:
-Take a branch, category, skill, branch skill, teacher, class or staff account out of new use while keeping its history. Deleting is only for records nothing uses yet.
+Take a branch, category, expense category, skill, branch skill, teacher, class or staff account out of new use while keeping its history. Deleting is only for records nothing uses yet.
 _Avoid_: Archive, disable
 
 ### Money
@@ -142,7 +142,7 @@ Money the college spent, recorded with the day it went out, the branch it was sp
 _Avoid_: Cost, outgoing, bill
 
 **Expense category**:
-What the money went on: Rent, Electricity, Teacher salary, Staff salary, Internet, Stationery, Transportation, Maintenance or Other expenses.
+What the money went on, like Rent or Electricity. The admin keeps the list. Teacher salary is the one entry nobody can rename, deactivate or delete, because teacher pay is recorded in it.
 _Avoid_: Expense type, account
 
 **Salary type**:

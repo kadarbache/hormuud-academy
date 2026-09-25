@@ -4,7 +4,7 @@ Questions we haven't answered yet, and the code work waiting on them. Move a
 decision to "Decided" when it's settled, and write the rule into CONTEXT.md or
 an ADR if it changes how the system behaves.
 
-Last updated 24 September 2026.
+Last updated 25 September 2026.
 
 ## Open
 
@@ -56,6 +56,17 @@ move them to Vercel Blob. Parked on 24 Sep 2026.
 
 ## Still to do (no decision needed)
 
+**Editable expense categories, before it goes live.** Built and tried in
+Chrome on 25 Sep 2026: adding, a duplicate name refused, renaming,
+recording an expense in the new category, deactivating it (gone from Record
+expense, still in the reports and the filter, an old expense keeps it when
+edited, a new one refused by the server), deleting it once nothing used it,
+a budget plan keeping a deactivated category's amount, and the teacher pay
+limit still refusing a second salary. Not committed yet. Production needs
+the `20260925120000_expense_categories` migration applied *before* the push,
+or every money screen breaks. `pnpm db:deploy` is blocked on this machine,
+so it goes in by hand, after a backup.
+
 **Finish the switch to Google sign-in.** Built on 24 Sep 2026: the Google
 button next to the password form, a Gmail field on Edit staff, new accounts
 with no password, and a seed that makes the first admin without one. Tried
@@ -103,6 +114,13 @@ adding a skill to an existing student, and finishing or dropping a skill.
 
 ## Decided
 
+- **Expense categories are the admin's.** A new page, Money → Expense
+  categories (`/finance/expense-categories`), adds, renames, deactivates and
+  deletes them, A to Z. A category an expense or a budget plan uses can't be
+  deleted, only deactivated; there is no "move its expenses and delete" for
+  now. Teacher salary is fully locked: no rename, no deactivate, no delete,
+  because teacher pay is recorded in it. Income categories stay fixed.
+  (25 Sep 2026)
 - **Staff sign in with Google only.** No staff account has a password, the
   admin's included. The admin creates each account with the person's Gmail
   and tells them it's ready; Google proves the address is theirs, so no invite

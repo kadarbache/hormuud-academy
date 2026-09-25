@@ -281,6 +281,7 @@ hormuud-academy/
 │   │       │   ├── income/      Income, and every action that records a payment
 │   │       │   ├── owed/        Who still owes a registration fee or a month
 │   │       │   ├── expenses/    Expenses, admins only
+│   │       │   ├── expense-categories/ The list of expense categories, admins only
 │   │       │   ├── teacher-pay/ What each teacher earned and was paid, admins only
 │   │       │   └── budget/      The plan per branch per month, admins only
 │   │       ├── teachers/        Admins manage them; branch staff see their branch's
@@ -338,10 +339,11 @@ The finance folder works the same way, with a few pieces shared by all four mone
 
 | File | What it does |
 |---|---|
-| `labels.ts` | The word shown for each stored code: `EDAHAB` is "eDahab", `TEACHER_SALARY` is "Teacher salary". Safe to import from a client component, so a dropdown and a table can't disagree |
+| `labels.ts` | The word shown for each stored code: `EDAHAB` is "eDahab", `MONTHLY_FEE` is "Monthly fee". Also `TEACHER_SALARY_ID`, the id of the Teacher salary expense category. Safe to import from a client component, so a dropdown and a table can't disagree |
 | `access.ts` | Which payments a person may see, and which branch a screen reports on |
 | `period.ts` | Reads "one day", "one month" or "everything" out of the query string and turns it into a date filter |
 | `queries.ts` | Income by method, income by category, expenses by category, the totals and the net balance |
+| `expense-categories/queries.ts` | The expense categories from A to Z, and the ones an expense can be put in |
 | `figures.tsx` | `StatCard` and `Breakdown`, the two shapes every money screen is drawn from |
 | `fee-months.ts` | The months one enrollment owes a fee for. Pure arithmetic, no database |
 | `income/actions.ts` | Every action that records or removes a payment, including the ones the student's page calls |
@@ -432,6 +434,8 @@ A fee is paid in full or not at all, whether it's a registration fee or one mont
 
 **Every dollar out is an expense**, and every expense names the branch it was spent for. A teacher's pay is an expense in the Teacher salary category that also names the teacher and the month it covers.
 
+**Expense categories are a list the admin keeps**, not codes fixed in the program. Teacher salary is the exception: teacher pay is found by it, so it has the fixed id `teacher_salary` and can't be renamed, deactivated or deleted. A category that an expense or a budget plan uses can only be deactivated, never deleted, so past months keep adding up. [ADR 0006](adr/0006-expense-categories-are-kept-by-the-admin.md) explains why.
+
 **A percentage-paid teacher's share** is worked out when the payment is recorded and written onto it, along with the rate it was worked out at, by `src/lib/teacher-share.ts`. Raising a rate changes what they earn from that day on and never rewrites the past. [ADR 0005](adr/0005-a-teachers-share-is-worked-out-once.md) covers it.
 
 ### Student IDs
@@ -500,6 +504,8 @@ erDiagram
     Teacher |o--o{ Payment : "earns a share of"
     User ||--o{ Payment : "recorded"
     Branch ||--o{ Expense : "spends"
+    ExpenseCategory ||--o{ Expense : "groups"
+    ExpenseCategory ||--o{ MonthlyBudgetLine : "is planned in"
     Teacher |o--o{ Expense : "is paid by"
     User ||--o{ Expense : "recorded"
     Branch ||--o{ MonthlyBudget : "plans"
@@ -595,10 +601,15 @@ erDiagram
         string note
         string recordedById FK
     }
+    ExpenseCategory {
+        string id PK "teacher_salary is fixed"
+        string name UK
+        boolean active
+    }
     Expense {
         string id PK
         int number UK
-        enum category "RENT, ELECTRICITY, TEACHER_SALARY, ..."
+        string categoryId FK
         enum method "CASH, ZAAD, EDAHAB or BANK"
         decimal amount
         date spentOn
@@ -618,7 +629,7 @@ erDiagram
     }
     MonthlyBudgetLine {
         string budgetId PK, FK
-        enum category PK "one line per expense category"
+        string categoryId PK, FK "one line per expense category"
         decimal amount
     }
     User {
@@ -695,7 +706,9 @@ A student has no status column. They are Active when at least one of their enrol
 | `teacherId`, `teacherSharePercent`, `teacherShare` | Filled in only when the skill's teacher is paid by percentage. The rate is kept beside the amount so a later change never rewrites it |
 | `note`, `recordedById` | A free note, and the account that recorded it |
 
-**Expense** (`expenses`). Money spent. A number, a category (`RENT`, `ELECTRICITY`, `TEACHER_SALARY`, `STAFF_SALARY`, `INTERNET`, `STATIONERY`, `TRANSPORTATION`, `MAINTENANCE`, `OTHER`), a method, an amount, the day it went out, the branch it was spent for, a note and who recorded it. A teacher's pay also carries `teacherId` and the `forMonth` it covers.
+**ExpenseCategory** (`expense_categories`). What money goes on, like Rent. Name (unique) and `active`. The migration that made the table started it with nine: Rent, Electricity, Teacher salary, Staff salary, Internet, Stationery, Transportation, Maintenance and Other expenses, with ids made from their old codes (`rent`, `teacher_salary` and so on). Categories the admin adds get ordinary ids. Teacher salary's id, `teacher_salary`, never changes: teacher pay is found by it.
+
+**Expense** (`expenses`). Money spent. A number, a category, a method, an amount, the day it went out, the branch it was spent for, a note and who recorded it. A teacher's pay also carries `teacherId` and the `forMonth` it covers.
 
 **MonthlyBudget** (`monthly_budgets`) and **MonthlyBudgetLine** (`monthly_budget_lines`). One branch's plan for one month: the income it expects, a note, and one line per expense category it plans to spend on. A category with no line simply wasn't planned for. Nothing about what *actually* happened is stored here — that's counted from the payments and expenses each time the screen opens, so the comparison always matches the ledger.
 
@@ -709,7 +722,7 @@ A student has no status column. They are Active when at least one of their enrol
 
 These hold even if a bug slips into the code:
 
-- Unique: branch names, category names, skill names, class names within a branch, one branch skill per skill per branch, student numbers, user emails.
+- Unique: branch names, category names, expense category names, skill names, class names within a branch, one branch skill per skill per branch, student numbers, user emails.
 - One active enrollment per student per skill, at any branch. This is a **partial unique index**: it only counts rows whose status is `ACTIVE`, so a student can finish a skill and take it again later.
 - One registration fee per enrollment, and one monthly fee payment per enrollment per fee month. Both are partial unique indexes too, counting only rows of that category. Two clicks on Record payment can't charge a student twice, whatever the code does.
 - One budget per branch per month.
@@ -728,6 +741,7 @@ The app adds its own checks on top. Names are compared ignoring upper and lower 
 | `20260921120000_whatsapp_phone_numbers` | Rewrites every phone number already in the database into WhatsApp's form. `0611111111`, `611111111`, `+252 61 1111111` and `00252611111111` all become `252611111111`. Anything that isn't a Somali mobile is left alone for a person to look at |
 | `20260921180000_branch_skill_pricing` | Gives each branch skill its own duration, registration fee and monthly fee, copied from its skill so nothing changes until the admin edits a branch |
 | `20260922090000_rate_limit` | Adds the `rateLimit` table, which counts login attempts so someone can't guess a password by trying thousands |
+| `20260925120000_expense_categories` | Turns the fixed list of expense categories into the `expense_categories` table. The nine old categories become its first rows, and every expense and budget line keeps its category |
 
 ### Looking at the data yourself
 
@@ -762,6 +776,7 @@ The app adds its own checks on top. Names are compared ignoring upper and lower 
 | See teachers and classes | Every branch's | Their own branch's, read-only |
 | Add or change teachers and classes | Yes | No |
 | Branches, skills, categories | Yes | No, those pages aren't in their menu and are blocked |
+| Expense categories | Yes | No, the page is blocked |
 | Staff accounts | Yes | No |
 
 A staff account that has no branch set sees a notice asking them to contact the admin, and can't do anything else.
@@ -778,7 +793,7 @@ To log out, use **Log out** at the bottom of the sidebar.
 
 ### The screen layout
 
-- **The sidebar** on the left. Students (**Students** and **Register student**) is there for everyone. Admins also get Money (**Dashboard**, **Income**, **Fees owed**, **Expenses**, **Teacher pay**, **Monthly budget**) and Admin (**Branches**, **Skills**, **Categories**, **Teachers**, **Classes**, **Staff accounts**). Branch staff get Your branch instead (**Income**, **Fees owed**, **Teachers** and **Classes**), which shows only their own branch; the teachers and classes there can't be changed. The bottom shows your name, your role and your branch.
+- **The sidebar** on the left. Students (**Students** and **Register student**) is there for everyone. Admins also get Money (**Dashboard**, **Income**, **Fees owed**, **Expenses**, **Expense categories**, **Teacher pay**, **Monthly budget**) and Admin (**Branches**, **Skills**, **Categories**, **Teachers**, **Classes**, **Staff accounts**). Branch staff get Your branch instead (**Income**, **Fees owed**, **Teachers** and **Classes**), which shows only their own branch; the teachers and classes there can't be changed. The bottom shows your name, your role and your branch.
 - **The header** shows "All branches" for an admin, or your branch's name for branch staff. The button on the left of the header hides and shows the sidebar.
 - **On a phone**, the sidebar folds away. Open it with the button at the top left.
 - **Tables** are wider than a phone, so the last columns sit off the side. Instead of scrolling across, tap a row: a pop-up lists everything in it, one line per column, with that row's buttons at the bottom. Tapping a link inside the row, such as a student's name, still opens that page. The same click works on a computer.
@@ -954,11 +969,20 @@ A month only counts once it has started, and a student who dropped a skill in Ma
 
 ### Expenses
 
-Admins only. The same period picker, plus branch, category and teacher filters. At the top, the total spent and how it was paid out; below it, one row per expense category with the total.
+Admins only. The same period picker, plus branch, category and teacher filters. At the top, the total spent and how it was paid out; below it, one row per active expense category with the total. A deactivated category gets a row only when money went on it in the period, so old spending still adds up. The category filter lists deactivated categories too, marked "(inactive)", so their old expenses can still be found.
 
-**Record expense** asks for the category, amount, method, day, branch and a note. Choose **Teacher salary** and two more fields appear: which teacher, and which month the pay covers. That's what makes a salary traceable back to a person, which is why it isn't optional.
+**Record expense** asks for the category, amount, method, day, branch and a note. Only active categories are offered. Choose **Teacher salary** and two more fields appear: which teacher, and which month the pay covers. That's what makes a salary traceable back to a person, which is why it isn't optional.
 
-Each row can be edited or removed.
+Each row can be edited or removed. An expense in a category that has since been deactivated keeps it when edited, but can't be moved into another deactivated one.
+
+### Expense categories
+
+Admins only, from the sidebar or the **Categories** button on Expenses. The list of what money goes on, from A to Z, with how many expenses and budget plans use each one.
+
+- **Add category** and **Rename**. Names are unique, ignoring upper and lower case. A new name shows everywhere, on past expenses too.
+- **Deactivate** takes a category out of Record expense and the budget form. Its old expenses keep it and the reports still count them. **Activate** brings it back.
+- **Delete** only appears while no expense and no budget plan uses the category. Once one does, deleting it would change what past months add up to, so it can only be deactivated.
+- **Teacher salary** is marked **Built in** and has no buttons. Teacher pay is recorded in it, so it can't be renamed, deactivated or deleted.
 
 ### Teacher pay
 
@@ -976,7 +1000,7 @@ Admins only. Pick a month, and the first screen compares every branch's plan aga
 
 Click a branch to open its plan for that month. At the top: income, expenses, the net balance, and how the month came out against what was expected. Then a line-by-line comparison — income first, then every expense category, then the totals — with the difference beside each. A difference that's the wrong way round is red: taking less income than planned, or spending more than budgeted. A category with no plan reads **Not planned**, and any spending on it still shows.
 
-The form underneath writes or replaces the plan: the income you expect, an amount for each category you plan to spend on, and a note. Boxes left empty mean nothing was planned for that category. **Remove the plan** throws the plan away and leaves every payment and expense exactly as they are.
+The form underneath writes or replaces the plan: the income you expect, an amount for each active category you plan to spend on, and a note. Boxes left empty mean nothing was planned for that category. A deactivated category keeps its box, and its line in the comparison, while the plan has an amount for it, so saving the plan again doesn't lose that amount. **Remove the plan** throws the plan away and leaves every payment and expense exactly as they are.
 
 ### The financial dashboard
 
@@ -1009,6 +1033,8 @@ Admins only, and the first thing under Money. Pick a day, a month and optionally
 **Counting the till at the end of the day.** Open Income. The day is already today. The four figures across the top are the cash, ZAAD, eDahab and bank that came in.
 
 **Recording the rent or the electricity.** An admin opens Expenses, presses Record expense, and picks the category, amount, method, day and the branch the money was spent for.
+
+**A new kind of spending.** The college starts paying for a security guard. An admin opens Expense categories, presses Add category and types Security. It's in Record expense and the budget form straight away. If the college stops paying for it, Deactivate it: the months it was paid in still show it.
 
 **Paying a teacher.** An admin opens Teacher pay, picks the month and presses Pay on that teacher's row. A fixed salary comes up at their monthly amount; a percentage teacher comes up at what they're owed. Both save as a Teacher salary expense for that month.
 
