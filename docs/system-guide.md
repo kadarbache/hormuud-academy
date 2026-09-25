@@ -63,7 +63,7 @@ Two kinds of people log in:
 - **Admins** see every branch and set everything up.
 - **Branch staff** work at one branch. They register students and look after those students' skills at that branch.
 
-Nobody signs up on their own. The admin creates every account.
+Nobody signs up on their own. The admin creates every account, and the person signs in with the Google account for that account's email. Passwords from before Google sign-in still work until the switch-over finishes.
 
 Phase 1 was the college itself: branches, skills, teachers, classes, students and enrollments. Phase 2 is the money described above. Attendance, exams and certificates aren't built yet, and the last section lists everything else that's missing.
 
@@ -78,7 +78,7 @@ Phase 1 was the college itself: branches, skills, teachers, classes, students an
 | Components | shadcn/ui on Radix UI | Buttons, dialogs, tables, the sidebar, form fields |
 | Database | PostgreSQL | Stores everything. Neon in production, `prisma dev` on your computer |
 | Database access | Prisma 7 | Describes the tables, changes the database safely, runs typed queries |
-| Login | Better Auth 1.7 | Passwords, sessions, roles, deactivating accounts |
+| Login | Better Auth 1.7 | Google sign-in, sessions, roles, deactivating accounts, and the old passwords until they're removed |
 | Validation | Zod 4 | Checks every form on the server before anything is saved |
 | Photos | Cloudinary | Stores student photos |
 | Hosting | Vercel | Runs the app on the internet |
@@ -129,11 +129,37 @@ Better Auth handles everything about logging in:
 - The **admin plugin** adds roles (`admin` and `staff`), lets an admin create accounts and set passwords, and **bans** accounts. In this app, "Deactivate" on a staff account is a ban. A ban also ends the person's open sessions.
 - It **rate-limits** its own `/api/auth` endpoints and keeps the counts in the `rateLimit` table. Its default store is the server's memory, which doesn't work on Vercel, where each copy of the app has its own memory and loses it often. Better Auth only applies these limits in production.
 - The `nextCookies()` plugin lets server actions set the login cookie.
-- Sign-up is switched off (`disableSignUp: true`). The seed script creates the first admin, and after that only admins create accounts.
+- Sign-up is switched off (`disableSignUp: true`), for passwords and for Google. The seed script creates the first admin, and after that only admins create accounts.
+- It signs staff in with **Google** (`socialProviders.google`), described below.
 
-The configuration is in `src/lib/auth.ts`. Better Auth's web endpoints are served at `/api/auth/...` by `src/app/api/auth/[...all]/route.ts`. The screens don't call them directly, because the login and logout forms use server actions.
+The configuration is in `src/lib/auth.ts`. Better Auth's web endpoints are served at `/api/auth/...` by `src/app/api/auth/[...all]/route.ts`. The screens don't call them directly, because the login and logout forms use server actions. The one endpoint used from outside is `/api/auth/callback/google`, where Google sends people back.
 
-A server action calls Better Auth's functions directly, without going through `/api/auth`, so Better Auth's rate limit never sees it. That's why the login action checks its own limit first, with `consumeRateLimit()` from `src/lib/rate-limit.ts`, in the same `rateLimit` table.
+A server action calls Better Auth's functions directly, without going through `/api/auth`, so Better Auth's rate limit never sees it. That's why the login actions check their own limits first, with `consumeRateLimit()` from `src/lib/rate-limit.ts`, in the same `rateLimit` table.
+
+### Google sign-in
+
+Staff sign in with their Google account instead of a password. Google proves the person owns the email, which is what an invite email would otherwise do, so the app sends no emails and needs no password.
+
+What happens when someone presses **Sign in with Google**:
+
+1. The form runs `signInWithGoogle` in `src/app/login/actions.ts`. It asks Better Auth for Google's sign-in address and sends the browser there. Better Auth stores a random `state` in the `verification` table and in a cookie, so nobody can finish a sign-in someone else started.
+2. Google shows its account picker (`prompt: "select_account"`, so on a shared computer nobody walks in as whoever signed in last), and the person picks their account.
+3. Google sends the browser to `/api/auth/callback/google`. Better Auth checks the `state`, asks Google who the person is, and looks for a user with that email.
+4. **No user with that email:** refused, because sign-up is off. The browser goes back to `/login?error=signup_disabled`, and the page explains it.
+5. **A user with that email:** on the first Google sign-in, Better Auth adds an `account` row with `providerId = "google"`, which links that Google account to the user. After that it finds the user through the link. It links only when the user's `emailVerified` is true, and every account the admin creates or saves is marked so.
+6. A session is created as usual and the browser goes to `/students`. A deactivated account is refused at this step and sent back to `/login?error=BANNED_USER`.
+
+Google also hands over tokens for its own services. The app never uses them, and `encryptOAuthTokens` keeps them encrypted in the `account` table.
+
+**Only the admin creates accounts, and two settings make sure of it.** Better Auth has a second way to sign in with Google: posting a Google ID token straight to `/api/auth/sign-in/social`. In Better Auth 1.7.5 that way ignores `disableSignUp`, so anyone with a Google account could have made themselves a staff account with one request. The app never uses it, so `disableIdTokenSignIn: true` switches it off (it answers `ID_TOKEN_NOT_SUPPORTED`). As a backstop, a `databaseHooks.user.create.before` hook in `src/lib/auth.ts` refuses to create any user unless the request is the admin plugin's `/admin/create-user`, which the Staff page, the seed and the demo script all use. Any other attempt fails with `signup_disabled`, whatever a sign-in setting says.
+
+The Google side is an **OAuth client** in a Google Cloud project, whose ID and secret are `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. Its authorized redirect URIs must list `http://localhost:3000/api/auth/callback/google` and `https://hormuud-academy.vercel.app/api/auth/callback/google`. Without the two keys the Google button is hidden (`googleSignInEnabled`).
+
+**Changing a staff member's email** removes their Google link and logs them out, because the old Google account would otherwise still get in. They sign in again with the Google account for the new address.
+
+**The first admin** comes from the seed: `pnpm db:seed` creates an admin from `SEED_ADMIN_NAME` and `SEED_ADMIN_EMAIL`, with no password. If the only admin loses their Google account, run the seed again with a new Gmail. It leaves existing emails alone and creates the new admin. Two admins avoid needing that.
+
+**The switch-over.** Accounts made before Google sign-in still have passwords, and the login page still shows the password form under the Google button. The steps to finish it are in `docs/open-decisions.md`.
 
 ### Zod
 
@@ -235,7 +261,7 @@ hormuud-academy/
 ├── src/
 │   ├── app/                     Every page, by URL
 │   │   ├── layout.tsx           The outer page: fonts and pop-up messages
-│   │   ├── login/               The login page and its server action
+│   │   ├── login/               The login page and its server actions (password and Google)
 │   │   ├── api/auth/            Better Auth's web endpoints
 │   │   └── (app)/               Everything behind the login
 │   │       ├── layout.tsx       Checks the login, draws the sidebar and header
@@ -376,11 +402,13 @@ sequenceDiagram
 
 - Every page and every server action checks the login again. A server action can be called without opening its page, so hiding a button isn't enough: the action itself checks with `requireUser()` or `requireAdmin()`, and then checks the branch rules.
 - The branch rules live in `src/app/(app)/students/access.ts`: `visibleEnrollments`, `browsableStudents`, `canEditStudent` and `canActAtBranch`.
-- Passwords are stored as hashes. Nobody, including the admin, can read a password back. An admin can only set a new one.
+- Staff sign in with Google, and an unknown Google account is refused. The app never sees a Google password.
+- No account can be created except through the admin's create-user. A database hook in `src/lib/auth.ts` refuses every other way, so a sign-in setting that fails to switch sign-up off can't open it.
+- The passwords left from before Google sign-in are stored as hashes. Nobody, including the admin, can read a password back. An admin can only set a new one, and only on an account that still has one.
 - There is no sign-up page.
 - Deactivating an account stops the login and ends every open session straight away.
 - Setting a new password also ends every open session for that person, because a reset often means someone else knew the old password. An admin who resets their own password stays logged in on the device they're using.
-- The login form allows 5 tries per email and 20 tries per computer (IP address) each minute. After that it shows "Too many login attempts" and how many seconds to wait. This stops anyone guessing a password by trying thousands.
+- The login form allows 5 tries per email and 20 tries per computer (IP address) each minute. After that it shows "Too many login attempts" and how many seconds to wait. This stops anyone guessing a password by trying thousands. The Google button has its own limit of 20 a minute per computer.
 
 ### Dates and the time zone
 
@@ -671,9 +699,9 @@ A student has no status column. They are Active when at least one of their enrol
 
 **MonthlyBudget** (`monthly_budgets`) and **MonthlyBudgetLine** (`monthly_budget_lines`). One branch's plan for one month: the income it expects, a note, and one line per expense category it plans to spend on. A category with no line simply wasn't planned for. Nothing about what *actually* happened is stored here — that's counted from the payments and expenses each time the screen opens, so the comparison always matches the ledger.
 
-**User** (`user`). A login account. Better Auth's own columns (name, email, `emailVerified`, `image`), the admin plugin's columns (`role`, `banned`, `banReason`, `banExpires`), and this app's `branchId`. Branch staff have a branch. Admins have none.
+**User** (`user`). A login account. Better Auth's own columns (name, email, `emailVerified`, `image`), the admin plugin's columns (`role`, `banned`, `banReason`, `banExpires`), and this app's `branchId`. Branch staff have a branch. Admins have none. `emailVerified` is true once the admin has created or saved the account, and Google sign-in needs it.
 
-**Session**, **Account**, **Verification** (`session`, `account`, `verification`). Better Auth's tables. A session is one login on one device. An account row holds the password hash for email logins. Verification is unused for now; Better Auth uses it for things like email confirmation links.
+**Session**, **Account**, **Verification** (`session`, `account`, `verification`). Better Auth's tables. A session is one login on one device. An account row is one way to sign in: `providerId = "google"` links a Google account, and `providerId = "credential"` holds an old password's hash. Verification holds the `state` of each Google sign-in while the person is at Google.
 
 **RateLimit** (`rateLimit`). Counts recent login attempts. `key` says what's being counted, such as `action:sign-in:email:amina@example.com`, `count` is the attempts so far, and `lastRequest` is when the count started, in milliseconds. Rows older than a minute are deleted as new attempts come in.
 
@@ -742,7 +770,9 @@ A staff account that has no branch set sees a notice asking them to contact the 
 
 ### Logging in and out
 
-Go to the app's address. Anyone not logged in lands on the login page. Log in with the email and password the admin gave you. A wrong password shows "Wrong email or password.", and a deactivated account shows "This account has been deactivated." After 5 wrong tries in a minute, the form makes you wait before you can try again.
+Go to the app's address. Anyone not logged in lands on the login page. Press **Sign in with Google** and pick the Google account whose email the admin put on your account. A Google account the admin didn't add is refused with "There's no account for that Google address", and a deactivated account shows "This account has been deactivated."
+
+Until the switch-over finishes, the email and password form is still under the Google button. A wrong password shows "Wrong email or password." After 5 wrong tries in a minute, the form makes you wait before you can try again.
 
 To log out, use **Log out** at the bottom of the sidebar.
 
@@ -764,7 +794,7 @@ Log in as the admin and do these in order, because each step needs the one befor
 4. **Teachers.** Add each teacher and tick the branches they work at.
 5. **Skills.** Add each skill with its category, duration, registration fee and monthly fee. After saving, the app opens the skill's page.
 6. **On each skill's page**, press **Add to a branch** for every branch that teaches it and pick that branch's teacher and class. A skill no branch teaches can't be taken by anyone.
-7. **Staff accounts.** Create an account for each person at each branch, and give them their email and password yourself.
+7. **Staff accounts.** Create an account for each person at each branch with their Gmail address, and tell them to sign in with Google.
 
 After that, staff can register students.
 
@@ -808,9 +838,10 @@ On a **skill's page** you can:
 
 #### Staff accounts
 
-- **Add staff account.** Enter a name, an email, a role and, for branch staff, their branch, then choose a password of at least 8 characters. There's no email sending, so you tell the person their password yourself.
-- **Edit** changes the name, role or branch. The email can't be changed. You can't change your own role, so the college can't be left without an admin.
-- **New password** sets a new password when someone forgets theirs. It also logs them out everywhere, so they log in again with the new one.
+- **Add staff account.** Enter a name, the person's Gmail address, a role and, for branch staff, their branch. There's no password and no email sending: tell the person yourself that they can sign in with Google.
+- **Signs in with** shows Google once the person has signed in with Google, "Google, not signed in yet" before that, and Password for an account left from before Google sign-in.
+- **Edit** changes the name, Gmail address, role or branch. Changing the address logs the person out and removes their Google link, so they sign in again with the Google account for the new address. Saving also gets an older account ready for Google. You can't change your own role, so the college can't be left without an admin.
+- **New password** shows only on accounts that still have a password from before Google sign-in. It sets a new one and logs them out everywhere.
 - **Deactivate** logs the person out everywhere and blocks their login. Their students and records stay. **Turn back on** reverses it. You can't deactivate yourself.
 
 Accounts can't be deleted, because students and enrollments record who created them.
@@ -1009,7 +1040,7 @@ Admins only, and the first thing under Money. Pick a day, a month and optionally
 
 **A branch closes.** Finish or drop its students' skills, deactivate its skills on each skill page, deactivate its staff accounts, then deactivate the branch. The history stays.
 
-**A staff member forgets their password.** An admin opens Staff accounts, presses New password and tells them the new one.
+**A staff member can't get into their Google account.** Google's own account recovery is the first stop. If the account is gone for good, an admin edits their staff account and puts in a new Gmail address. An account left from before Google sign-in can still get a new password under New password.
 
 **A staff member leaves.** An admin deactivates their account. The students they registered keep their "registered by" record.
 
@@ -1047,14 +1078,15 @@ The [README](../README.md) has the full first-time setup and the steps to deploy
 | `SHADOW_DATABASE_URL` | Only locally: a scratch database `prisma migrate dev` uses to check migrations |
 | `BETTER_AUTH_SECRET` | A long random secret that signs the login cookies. Different in every environment, and never shared |
 | `BETTER_AUTH_URL` | The app's address, like `http://localhost:3000` or the production address |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | The Google Cloud OAuth client for Google sign-in. Leave empty to hide the Google button |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Photo upload. Leave empty to turn photos off |
-| `SEED_ADMIN_NAME`, `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` | The first admin that `pnpm db:seed` creates |
+| `SEED_ADMIN_NAME`, `SEED_ADMIN_EMAIL` | The first admin that `pnpm db:seed` creates. The email is their Gmail address; there's no password |
 
 `.env` holds real secrets and is never committed. `.env.example` is the copy without values.
 
 ### Sample data
 
-`pnpm db:demo` adds two branches (Main Branch and Second Branch), four skills, four teachers, four students and a branch staff account `staff@college.local` at Main Branch. It prints that account's password once. If you lose it, set a new one under Staff accounts.
+`pnpm db:demo` adds two branches (Main Branch and Second Branch), four skills, four teachers, four students and a branch staff account `staff@college.local` at Main Branch. That address isn't a Google account, so it signs in with a password, which the script prints once. If you lose it, set a new one under Staff accounts.
 
 The sample students cover a student with two skills, a student past their end date, a student taking skills at both branches, an Inactive student, and both paid and unpaid registration fees. The money is there too: two of the four teachers are on a fixed salary and two on a percentage, fees are paid across all four methods with some months left owing, books were sold over the counter, rent and electricity went out for this month and last, last month's salaries were paid and this month's weren't, and both branches have a plan for this month to compare against. Never run it on the real database. It refuses anyway if branches already exist.
 
@@ -1109,7 +1141,7 @@ Everything here was left out of Phase 1 on purpose, or is a known gap:
 - No automated tests yet. Everything was checked by hand in the browser. Adding tests is a good next step: unit tests for `src/lib` and browser tests for registration and the branch rules.
 - No import from the old system. Old students are typed in by hand.
 - No printing: no ID cards, receipts or registration forms.
-- No emails. Staff can't reset their own password, so an admin does it.
+- No emails. Staff sign in with Google, so there's nothing to send.
 - Photos stay off until the Cloudinary keys are set.
 - No record of who changed what. Only who registered a student, who added each enrollment, who recorded each payment and expense, and who saved each budget. A fee the admin lowered or waived doesn't show what it was before, and an edited expense doesn't show its old amount.
 - Each branch runs a skill once, with one teacher in one class. There are no morning and evening groups of the same skill at the same branch.
