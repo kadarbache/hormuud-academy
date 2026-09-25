@@ -28,13 +28,14 @@ function pick<T extends string>(value: string, allowed: readonly T[]): T | "" {
 
 export function readIncomeFilters(params: SearchParams): IncomeFilters {
   const branch = one(params, "branch");
+  const teacher = one(params, "teacher");
   const page = Number.parseInt(one(params, "page"), 10);
   return {
     period: readPeriod(params),
     branchId: branch === ANY ? "" : branch,
     category: pick(one(params, "category"), incomeCategories),
     method: pick(one(params, "method"), paymentMethods),
-    teacherId: one(params, "teacher"),
+    teacherId: teacher === ANY ? "" : teacher,
     q: one(params, "q").trim(),
     page: Number.isFinite(page) && page > 0 ? page : 1,
   };

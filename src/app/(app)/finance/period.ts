@@ -68,7 +68,11 @@ export function periodPhrase(period: Period): string {
   return `on ${formatDate(period.day)}`;
 }
 
-/** The period part of a link, so filters survive a click. */
+/**
+ * The period part of a link, so filters survive a click. The kind is always
+ * spelled out, because a screen may open something other than a day when it
+ * is missing (Expenses opens the month).
+ */
 export function periodParams(period: Period): [string, string][] {
   if (period.kind === "all") return [["period", "all"]];
   if (period.kind === "month") {
@@ -77,5 +81,8 @@ export function periodParams(period: Period): [string, string][] {
       ["month", period.month],
     ];
   }
-  return [["day", period.day]];
+  return [
+    ["period", "day"],
+    ["day", period.day],
+  ];
 }
