@@ -79,57 +79,92 @@ so that part is ready.
 Start Meta Business verification. It has the longest wait, so it can run while
 everything else is decided.
 
-## 2. Sign in with Google
+## 2. Student portal
 
-Let staff log in with their Google account instead of typing a password. Only
-staff log in (the admin and branch staff); students never do.
+Students sign in to see their own exam results and attendance, plus their
+fees, their skills and their profile. Talked through on 24 September 2026.
 
-Leaning (not final): **keep both**. Staff can use Google or their password, and
-the admin always keeps a password as a backup.
+Decided so far:
+
+- **Credentials: Student ID and a password.** The student types `STU-00001`
+  and their password. Every student has a Student ID; many have no email and
+  the phone is optional, and siblings can share a phone.
+- **First password: staff hand over a temporary one.** Staff press "Create
+  login" on the student, the app shows a one-time password once, staff give it
+  to the student, and the student must choose their own on first sign-in.
+- **Forgotten password: back to the branch.** Staff issue a new temporary
+  password. Once WhatsApp messages exist (section 1), a code by WhatsApp could
+  replace the visit.
+- **One login per student, managed from any of their branches.** A student has
+  one account however many branches they study at. The admin, and staff at any
+  branch the student belongs to, can create it, reset it and switch it off.
+  "Belongs to" means the same students staff already see in their list: their
+  home branch, or a branch where they take or took a skill.
+- **Who can sign in: any student with a login.** Finished and dropped students
+  keep read-only access to their own history. Staff can still switch a login
+  off by hand.
+- **What they see:** exam results, attendance, fees owed and paid, their
+  enrollments (skill, branch, class, teacher, end date), and their profile,
+  read-only. Changes to a profile still go through staff.
+- **No parent access** for now.
 
 ### Needed before any code
 
-1. **A Google Cloud project** (free) with an **OAuth consent screen**, the
-   "Sign in to Hormuud Academy" screen people see.
-2. **An OAuth client ID** listing the app's exact web address. Localhost works
-   for testing; the real domain has to exist first, so this waits on deploying.
-3. **Publish the consent screen.** In "Testing" mode only up to 100 listed test
-   users can sign in, and they're logged out every 7 days. Asking only for name
-   and email needs no Google review; adding a logo may need a short brand check.
-
-### Cost
-
-Free.
+1. **Exams and attendance themselves.** Neither exists yet. The portal can
+   ship earlier with fees, skills and profile, since that data is already
+   there.
+2. **Strict roles.** `requireUser` in `src/lib/session.ts` treats every role
+   that isn't `admin` as `staff`. A `student` role added without fixing that
+   would open the whole staff app for their branch. Unknown roles must get
+   nothing, and every staff page must refuse a student.
 
 ### How it fits the app
 
-- The admin still creates every staff account, with its role and branch.
-  Google only replaces the password.
-- The staff account's email has to be the person's Google email.
-- Sign-up through Google is off, so an unknown Google account is refused.
-- Deactivating a staff member still locks them out, Google or not.
-
-### Things to weigh
-
-- **Good:** no passwords to hand out or reset, and Google's security (two-step
-  verification) is usually stronger than a password the admin chose.
-- **Shared branch computers:** Google stays signed in in the browser. If staff
-  share a computer and don't sign out of Google, the next person opens the app
-  as them. Separate browser profiles, or signing out, solves it.
-- **Personal Gmail:** access is tied to that account. Fine, since the admin
-  controls access, but a college Google Workspace would be tidier.
+- **One login system.** A student account is a Better Auth `User` with role
+  `student` and a one-to-one link to its `Student` row. Every portal query is
+  scoped to that one student, never taken from the URL.
+- **Better Auth's username plugin** signs students in by Student ID. Better
+  Auth still wants an email per user, so a student gets a placeholder address
+  that is never mailed.
+- **Creating a student login has to go through `/admin/create-user`.** A
+  hook in `src/lib/auth.ts` refuses to create a user any other way. If staff
+  create logins through something else, that path has to be added to the hook
+  on purpose.
+- **Its own area,** something like `/portal`, with its own layout, built for a
+  phone first. Staff and students are sent to their own side after sign-in.
+- **Sign-in limits per account.** Today's limit is 5 tries a minute per IP.
+  A class on the branch Wi-Fi shares one IP, so a few typos would lock
+  everyone out. Students need a limit per Student ID.
+- **Must change password** is a flag on the account, set whenever staff issue
+  a temporary one, and cleared when the student picks their own.
+- Every "create login" and "reset password" is recorded: which staff member,
+  at which branch, when. Staff at several branches can reset the same login,
+  so the record shows who did it.
 
 ### Still to decide
 
-- Whether to do it at all, and when.
-- Keep both login methods (the leaning), or Google only for branch staff.
+- Rules for a student's own password (at least 8 characters, like the old
+  staff passwords?).
+- Whether Google sign-in stays staff-only. Leaning yes: students use their
+  Student ID. Either way, Google must refuse a student account even if its
+  email matches a Google account.
+- How long a student stays signed in on their phone.
+- Whether the portal is in English, Somali, or both.
+- Whether students see exam results as soon as they're entered, or only once
+  staff publish them.
+- Whether they see which fee months are unpaid, and whether that should hold
+  back anything (results, a certificate).
 
 ## Side by side
 
-| | WhatsApp | Google sign-in |
+| | WhatsApp | Student portal |
 |---|---|---|
-| Waiting on others | Meta business verification, template approval | Almost nothing |
+| Waiting on others | Meta business verification, template approval | Exams and attendance being built |
 | Cost | Per message | Free |
-| Needs the app deployed | Yes, for delivery reports | Yes, for the real domain |
-| Size of the work | Medium to large | Small |
-| Who benefits | Students | Staff |
+| Needs the app deployed | Yes, for delivery reports | Already deployed |
+| Size of the work | Medium to large | Medium, on top of exams and attendance |
+| Who benefits | Students | Students |
+
+Google sign-in for staff was on this list until 24 September 2026, when it was
+built. How it works is in `docs/system-guide.md`, and the rest of the
+switch-over is in `docs/open-decisions.md`.
