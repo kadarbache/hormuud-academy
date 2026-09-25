@@ -1,6 +1,7 @@
 "use server";
 
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { APIError } from "better-auth/api";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
@@ -48,4 +49,25 @@ export async function signIn(formData: FormData): Promise<ActionResult> {
   }
 
   return success();
+}
+
+/**
+ * Sends the browser to Google. Google sends it back to Better Auth's callback,
+ * which logs the person in and goes on to /students, or comes back to /login
+ * with `?error=` when the Google account has no staff account here.
+ */
+export async function signInWithGoogle() {
+  const requestHeaders = await headers();
+  // Every click stores a sign-in attempt, so one machine can't pile them up.
+  const byIp = await consumeRateLimit(`sign-in:google:ip:${clientIp(requestHeaders)}`, IP_LIMIT);
+  if (!byIp.allowed) redirect("/login?error=too_many_attempts");
+
+  // nextCookies() sets the cookie Better Auth checks when Google sends the
+  // person back, so nobody can finish a sign-in someone else started.
+  const { url } = await auth.api.signInSocial({
+    body: { provider: "google", callbackURL: "/students", errorCallbackURL: "/login" },
+    headers: requestHeaders,
+  });
+  if (!url) throw new Error("Better Auth returned no Google sign-in address.");
+  redirect(url);
 }
