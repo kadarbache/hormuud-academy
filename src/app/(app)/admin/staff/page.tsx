@@ -22,7 +22,10 @@ export default async function StaffPage() {
   const [accounts, branches] = await Promise.all([
     prisma.user.findMany({
       orderBy: [{ role: "asc" }, { name: "asc" }],
-      include: { branch: { select: { name: true } } },
+      include: {
+        branch: { select: { name: true } },
+        accounts: { select: { providerId: true } },
+      },
     }),
     prisma.branch.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
   ]);
@@ -51,6 +54,7 @@ export default async function StaffPage() {
           { label: "Name" },
           { label: "Role" },
           { label: "Branch" },
+          { label: "Signs in with" },
           { label: "Status" },
           { label: "Actions", actions: true, className: "text-right" },
         ]}
@@ -62,6 +66,10 @@ export default async function StaffPage() {
             account.branchId && !branchOptions.some((option) => option.value === account.branchId)
               ? [{ value: account.branchId, label: account.branch?.name ?? "Current branch" }, ...branchOptions]
               : branchOptions;
+          // Google is linked on the person's first Google sign-in. A password
+          // is left over from before Google sign-in.
+          const hasGoogle = account.accounts.some((a) => a.providerId === "google");
+          const hasPassword = account.accounts.some((a) => a.providerId === "credential");
 
           return {
             key: account.id,
@@ -79,6 +87,13 @@ export default async function StaffPage() {
               ),
               Role: role === "admin" ? "Admin" : "Branch staff",
               Branch: role === "admin" ? "All branches" : (account.branch?.name ?? "Not set"),
+              "Signs in with": hasGoogle ? (
+                hasPassword ? "Google or password" : "Google"
+              ) : hasPassword ? (
+                "Password"
+              ) : (
+                <span className="text-muted-foreground">Google, not signed in yet</span>
+              ),
               Status: account.banned ? (
                 <Badge variant="outline" className="text-muted-foreground">
                   Deactivated
@@ -99,15 +114,17 @@ export default async function StaffPage() {
                       </Button>
                     }
                   />
-                  <ResetPasswordDialog
-                    action={resetStaffPassword.bind(null, account.id)}
-                    name={account.name}
-                    trigger={
-                      <Button variant="ghost" size="sm">
-                        New password
-                      </Button>
-                    }
-                  />
+                  {hasPassword && (
+                    <ResetPasswordDialog
+                      action={resetStaffPassword.bind(null, account.id)}
+                      name={account.name}
+                      trigger={
+                        <Button variant="ghost" size="sm">
+                          New password
+                        </Button>
+                      }
+                    />
+                  )}
                   {!isSelf && (
                     <ActionButton
                       variant="ghost"

@@ -32,7 +32,7 @@ export function StaffAccountDialog({
       description={
         account
           ? account.email
-          : "The person logs in with this email and password. There is no sign-up page."
+          : "The person signs in with the Google account that has this email. There is no sign-up page."
       }
       trigger={trigger}
       action={action}
@@ -41,16 +41,20 @@ export function StaffAccountDialog({
       {(errors) => (
         <>
           <TextField label="Name" name="name" defaultValue={account?.name} required errors={errors.name} />
-          {!account && (
-            <TextField
-              label="Email"
-              name="email"
-              type="email"
-              autoComplete="off"
-              required
-              errors={errors.email}
-            />
-          )}
+          <TextField
+            label="Gmail address"
+            name="email"
+            type="email"
+            autoComplete="off"
+            defaultValue={account?.email}
+            description={
+              account
+                ? "Changing it logs them out. They sign back in with the Google account for the new address."
+                : "The address of their Google account. Tell them yourself that the account is ready."
+            }
+            required
+            errors={errors.email}
+          />
           <SelectField
             label="Role"
             name="role"
@@ -77,17 +81,6 @@ export function StaffAccountDialog({
               placeholder="Pick a branch"
               defaultValue={account?.branchId ?? ""}
               errors={errors.branchId}
-            />
-          )}
-          {!account && (
-            <TextField
-              label="Password"
-              name="password"
-              type="text"
-              autoComplete="new-password"
-              description="At least 8 characters. You'll give it to the person yourself."
-              required
-              errors={errors.password}
             />
           )}
         </>
