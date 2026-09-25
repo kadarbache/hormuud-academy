@@ -33,7 +33,7 @@ import {
   paymentMethod,
 } from "@/lib/validation";
 import { feeMonths } from "../fee-months";
-import { walkInIncomeCategories } from "../labels";
+import { TEACHER_SALARY_ID, walkInIncomeCategories } from "../labels";
 
 // Recording money in. Every screen that takes a payment ends up here, so the
 // branch check and the teacher's share are worked out the same way whether
@@ -272,7 +272,11 @@ export async function deletePayment(id: string): Promise<ActionResult> {
   if (payment.teacherId) {
     const month = fromDbMonth(payment.paidOn);
     const paid = await prisma.expense.findFirst({
-      where: { category: "TEACHER_SALARY", teacherId: payment.teacherId, forMonth: toDbMonth(month) },
+      where: {
+        categoryId: TEACHER_SALARY_ID,
+        teacherId: payment.teacherId,
+        forMonth: toDbMonth(month),
+      },
       select: { id: true },
     });
     if (paid) {

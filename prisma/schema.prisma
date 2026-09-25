@@ -357,16 +357,20 @@ enum IncomeCategory {
   OTHER
 }
 
-enum ExpenseCategory {
-  RENT
-  ELECTRICITY
-  TEACHER_SALARY
-  STAFF_SALARY
-  INTERNET
-  STATIONERY
-  TRANSPORTATION
-  MAINTENANCE
-  OTHER
+/// What the money went on. The admin keeps the list. Teacher salary is the one
+/// row the app itself relies on: teacher pay is an expense in it. It always has
+/// the id "teacher_salary" and can't be renamed, deactivated or deleted.
+model ExpenseCategory {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  expenses    Expense[]
+  budgetLines MonthlyBudgetLine[]
+
+  @@map("expense_categories")
 }
 
 enum SalaryType {
@@ -429,17 +433,18 @@ model Payment {
 }
 
 /// Money spent. A teacher's salary and a percentage teacher's payout are both
-/// expenses in the TEACHER_SALARY category, with the teacher named.
+/// expenses in the Teacher salary category, with the teacher named.
 model Expense {
-  id       String          @id @default(cuid())
-  number   Int             @unique @default(autoincrement())
-  category ExpenseCategory
-  method   PaymentMethod
-  amount   Decimal         @db.Decimal(10, 2)
+  id         String          @id @default(cuid())
+  number     Int             @unique @default(autoincrement())
+  categoryId String
+  category   ExpenseCategory @relation(fields: [categoryId], references: [id])
+  method     PaymentMethod
+  amount     Decimal         @db.Decimal(10, 2)
   /// The college day the money went out.
-  spentOn  DateTime        @db.Date
-  branchId String
-  branch   Branch          @relation(fields: [branchId], references: [id])
+  spentOn    DateTime        @db.Date
+  branchId   String
+  branch     Branch          @relation(fields: [branchId], references: [id])
 
   /// Set on a salary or payout so a teacher's pay can be traced.
   teacherId String?
@@ -455,7 +460,7 @@ model Expense {
 
   @@index([spentOn])
   @@index([branchId, spentOn])
-  @@index([category, spentOn])
+  @@index([categoryId, spentOn])
   @@index([teacherId])
   @@map("expenses")
 }
@@ -488,11 +493,13 @@ model MonthlyBudget {
 /// What one expense category was budgeted for in one month. A category with
 /// no line wasn't planned for; spending on it still shows up as unplanned.
 model MonthlyBudgetLine {
-  budgetId String
-  budget   MonthlyBudget   @relation(fields: [budgetId], references: [id], onDelete: Cascade)
-  category ExpenseCategory
-  amount   Decimal         @db.Decimal(10, 2)
+  budgetId   String
+  budget     MonthlyBudget   @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   ExpenseCategory @relation(fields: [categoryId], references: [id])
+  amount     Decimal         @db.Decimal(10, 2)
 
-  @@id([budgetId, category])
+  @@id([budgetId, categoryId])
+  @@index([categoryId])
   @@map("monthly_budget_lines")
 }

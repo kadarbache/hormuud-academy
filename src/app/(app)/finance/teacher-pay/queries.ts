@@ -3,6 +3,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { monthEnd, monthStart, toDbDate, toDbMonth } from "@/lib/dates";
 import { fromCents, subtractMoney, toCents } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
+import { TEACHER_SALARY_ID } from "../labels";
 
 // What each teacher has earned and what they have been paid.
 //
@@ -35,7 +36,7 @@ async function shareTotals(where: Prisma.PaymentWhereInput) {
 async function payoutTotals(where: Prisma.ExpenseWhereInput) {
   const rows = await prisma.expense.groupBy({
     by: ["teacherId"],
-    where: { ...where, category: "TEACHER_SALARY", teacherId: { not: null } },
+    where: { ...where, categoryId: TEACHER_SALARY_ID, teacherId: { not: null } },
     _sum: { amount: true },
   });
   return sumByTeacher(rows.map((row) => ({ teacherId: row.teacherId, total: row._sum.amount })));
@@ -140,7 +141,7 @@ export async function getTeacherPay(id: string) {
       },
     }),
     prisma.expense.findMany({
-      where: { teacherId: id, category: "TEACHER_SALARY" },
+      where: { teacherId: id, categoryId: TEACHER_SALARY_ID },
       orderBy: [{ spentOn: "desc" }, { number: "desc" }],
       include: { branch: { select: { name: true } }, recordedBy: { select: { name: true } } },
     }),
@@ -180,7 +181,7 @@ export async function percentageOwed(teacherId: string, leaveOut?: string): Prom
     prisma.expense.aggregate({
       where: {
         teacherId,
-        category: "TEACHER_SALARY",
+        categoryId: TEACHER_SALARY_ID,
         ...(leaveOut ? { id: { not: leaveOut } } : {}),
       },
       _sum: { amount: true },
@@ -198,7 +199,7 @@ export async function paidForMonth(
   const { _sum } = await prisma.expense.aggregate({
     where: {
       teacherId,
-      category: "TEACHER_SALARY",
+      categoryId: TEACHER_SALARY_ID,
       forMonth: toDbMonth(month),
       ...(leaveOut ? { id: { not: leaveOut } } : {}),
     },

@@ -1,13 +1,9 @@
 import "server-only";
-import type {
-  ExpenseCategory,
-  IncomeCategory,
-  PaymentMethod,
-  Prisma,
-} from "@/generated/prisma/client";
+import type { IncomeCategory, PaymentMethod, Prisma } from "@/generated/prisma/client";
 import { fromCents, subtractMoney, toCents } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
-import { expenseCategories, incomeCategories, paymentMethods } from "./labels";
+import { listExpenseCategories } from "./expense-categories/queries";
+import { incomeCategories, paymentMethods } from "./labels";
 
 // The figures every financial screen is built from. Nothing here stores a
 // total: a day's takings are counted from the payments recorded for that day,
@@ -53,14 +49,28 @@ export async function incomeByCategory(
   );
 }
 
+export type CategoryRow = { key: string; label: string; amount: string };
+
+/**
+ * Spending by expense category, as the rows of a breakdown. Every active
+ * category is listed, so a zero is visibly a zero. A deactivated one is listed
+ * only when money went on it here, so old spending still adds up.
+ */
 export async function expensesByCategory(
   where: Prisma.ExpenseWhereInput,
-): Promise<Totals<ExpenseCategory>> {
-  const rows = await prisma.expense.groupBy({ by: ["category"], where, _sum: { amount: true } });
-  return collect(
-    expenseCategories,
-    rows.map((row) => ({ key: row.category, amount: row._sum.amount })),
+): Promise<{ rows: CategoryRow[]; total: string }> {
+  const [categories, sums] = await Promise.all([
+    listExpenseCategories(),
+    prisma.expense.groupBy({ by: ["categoryId"], where, _sum: { amount: true } }),
+  ]);
+  const { byKey, total } = collect(
+    categories.map((category) => category.id),
+    sums.map((row) => ({ key: row.categoryId, amount: row._sum.amount })),
   );
+  const rows = categories
+    .filter((category) => category.active || toCents(byKey[category.id]) !== 0)
+    .map((category) => ({ key: category.id, label: category.name, amount: byKey[category.id] }));
+  return { rows, total };
 }
 
 export async function expensesByMethod(

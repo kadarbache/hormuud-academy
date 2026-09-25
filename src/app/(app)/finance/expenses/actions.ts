@@ -16,27 +16,16 @@ import {
   optionalText,
   paymentMethod,
 } from "@/lib/validation";
-import { expenseCategoryLabels } from "../labels";
+import { TEACHER_SALARY_ID } from "../labels";
 import { paidForMonth, percentageOwed } from "../teacher-pay/queries";
 
 // Money out. Expenses are the admin's alone: a branch shouldn't be able to
 // read what the college pays its rent or its people.
 
 const expenseSchema = z.object({
-  category: z.enum(
-    [
-      "RENT",
-      "ELECTRICITY",
-      "TEACHER_SALARY",
-      "STAFF_SALARY",
-      "INTERNET",
-      "STATIONERY",
-      "TRANSPORTATION",
-      "MAINTENANCE",
-      "OTHER",
-    ],
-    { error: "Pick what the money was spent on." },
-  ),
+  categoryId: z
+    .string({ error: "Pick what the money was spent on." })
+    .min(1, "Pick what the money was spent on."),
   method: paymentMethod("Pick how it was paid."),
   amount: money("Enter the amount spent."),
   spentOn: isoDate("Pick the day it was paid.").refine(
@@ -47,14 +36,12 @@ const expenseSchema = z.object({
   note: optionalText(200),
 });
 
-type Parsed = z.infer<typeof expenseSchema>;
-
 /**
  * A teacher's pay always names the teacher and the month it covers, so it can
  * be traced back to them. Everything else leaves both empty.
  */
-function readTeacherPay(values: Record<string, string>, category: Parsed["category"]) {
-  if (category !== "TEACHER_SALARY") return { ok: true as const, teacherId: null, forMonth: null };
+function readTeacherPay(values: Record<string, string>, categoryId: string) {
+  if (categoryId !== TEACHER_SALARY_ID) return { ok: true as const, teacherId: null, forMonth: null };
 
   const month = isoMonth("Pick the month this pay covers.").safeParse(values.forMonth);
   if (!values.teacherId || !month.success) {
@@ -107,8 +94,14 @@ async function overpaymentMessage(
     : `${teacher.name}'s ${formatMoney(salary)} for ${formatMonth(forMonth)} is already paid in full.`;
 }
 
-/** `editing` is the expense being changed, so its old amount isn't counted twice. */
-async function checkedFields(values: Record<string, string>, editing?: string) {
+/**
+ * `editing` is the expense being changed, so its old amount isn't counted
+ * twice and it can stay in a category that has been deactivated since.
+ */
+async function checkedFields(
+  values: Record<string, string>,
+  editing?: { id: string; categoryId: string },
+) {
   const parsed = expenseSchema.safeParse(values);
   if (!parsed.success) return { ok: false as const, result: invalid(parsed.error) };
   if (!isPositiveMoney(parsed.data.amount)) {
@@ -120,7 +113,20 @@ async function checkedFields(values: Record<string, string>, editing?: string) {
     };
   }
 
-  const pay = readTeacherPay(values, parsed.data.category);
+  const category = await prisma.expenseCategory.findUnique({
+    where: { id: parsed.data.categoryId },
+  });
+  if (!category) return { ok: false as const, result: failure("That category no longer exists.") };
+  if (!category.active && category.id !== editing?.categoryId) {
+    return {
+      ok: false as const,
+      result: failure("Check the highlighted fields.", {
+        categoryId: [`${category.name} has been deactivated. Pick another category.`],
+      }),
+    };
+  }
+
+  const pay = readTeacherPay(values, category.id);
   if (!pay.ok) return { ok: false as const, result: failure("Check the highlighted fields.", pay.errors) };
 
   if (!(await prisma.branch.findUnique({ where: { id: parsed.data.branchId } }))) {
@@ -133,7 +139,12 @@ async function checkedFields(values: Record<string, string>, editing?: string) {
     });
     if (!teacher) return { ok: false as const, result: failure("That teacher no longer exists.") };
 
-    const tooMuch = await overpaymentMessage(teacher, parsed.data.amount, pay.forMonth, editing);
+    const tooMuch = await overpaymentMessage(
+      teacher,
+      parsed.data.amount,
+      pay.forMonth,
+      editing?.id,
+    );
     if (tooMuch) {
       return {
         ok: false as const,
@@ -151,7 +162,7 @@ async function checkedFields(values: Record<string, string>, editing?: string) {
       forMonth: pay.forMonth ? toDbMonth(pay.forMonth) : null,
     },
     paidFor: pay.forMonth,
-    category: parsed.data.category,
+    categoryName: category.name,
     amount: parsed.data.amount,
   };
 }
@@ -165,18 +176,15 @@ export async function createExpense(formData: FormData): Promise<ActionResult> {
 
   refresh();
   const covers = checked.paidFor ? ` for ${formatMonth(checked.paidFor)}` : "";
-  return success(
-    `${expenseCategoryLabels[checked.category]}${covers}: ${formatMoney(checked.amount)} recorded.`,
-  );
+  return success(`${checked.categoryName}${covers}: ${formatMoney(checked.amount)} recorded.`);
 }
 
 export async function updateExpense(id: string, formData: FormData): Promise<ActionResult> {
   await requireAdmin();
-  if (!(await prisma.expense.findUnique({ where: { id } }))) {
-    return failure("That expense no longer exists.");
-  }
+  const expense = await prisma.expense.findUnique({ where: { id } });
+  if (!expense) return failure("That expense no longer exists.");
 
-  const checked = await checkedFields(formObject(formData), id);
+  const checked = await checkedFields(formObject(formData), expense);
   if (!checked.ok) return checked.result;
 
   await prisma.expense.update({ where: { id }, data: checked.data });

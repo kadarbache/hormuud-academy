@@ -4,10 +4,10 @@ import { useState } from "react";
 import { FormDialog } from "@/components/form-dialog";
 import { SelectField, TextField, type Option } from "@/components/form-fields";
 import type { ActionResult } from "@/lib/action-result";
-import { expenseCategoryOptions, paymentMethodOptions } from "../labels";
+import { paymentMethodOptions, TEACHER_SALARY_ID } from "../labels";
 
 export type ExpenseDefaults = {
-  category: string;
+  categoryId: string;
   amount: string;
   method: string;
   spentOn: string;
@@ -28,6 +28,7 @@ export function ExpenseDialog({
   title,
   description,
   submitLabel,
+  categories,
   branches,
   teachers,
   defaults,
@@ -38,14 +39,15 @@ export function ExpenseDialog({
   title: string;
   description?: React.ReactNode;
   submitLabel: string;
+  categories: Option[];
   branches: Option[];
   teachers: Option[];
   defaults: ExpenseDefaults;
   today: string;
   trigger: React.ReactNode;
 }) {
-  const [category, setCategory] = useState(defaults.category);
-  const isTeacherPay = category === "TEACHER_SALARY";
+  const [categoryId, setCategoryId] = useState(defaults.categoryId);
+  const isTeacherPay = categoryId === TEACHER_SALARY_ID;
 
   return (
     <FormDialog
@@ -59,12 +61,12 @@ export function ExpenseDialog({
         <>
           <SelectField
             label="Spent on"
-            name="category"
-            options={expenseCategoryOptions}
+            name="categoryId"
+            options={categories}
             placeholder="Pick a category"
-            value={category}
-            onValueChange={setCategory}
-            errors={errors.category}
+            value={categoryId}
+            onValueChange={setCategoryId}
+            errors={errors.categoryId}
           />
 
           {isTeacherPay && (

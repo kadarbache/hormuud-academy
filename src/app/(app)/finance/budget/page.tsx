@@ -25,7 +25,6 @@ import { sumMoney } from "@/lib/money";
 import { one } from "@/lib/search-params";
 import { requireAdmin } from "@/lib/session";
 import { StatCard, StatRow } from "../figures";
-import { expenseCategoryLabels } from "../labels";
 import { isNegative } from "../queries";
 import { deleteBudget, saveBudget } from "./actions";
 import { BudgetForm } from "./budget-form";
@@ -263,8 +262,8 @@ export default async function BudgetPage({ searchParams }: PageProps<"/finance/b
               </TableRow>
 
               {plan.lines.map((line) => (
-                <TableRow key={line.category}>
-                  <TableCell>{expenseCategoryLabels[line.category]}</TableCell>
+                <TableRow key={line.categoryId}>
+                  <TableCell>{line.name}</TableCell>
                   <TableCell className="text-right tabular-nums">
                     {Number(line.planned) > 0 ? (
                       formatMoney(line.planned)
@@ -330,13 +329,18 @@ export default async function BudgetPage({ searchParams }: PageProps<"/finance/b
         action={saveBudget.bind(null, branchId)}
         month={month}
         branchName={plan.branch.name}
+        // A deactivated category keeps its box while this plan has an amount
+        // for it, so saving again doesn't quietly drop that line.
+        categories={plan.lines
+          .filter((line) => line.active || Number(line.planned) > 0)
+          .map((line) => ({ id: line.categoryId, name: line.name }))}
         defaults={{
           expectedIncome: plan.budget ? plan.expectedIncome : "",
           note: plan.budget?.note ?? "",
           lines: Object.fromEntries(
             plan.lines
               .filter((line) => Number(line.planned) > 0)
-              .map((line) => [line.category, line.planned]),
+              .map((line) => [line.categoryId, line.planned]),
           ),
         }}
       />

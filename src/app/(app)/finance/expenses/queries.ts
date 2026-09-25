@@ -1,8 +1,8 @@
 import "server-only";
-import type { ExpenseCategory, Prisma } from "@/generated/prisma/client";
+import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { one, type SearchParams } from "@/lib/search-params";
-import { ANY, expenseCategories } from "../labels";
+import { ANY } from "../labels";
 import { periodFilter, readPeriod, type Period } from "../period";
 
 export const PAGE_SIZE = 25;
@@ -11,7 +11,8 @@ export type ExpenseFilters = {
   period: Period;
   /** Empty means every branch. */
   branchId: string;
-  category: ExpenseCategory | "";
+  /** Empty means every category. */
+  categoryId: string;
   teacherId: string;
   page: number;
 };
@@ -19,6 +20,7 @@ export type ExpenseFilters = {
 export function readExpenseFilters(params: SearchParams): ExpenseFilters {
   const branch = one(params, "branch");
   const category = one(params, "category");
+  const teacher = one(params, "teacher");
   const page = Number.parseInt(one(params, "page"), 10);
   // Expenses are read a month at a time far more often than a day at a time,
   // so a link with no period on it opens the month.
@@ -26,10 +28,8 @@ export function readExpenseFilters(params: SearchParams): ExpenseFilters {
   return {
     period: readPeriod({ ...params, period }),
     branchId: branch === ANY ? "" : branch,
-    category: (expenseCategories as string[]).includes(category)
-      ? (category as ExpenseCategory)
-      : "",
-    teacherId: one(params, "teacher"),
+    categoryId: category === ANY ? "" : category,
+    teacherId: teacher === ANY ? "" : teacher,
     page: Number.isFinite(page) && page > 0 ? page : 1,
   };
 }
@@ -39,7 +39,7 @@ export function expenseWhere(filters: ExpenseFilters): Prisma.ExpenseWhereInput 
   if (filters.branchId) conditions.push({ branchId: filters.branchId });
   const spentOn = periodFilter(filters.period);
   if (spentOn) conditions.push({ spentOn });
-  if (filters.category) conditions.push({ category: filters.category });
+  if (filters.categoryId) conditions.push({ categoryId: filters.categoryId });
   if (filters.teacherId) conditions.push({ teacherId: filters.teacherId });
   return { AND: conditions };
 }
@@ -53,6 +53,7 @@ export async function listExpenses(where: Prisma.ExpenseWhereInput, page: number
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
       include: {
+        category: { select: { name: true } },
         branch: { select: { name: true } },
         teacher: { select: { id: true, name: true } },
         recordedBy: { select: { name: true } },

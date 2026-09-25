@@ -25,12 +25,11 @@ import { requireAdmin } from "@/lib/session";
 import { Breakdown, StatCard, StatRow } from "./figures";
 import {
   ANY,
-  expenseCategories,
-  expenseCategoryLabels,
   incomeCategories,
   incomeCategoryLabels,
   paymentMethodLabels,
   paymentMethods,
+  TEACHER_SALARY_ID,
   withAnyOption,
 } from "./labels";
 import {
@@ -218,13 +217,10 @@ export default async function FinancePage({ searchParams }: PageProps<"/finance"
           <div className="space-y-2">
             <Breakdown
               heading="Expense category"
-              rows={expenseCategories.map((category) => ({
-                key: category,
-                label: expenseCategoryLabels[category],
-                amount: monthExpensesByCategory.byKey[category],
+              rows={monthExpensesByCategory.rows.map((row) => ({
+                ...row,
                 hint:
-                  category === "TEACHER_SALARY" &&
-                  Number(monthExpensesByCategory.byKey[category]) > 0
+                  row.key === TEACHER_SALARY_ID && Number(row.amount) > 0
                     ? `Salaries and percentage payouts. Earned this month: ${formatMoney(monthTeacherShare)}`
                     : undefined,
               }))}

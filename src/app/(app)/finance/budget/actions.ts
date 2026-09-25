@@ -2,7 +2,6 @@
 
 import { refresh } from "next/cache";
 import { z } from "zod";
-import type { ExpenseCategory } from "@/generated/prisma/client";
 import {
   failure,
   invalid,
@@ -14,7 +13,7 @@ import { formatMonth, toDbMonth } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
 import { formObject, isoMonth, money, optionalText } from "@/lib/validation";
-import { expenseCategories, lineField } from "../labels";
+import { lineField } from "../labels";
 
 // Writing the plan for a month. A branch has at most one plan per month, so
 // saving again replaces what was there rather than adding a second one.
@@ -24,12 +23,12 @@ import { expenseCategories, lineField } from "../labels";
  * was planned for it, which is different from planning zero only in that no
  * line is kept; either way spending on it still shows as unplanned.
  */
-function readLines(values: Record<string, string>) {
-  const lines: { category: ExpenseCategory; amount: string }[] = [];
+function readLines(values: Record<string, string>, categoryIds: string[]) {
+  const lines: { categoryId: string; amount: string }[] = [];
   const errors: FieldErrors = {};
 
-  for (const category of expenseCategories) {
-    const field = lineField(category);
+  for (const categoryId of categoryIds) {
+    const field = lineField(categoryId);
     const raw = values[field]?.trim();
     if (!raw) continue;
 
@@ -38,7 +37,7 @@ function readLines(values: Record<string, string>) {
       errors[field] = ["Enter an amount like 300 or 300.50."];
       continue;
     }
-    if (Number(parsed.data) > 0) lines.push({ category, amount: parsed.data });
+    if (Number(parsed.data) > 0) lines.push({ categoryId, amount: parsed.data });
   }
 
   return { lines, errors };
@@ -58,7 +57,13 @@ export async function saveBudget(
       note: optionalText(300),
     })
     .safeParse(values);
-  const { lines, errors } = readLines(values);
+  // Every category is read, not only the active ones: the form still shows a
+  // deactivated category that this plan has an amount for.
+  const categories = await prisma.expenseCategory.findMany({ select: { id: true } });
+  const { lines, errors } = readLines(
+    values,
+    categories.map((category) => category.id),
+  );
 
   if (!parsed.success) {
     return failure("Check the highlighted fields.", {

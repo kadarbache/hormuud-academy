@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Form from "next/form";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ActionButton } from "@/components/action-button";
@@ -12,15 +12,9 @@ import { EmptyRow } from "@/components/status-badge";
 import { collegeMonth, collegeToday, formatDate, formatMonth, fromDbDate, fromDbMonth } from "@/lib/dates";
 import { formatMoney } from "@/lib/format";
 import { requireAdmin } from "@/lib/session";
+import { expenseCategoryOptions, listExpenseCategories } from "../expense-categories/queries";
 import { Breakdown, StatCard, StatRow } from "../figures";
-import {
-  ANY,
-  expenseCategories,
-  expenseCategoryLabels,
-  expenseCategoryOptions,
-  paymentMethodLabels,
-  withAnyOption,
-} from "../labels";
+import { ANY, paymentMethodLabels, withAnyOption } from "../labels";
 import { periodLabel, periodParams, periodPhrase } from "../period";
 import { PeriodPicker } from "../period-picker";
 import { expensesByCategory, expensesByMethod } from "../queries";
@@ -41,7 +35,7 @@ export const metadata: Metadata = { title: "Expenses" };
 function pageHref(filters: ExpenseFilters, page: number) {
   const params = new URLSearchParams(periodParams(filters.period));
   if (filters.branchId) params.set("branch", filters.branchId);
-  if (filters.category) params.set("category", filters.category);
+  if (filters.categoryId) params.set("category", filters.categoryId);
   if (filters.teacherId) params.set("teacher", filters.teacherId);
   if (page > 1) params.set("page", String(page));
   return `/finance/expenses?${params.toString()}`;
@@ -53,17 +47,19 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/finance
   const where = expenseWhere(filters);
   const today = collegeToday();
 
-  const [byCategory, byMethod, { rows, total, pageCount }, branches, teachers] = await Promise.all([
-    expensesByCategory(where),
-    expensesByMethod(where),
-    listExpenses(where, filters.page),
-    branchChoices(),
-    teacherChoices(),
-  ]);
+  const [byCategory, byMethod, { rows, total, pageCount }, branches, teachers, categories] =
+    await Promise.all([
+      expensesByCategory(where),
+      expensesByMethod(where),
+      listExpenses(where, filters.page),
+      branchChoices(),
+      teacherChoices(),
+      listExpenseCategories(),
+    ]);
 
   const when = periodLabel(filters.period);
   const firstShown = (filters.page - 1) * PAGE_SIZE + 1;
-  const filtered = Boolean(filters.branchId || filters.category || filters.teacherId);
+  const filtered = Boolean(filters.branchId || filters.categoryId || filters.teacherId);
   const filteredTeacher = teachers.find((teacher) => teacher.value === filters.teacherId);
 
   // An inactive branch keeps its old expenses, but nothing new is booked to it.
@@ -71,7 +67,7 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/finance
     .filter((branch) => branch.active)
     .map((branch) => ({ value: branch.id, label: branch.name }));
   const newExpense = {
-    category: "",
+    categoryId: "",
     amount: "",
     method: "CASH",
     spentOn: today,
@@ -84,10 +80,17 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/finance
   return (
     <>
       <PageHeader title="Expenses" description={`What the college spent, ${when}.`}>
+        <Button variant="outline" asChild>
+          <Link href="/finance/expense-categories">
+            <Tag />
+            Categories
+          </Link>
+        </Button>
         <ExpenseDialog
           action={createExpense}
           title="Record an expense"
           submitLabel="Record expense"
+          categories={expenseCategoryOptions(categories)}
           branches={branchOptions}
           teachers={teachers}
           defaults={newExpense}
@@ -127,8 +130,15 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/finance
           <SelectInput
             id="category"
             name="category"
-            options={withAnyOption(expenseCategoryOptions, "Every category")}
-            defaultValue={filters.category || ANY}
+            options={withAnyOption(
+              // Deactivated categories stay, so their old spending can still be found.
+              categories.map((category) => ({
+                value: category.id,
+                label: category.active ? category.name : `${category.name} (inactive)`,
+              })),
+              "Every category",
+            )}
+            defaultValue={filters.categoryId || ANY}
             className="w-48"
           />
         </div>
@@ -166,11 +176,7 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/finance
 
       <Breakdown
         heading="Expense category"
-        rows={expenseCategories.map((category) => ({
-          key: category,
-          label: expenseCategoryLabels[category],
-          amount: byCategory.byKey[category],
-        }))}
+        rows={byCategory.rows}
         total={byCategory.total}
         totalLabel="Total expenses"
       />
@@ -208,13 +214,13 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/finance
               ]}
               rows={rows.map((expense) => ({
                 key: expense.id,
-                title: expenseCategoryLabels[expense.category],
+                title: expense.category.name,
                 description: `${formatMoney(expense.amount.toString())} on ${formatDate(expense.spentOn)}`,
                 cells: {
                   Date: formatDate(expense.spentOn),
                   "Spent on": (
                     <>
-                      <div>{expenseCategoryLabels[expense.category]}</div>
+                      <div>{expense.category.name}</div>
                       <div className="text-xs text-muted-foreground">
                         {expense.teacher
                           ? `${expense.teacher.name}${expense.forMonth ? `, ${formatMonth(fromDbMonth(expense.forMonth))}` : ""}`
@@ -232,11 +238,12 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/finance
                         action={updateExpense.bind(null, expense.id)}
                         title="Edit expense"
                         submitLabel="Save"
+                        categories={expenseCategoryOptions(categories, expense.categoryId)}
                         branches={branchOptions}
                         teachers={teachers}
                         today={today}
                         defaults={{
-                          category: expense.category,
+                          categoryId: expense.categoryId,
                           amount: expense.amount.toString(),
                           method: expense.method,
                           spentOn: fromDbDate(expense.spentOn),

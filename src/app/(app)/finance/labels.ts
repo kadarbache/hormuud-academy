@@ -2,12 +2,7 @@
 // a dropdown, a table and a total never disagree. Safe to import from client
 // components: no database, no session.
 
-import type {
-  ExpenseCategory,
-  IncomeCategory,
-  PaymentMethod,
-  SalaryType,
-} from "@/generated/prisma/client";
+import type { IncomeCategory, PaymentMethod, SalaryType } from "@/generated/prisma/client";
 import type { Option } from "@/components/select-input";
 
 /** How money changed hands. Cash first: it's what most payments are. */
@@ -26,17 +21,12 @@ export const incomeCategoryLabels: Record<IncomeCategory, string> = {
   OTHER: "Other income",
 };
 
-export const expenseCategoryLabels: Record<ExpenseCategory, string> = {
-  RENT: "Rent",
-  ELECTRICITY: "Electricity",
-  TEACHER_SALARY: "Teacher salary",
-  STAFF_SALARY: "Staff salary",
-  INTERNET: "Internet",
-  STATIONERY: "Stationery",
-  TRANSPORTATION: "Transportation",
-  MAINTENANCE: "Maintenance",
-  OTHER: "Other expenses",
-};
+/**
+ * The expense category teacher pay is recorded in. The admin keeps the other
+ * categories in the database; this one is fixed there by the migration that
+ * made them, and can't be renamed, deactivated or deleted.
+ */
+export const TEACHER_SALARY_ID = "teacher_salary";
 
 export const salaryTypeLabels: Record<SalaryType, string> = {
   FIXED: "Fixed salary",
@@ -49,12 +39,10 @@ function toOptions<T extends string>(labels: Record<T, string>): Option[] {
 
 export const paymentMethodOptions = toOptions(paymentMethodLabels);
 export const incomeCategoryOptions = toOptions(incomeCategoryLabels);
-export const expenseCategoryOptions = toOptions(expenseCategoryLabels);
 export const salaryTypeOptions = toOptions(salaryTypeLabels);
 
 export const paymentMethods = Object.keys(paymentMethodLabels) as PaymentMethod[];
 export const incomeCategories = Object.keys(incomeCategoryLabels) as IncomeCategory[];
-export const expenseCategories = Object.keys(expenseCategoryLabels) as ExpenseCategory[];
 
 /**
  * The income a member of staff types in themselves. A registration fee and a
@@ -68,9 +56,9 @@ export const walkInIncomeOptions = walkInIncomeCategories.map((value) => ({
   label: incomeCategoryLabels[value],
 }));
 
-/** The form field a category's planned amount is submitted under. */
-export function lineField(category: ExpenseCategory) {
-  return `line_${category}`;
+/** The form field an expense category's planned amount is submitted under. */
+export function lineField(categoryId: string) {
+  return `line_${categoryId}`;
 }
 
 /** A filter's "no filter" choice. Radix won't take an empty option value. */

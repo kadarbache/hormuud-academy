@@ -15,6 +15,7 @@ import {
   LogOut,
   Presentation,
   Receipt,
+  Tag,
   Tags,
   UserPlus,
   Users,
@@ -104,6 +105,12 @@ const financeItems: NavItem[] = [
   incomeItem,
   owedItem,
   { href: "/finance/expenses", label: "Expenses", icon: Receipt, match: under("/finance/expenses") },
+  {
+    href: "/finance/expense-categories",
+    label: "Expense categories",
+    icon: Tag,
+    match: under("/finance/expense-categories"),
+  },
   {
     href: "/finance/teacher-pay",
     label: "Teacher pay",

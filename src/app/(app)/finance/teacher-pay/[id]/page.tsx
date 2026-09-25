@@ -10,11 +10,12 @@ import { collegeMonth, collegeToday, formatDate, formatMonth, fromDbMonth } from
 import { formatMoney, formatStudentNumber } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
+import { expenseCategoryOptions, listExpenseCategories } from "../../expense-categories/queries";
 import { createExpense } from "../../expenses/actions";
 import { ExpenseDialog } from "../../expenses/expense-dialog";
 import { branchChoices, teacherChoices } from "../../expenses/queries";
 import { Breakdown, StatCard, StatRow } from "../../figures";
-import { paymentMethodLabels, salaryTypeLabels } from "../../labels";
+import { paymentMethodLabels, salaryTypeLabels, TEACHER_SALARY_ID } from "../../labels";
 import { getTeacherPay } from "../queries";
 
 export async function generateMetadata({
@@ -36,7 +37,11 @@ export default async function TeacherPayDetailPage({
   const { teacher, payments, payouts, earnedEver, paidEver, owed, earningsByBranch } = pay;
   const byPercentage = teacher.salaryType === "PERCENTAGE";
   const today = collegeToday();
-  const [branches, teacherOptions] = await Promise.all([branchChoices(), teacherChoices()]);
+  const [branches, teacherOptions, categories] = await Promise.all([
+    branchChoices(),
+    teacherChoices(),
+    listExpenseCategories(),
+  ]);
   const branchOptions = branches
     .filter((branch) => branch.active)
     .map((branch) => ({ value: branch.id, label: branch.name }));
@@ -73,11 +78,12 @@ export default async function TeacherPayDetailPage({
               : `Their salary is ${formatMoney(teacher.fixedSalary?.toString() ?? "0")} a month.`
           }
           submitLabel="Record payment"
+          categories={expenseCategoryOptions(categories)}
           branches={branchOptions}
           teachers={teacherOptions}
           today={today}
           defaults={{
-            category: "TEACHER_SALARY",
+            categoryId: TEACHER_SALARY_ID,
             amount: byPercentage ? owed : (teacher.fixedSalary?.toString() ?? ""),
             method: "CASH",
             spentOn: today,

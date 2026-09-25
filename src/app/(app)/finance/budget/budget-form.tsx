@@ -7,7 +7,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { FormError, TextField } from "@/components/form-fields";
 import { useFormAction } from "@/hooks/use-form-action";
 import type { ActionResult } from "@/lib/action-result";
-import { expenseCategories, expenseCategoryLabels, lineField } from "../labels";
+import { lineField } from "../labels";
 
 /**
  * One branch's plan for one month: the income it expects and what it means to
@@ -19,11 +19,14 @@ export function BudgetForm({
   action,
   month,
   branchName,
+  categories,
   defaults,
 }: {
   action: (formData: FormData) => Promise<ActionResult>;
   month: string;
   branchName: string;
+  /** A box for each. `lines` below is keyed by their ids. */
+  categories: { id: string; name: string }[];
   defaults: { expectedIncome: string; note: string; lines: Record<string, string> };
 }) {
   const { pending, fieldErrors, formError, onSubmit } = useFormAction(action);
@@ -50,15 +53,15 @@ export function BudgetForm({
             <FieldSet>
               <FieldLegend variant="label">What you plan to spend</FieldLegend>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {expenseCategories.map((category) => (
+                {categories.map((category) => (
                   <TextField
-                    key={category}
-                    label={expenseCategoryLabels[category]}
-                    name={lineField(category)}
+                    key={category.id}
+                    label={category.name}
+                    name={lineField(category.id)}
                     inputMode="decimal"
-                    defaultValue={defaults.lines[category] ?? ""}
+                    defaultValue={defaults.lines[category.id] ?? ""}
                     placeholder="0"
-                    errors={fieldErrors[lineField(category)]}
+                    errors={fieldErrors[lineField(category.id)]}
                   />
                 ))}
               </div>

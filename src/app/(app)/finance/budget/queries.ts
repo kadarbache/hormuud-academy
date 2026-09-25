@@ -1,9 +1,8 @@
 import "server-only";
-import type { ExpenseCategory } from "@/generated/prisma/client";
 import { monthEnd, monthStart, toDbDate, toDbMonth } from "@/lib/dates";
 import { fromCents, subtractMoney, sumMoney, toCents } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
-import { expenseCategories } from "../labels";
+import { listExpenseCategories } from "../expense-categories/queries";
 
 // The plan for a month, next to what actually happened.
 //
@@ -71,7 +70,10 @@ export async function budgetOverview(month: string): Promise<BranchMonth[]> {
 }
 
 export type BudgetLine = {
-  category: ExpenseCategory;
+  categoryId: string;
+  name: string;
+  /** False for a deactivated category, listed because this month planned or spent on it. */
+  active: boolean;
   planned: string;
   actual: string;
   /** Actual minus planned. Positive means more was spent than planned for. */
@@ -81,7 +83,7 @@ export type BudgetLine = {
 /** One branch's plan for one month, with the actual figures beside it. */
 export async function branchBudget(branchId: string, month: string) {
   const paidOn = monthRange(month);
-  const [branch, budget, income, byCategory] = await Promise.all([
+  const [branch, budget, income, byCategory, categories] = await Promise.all([
     prisma.branch.findUnique({ where: { id: branchId }, select: { id: true, name: true } }),
     prisma.monthlyBudget.findUnique({
       where: { branchId_month: { branchId, month: toDbMonth(month) } },
@@ -89,23 +91,35 @@ export async function branchBudget(branchId: string, month: string) {
     }),
     prisma.payment.aggregate({ where: { branchId, paidOn }, _sum: { amount: true } }),
     prisma.expense.groupBy({
-      by: ["category"],
+      by: ["categoryId"],
       where: { branchId, spentOn: paidOn },
       _sum: { amount: true },
     }),
+    listExpenseCategories(),
   ]);
   if (!branch) return null;
 
   const plannedBy = new Map(
-    (budget?.lines ?? []).map((line) => [line.category, line.amount.toString()]),
+    (budget?.lines ?? []).map((line) => [line.categoryId, line.amount.toString()]),
   );
-  const actualBy = new Map(byCategory.map((row) => [row.category, amount(row._sum.amount)]));
+  const actualBy = new Map(byCategory.map((row) => [row.categoryId, amount(row._sum.amount)]));
 
-  const lines: BudgetLine[] = expenseCategories.map((category) => {
-    const planned = amount(plannedBy.get(category));
-    const actual = actualBy.get(category) ?? "0.00";
-    return { category, planned, actual, difference: subtractMoney(actual, planned) };
-  });
+  // Every active category, and a deactivated one only when this month planned
+  // or spent something on it.
+  const lines: BudgetLine[] = categories
+    .filter((category) => category.active || plannedBy.has(category.id) || actualBy.has(category.id))
+    .map((category) => {
+      const planned = amount(plannedBy.get(category.id));
+      const actual = actualBy.get(category.id) ?? "0.00";
+      return {
+        categoryId: category.id,
+        name: category.name,
+        active: category.active,
+        planned,
+        actual,
+        difference: subtractMoney(actual, planned),
+      };
+    });
 
   const expectedIncome = amount(budget?.expectedIncome);
   const actualIncome = amount(income._sum.amount);

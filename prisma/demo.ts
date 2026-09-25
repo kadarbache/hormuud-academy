@@ -318,16 +318,17 @@ async function main() {
   });
 
   // Running costs for this month and last, so the budget has something to
-  // compare against.
+  // compare against. The category ids are the ones the expense_categories
+  // migration gave the nine categories every database starts with.
   const expense = (
     branchId: string,
-    category: "RENT" | "ELECTRICITY" | "INTERNET" | "STATIONERY",
+    categoryId: "rent" | "electricity" | "internet" | "stationery",
     amount: string,
     month: string,
   ) =>
     prisma.expense.create({
       data: {
-        category,
+        categoryId,
         method: "CASH",
         amount,
         spentOn: toDbDate(`${month}-03` <= today ? `${month}-03` : today),
@@ -336,13 +337,13 @@ async function main() {
       },
     });
   for (const month of [monthOf(monthsAgo(1)), monthOf(today)]) {
-    await expense(main.id, "RENT", "300", month);
-    await expense(main.id, "ELECTRICITY", "60", month);
-    await expense(main.id, "INTERNET", "35", month);
-    await expense(second.id, "RENT", "200", month);
-    await expense(second.id, "ELECTRICITY", "40", month);
+    await expense(main.id, "rent", "300", month);
+    await expense(main.id, "electricity", "60", month);
+    await expense(main.id, "internet", "35", month);
+    await expense(second.id, "rent", "200", month);
+    await expense(second.id, "electricity", "40", month);
   }
-  await expense(main.id, "STATIONERY", "25", monthOf(today));
+  await expense(main.id, "stationery", "25", monthOf(today));
 
   // Last month's salaries went out; this month's haven't yet.
   const lastMonth = monthOf(monthsAgo(1));
@@ -352,7 +353,7 @@ async function main() {
   ] as const) {
     await prisma.expense.create({
       data: {
-        category: "TEACHER_SALARY",
+        categoryId: "teacher_salary",
         method: "CASH",
         amount,
         spentOn: toDbDate(`${lastMonth}-28` <= today ? `${lastMonth}-28` : today),
@@ -374,23 +375,20 @@ async function main() {
         expectedIncome,
         savedById: admin.id,
         lines: {
-          create: lines.map(([category, amount]) => ({
-            category: category as "RENT",
-            amount,
-          })),
+          create: lines.map(([categoryId, amount]) => ({ categoryId, amount })),
         },
       },
     });
   await plan(main.id, "600", [
-    ["RENT", "300"],
-    ["ELECTRICITY", "70"],
-    ["INTERNET", "35"],
-    ["TEACHER_SALARY", "250"],
+    ["rent", "300"],
+    ["electricity", "70"],
+    ["internet", "35"],
+    ["teacher_salary", "250"],
   ]);
   await plan(second.id, "400", [
-    ["RENT", "200"],
-    ["ELECTRICITY", "40"],
-    ["TEACHER_SALARY", "150"],
+    ["rent", "200"],
+    ["electricity", "40"],
+    ["teacher_salary", "150"],
   ]);
 
   console.log("Demo data added: 2 branches, 4 skills, 4 teachers, 4 students.");

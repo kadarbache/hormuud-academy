@@ -13,11 +13,12 @@ import { formatMoney } from "@/lib/format";
 import { isPositiveMoney, sumMoney } from "@/lib/money";
 import { one } from "@/lib/search-params";
 import { requireAdmin } from "@/lib/session";
+import { expenseCategoryOptions, listExpenseCategories } from "../expense-categories/queries";
 import { ExpenseDialog } from "../expenses/expense-dialog";
 import { branchChoices, teacherChoices } from "../expenses/queries";
 import { createExpense } from "../expenses/actions";
 import { StatCard, StatRow } from "../figures";
-import { salaryTypeLabels } from "../labels";
+import { salaryTypeLabels, TEACHER_SALARY_ID } from "../labels";
 import { listTeacherPay } from "./queries";
 
 export const metadata: Metadata = { title: "Teacher pay" };
@@ -28,12 +29,14 @@ export default async function TeacherPayPage({ searchParams }: PageProps<"/finan
   const month = isIsoMonth(requested) ? requested : collegeMonth();
   const today = collegeToday();
 
-  const [teachers, branches, teacherOptions] = await Promise.all([
+  const [teachers, branches, teacherOptions, categories] = await Promise.all([
     listTeacherPay(month),
     branchChoices(),
     teacherChoices(),
+    listExpenseCategories(),
   ]);
 
+  const categoryOptions = expenseCategoryOptions(categories);
   const branchOptions = branches
     .filter((branch) => branch.active)
     .map((branch) => ({ value: branch.id, label: branch.name }));
@@ -56,11 +59,12 @@ export default async function TeacherPayPage({ searchParams }: PageProps<"/finan
           title="Pay a teacher"
           description="This goes into the books as a teacher salary expense."
           submitLabel="Record payment"
+          categories={categoryOptions}
           branches={branchOptions}
           teachers={teacherOptions}
           today={today}
           defaults={{
-            category: "TEACHER_SALARY",
+            categoryId: TEACHER_SALARY_ID,
             amount: "",
             method: "CASH",
             spentOn: today,
@@ -198,11 +202,12 @@ export default async function TeacherPayPage({ searchParams }: PageProps<"/finan
                           : `Their salary is ${formatMoney(teacher.fixedSalary)} a month.`
                       }
                       submitLabel="Record payment"
+                      categories={categoryOptions}
                       branches={branchOptions}
                       teachers={teacherOptions}
                       today={today}
                       defaults={{
-                        category: "TEACHER_SALARY",
+                        categoryId: TEACHER_SALARY_ID,
                         amount: byPercentage ? teacher.owed : teacher.fixedSalary,
                         method: "CASH",
                         spentOn: today,
