@@ -188,7 +188,8 @@ expenses. Add, rename and deactivate from there to suit the college.
 
 Nothing is ever recorded twice. A salary you enter on the Teacher pay screen is
 the same expense you'll find on the Expenses page, counted in the month's
-spending like every other cost.
+spending like every other cost. The budget screen has a guide of its own:
+[Using the monthly budget](monthly-budget.md).
 
 None of these figures is stored anywhere — they're added up from your expenses
 each time a screen opens. Record one late and every screen shows it at once.
