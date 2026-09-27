@@ -186,7 +186,7 @@ export default async function FinancePage({ searchParams }: PageProps<"/finance"
           <StatCard label="Net balance" amount={monthNet} tone="balance" />
         </StatRow>
 
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div className="space-y-2">
             <Breakdown
               heading="Income category"

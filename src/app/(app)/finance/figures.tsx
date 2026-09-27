@@ -92,7 +92,9 @@ export function Breakdown({
             <TableRow key={row.key}>
               <TableCell>
                 <div>{row.label}</div>
-                {row.hint && <div className="text-xs text-muted-foreground">{row.hint}</div>}
+                {row.hint && (
+                  <div className="text-xs whitespace-normal text-muted-foreground">{row.hint}</div>
+                )}
               </TableCell>
               <TableCell className="text-right tabular-nums">{formatMoney(row.amount)}</TableCell>
             </TableRow>
