@@ -9,7 +9,7 @@ import { TEACHER_SALARY_ID } from "../labels";
 //
 // Nothing here is stored as a running total. A percentage teacher's earnings
 // are the shares written on the payments their students made, added up, and
-// what they are owed is that minus the salary expenses paid to them. So the
+// their unpaid share is that minus the salary expenses paid to them. So the
 // three figures can never drift apart, and removing a payment recorded by
 // mistake takes its share back out on its own.
 
@@ -66,7 +66,7 @@ export type TeacherPayRow = {
   /** Salary and payouts paid to them for the chosen month. */
   paidForMonth: string;
   /** Earned but not yet paid out. Percentage teachers only. */
-  owed: string;
+  unpaidShare: string;
 };
 
 export async function listTeacherPay(month: string): Promise<TeacherPayRow[]> {
@@ -102,7 +102,7 @@ export async function listTeacherPay(month: string): Promise<TeacherPayRow[]> {
       earnedInMonth: earnedInMonth.get(teacher.id) ?? "0.00",
       paidEver: paid,
       paidForMonth: paidForMonth.get(teacher.id) ?? "0.00",
-      owed: teacher.salaryType === "PERCENTAGE" ? subtractMoney(earned, paid) : "0.00",
+      unpaidShare: teacher.salaryType === "PERCENTAGE" ? subtractMoney(earned, paid) : "0.00",
     };
   });
 }
@@ -161,7 +161,7 @@ export async function getTeacherPay(id: string) {
     payouts,
     earnedEver: earned,
     paidEver: paid,
-    owed: subtractMoney(earned, paid),
+    unpaidShare: subtractMoney(earned, paid),
     earningsByBranch: earningsByBranch.map((row) => ({
       branchId: row.branchId,
       branchName: branchNames.get(row.branchId) ?? "A closed branch",
@@ -171,11 +171,11 @@ export async function getTeacherPay(id: string) {
 }
 
 /**
- * What a percentage teacher is owed right now: everything they've earned minus
- * everything paid to them. Pass the payout being edited to leave it out, so
- * changing an amount is checked against what was owed before it was paid.
+ * A percentage teacher's unpaid share right now: everything they've earned
+ * minus everything paid to them. Pass the payout being edited to leave it out,
+ * so changing an amount is checked against the share before it was paid.
  */
-export async function percentageOwed(teacherId: string, leaveOut?: string): Promise<string> {
+export async function unpaidShare(teacherId: string, leaveOut?: string): Promise<string> {
   const [earned, paid] = await Promise.all([
     prisma.payment.aggregate({ where: { teacherId }, _sum: { teacherShare: true } }),
     prisma.expense.aggregate({

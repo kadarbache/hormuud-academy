@@ -230,7 +230,7 @@ export default async function IncomePage({ searchParams }: PageProps<"/finance/i
           <p className="text-sm text-muted-foreground">
             Only the payments that earned {filteredTeacher.label} a share.{" "}
             <Link href={`/finance/teacher-pay/${filters.teacherId}`} className="underline">
-              See what they are owed
+              See their unpaid share
             </Link>
           </p>
         )}

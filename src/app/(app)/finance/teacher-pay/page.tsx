@@ -43,7 +43,7 @@ export default async function TeacherPayPage({ searchParams }: PageProps<"/finan
 
   const percentage = teachers.filter((teacher) => teacher.salaryType === "PERCENTAGE");
   const fixed = teachers.filter((teacher) => teacher.salaryType === "FIXED");
-  const owedNow = sumMoney(percentage.map((teacher) => teacher.owed));
+  const unpaidShares = sumMoney(percentage.map((teacher) => teacher.unpaidShare));
   const earnedInMonth = sumMoney(teachers.map((teacher) => teacher.earnedInMonth));
   const paidForMonth = sumMoney(teachers.map((teacher) => teacher.paidForMonth));
   const fixedDue = sumMoney(fixed.filter((t) => t.active).map((teacher) => teacher.fixedSalary));
@@ -108,9 +108,9 @@ export default async function TeacherPayPage({ searchParams }: PageProps<"/finan
           tone="muted"
         />
         <StatCard
-          label="Owed to percentage teachers"
-          amount={owedNow}
-          hint="Earned to date, minus everything paid out"
+          label="Unpaid teacher shares"
+          amount={unpaidShares}
+          hint="Their share earned, minus what they've been paid"
         />
       </StatRow>
 
@@ -124,7 +124,7 @@ export default async function TeacherPayPage({ searchParams }: PageProps<"/finan
             { label: "Teaches", className: "max-w-56 whitespace-normal text-muted-foreground" },
             { label: `Earned ${formatMonth(month)}`, className: "text-right tabular-nums" },
             { label: `Paid for ${formatMonth(month)}`, className: "text-right tabular-nums" },
-            { label: "Owed now", className: "text-right tabular-nums" },
+            { label: "Unpaid share", className: "text-right tabular-nums" },
             { label: "Actions", actions: true, className: "text-right" },
           ]}
           rows={teachers.map((teacher) => {
@@ -186,8 +186,8 @@ export default async function TeacherPayPage({ searchParams }: PageProps<"/finan
                     )}
                   </>
                 ),
-                "Owed now": byPercentage ? (
-                  formatMoney(teacher.owed)
+                "Unpaid share": byPercentage ? (
+                  formatMoney(teacher.unpaidShare)
                 ) : (
                   <span className="text-muted-foreground">&mdash;</span>
                 ),
@@ -198,7 +198,7 @@ export default async function TeacherPayPage({ searchParams }: PageProps<"/finan
                       title={`Pay ${teacher.name}`}
                       description={
                         byPercentage
-                          ? `Earned but not yet paid out: ${formatMoney(teacher.owed)}.`
+                          ? `${teacher.name}'s unpaid share is ${formatMoney(teacher.unpaidShare)}.`
                           : `Their salary is ${formatMoney(teacher.fixedSalary)} a month.`
                       }
                       submitLabel="Record payment"
@@ -208,7 +208,7 @@ export default async function TeacherPayPage({ searchParams }: PageProps<"/finan
                       today={today}
                       defaults={{
                         categoryId: TEACHER_SALARY_ID,
-                        amount: byPercentage ? teacher.owed : teacher.fixedSalary,
+                        amount: byPercentage ? teacher.unpaidShare : teacher.fixedSalary,
                         method: "CASH",
                         spentOn: today,
                         branchId: branchOptions.length === 1 ? branchOptions[0].value : "",

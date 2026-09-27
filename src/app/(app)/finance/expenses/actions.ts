@@ -17,7 +17,7 @@ import {
   paymentMethod,
 } from "@/lib/validation";
 import { TEACHER_SALARY_ID } from "../labels";
-import { paidForMonth, percentageOwed } from "../teacher-pay/queries";
+import { paidForMonth, unpaidShare } from "../teacher-pay/queries";
 
 // Money out. Expenses are the admin's alone: a branch shouldn't be able to
 // read what the college pays its rent or its people.
@@ -58,9 +58,9 @@ function readTeacherPay(values: Record<string, string>, categoryId: string) {
 
 /**
  * A teacher is never paid more than they're due. A percentage teacher can be
- * paid up to what they've earned and not yet been paid; a fixed teacher up to
- * their monthly salary for the month the pay covers, across every payment
- * made for it. Returns a message for the amount box, or null when it's fine.
+ * paid up to their unpaid share; a fixed teacher up to their monthly salary
+ * for the month the pay covers, across every payment made for it. Returns a
+ * message for the amount box, or null when it's fine.
  */
 async function overpaymentMessage(
   teacher: {
@@ -74,11 +74,11 @@ async function overpaymentMessage(
   leaveOut?: string,
 ): Promise<string | null> {
   if (teacher.salaryType === "PERCENTAGE") {
-    const owed = await percentageOwed(teacher.id, leaveOut);
-    if (toCents(amount) <= toCents(owed)) return null;
-    return isPositiveMoney(owed)
-      ? `${teacher.name} is owed ${formatMoney(owed)}. Pay that or less.`
-      : `${teacher.name} isn't owed anything, so there's nothing to pay.`;
+    const share = await unpaidShare(teacher.id, leaveOut);
+    if (toCents(amount) <= toCents(share)) return null;
+    return isPositiveMoney(share)
+      ? `${teacher.name}'s unpaid share is ${formatMoney(share)}. Pay that or less.`
+      : `${teacher.name} has no unpaid share, so there's nothing to pay.`;
   }
 
   const salary = teacher.fixedSalary?.toString() ?? "0";

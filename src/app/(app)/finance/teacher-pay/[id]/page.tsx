@@ -34,7 +34,7 @@ export default async function TeacherPayDetailPage({
   const pay = await getTeacherPay(id);
   if (!pay) notFound();
 
-  const { teacher, payments, payouts, earnedEver, paidEver, owed, earningsByBranch } = pay;
+  const { teacher, payments, payouts, earnedEver, paidEver, unpaidShare, earningsByBranch } = pay;
   const byPercentage = teacher.salaryType === "PERCENTAGE";
   const today = collegeToday();
   const [branches, teacherOptions, categories] = await Promise.all([
@@ -74,7 +74,7 @@ export default async function TeacherPayDetailPage({
           title={`Pay ${teacher.name}`}
           description={
             byPercentage
-              ? `Earned but not yet paid out: ${formatMoney(owed)}.`
+              ? `${teacher.name}'s unpaid share is ${formatMoney(unpaidShare)}.`
               : `Their salary is ${formatMoney(teacher.fixedSalary?.toString() ?? "0")} a month.`
           }
           submitLabel="Record payment"
@@ -84,7 +84,7 @@ export default async function TeacherPayDetailPage({
           today={today}
           defaults={{
             categoryId: TEACHER_SALARY_ID,
-            amount: byPercentage ? owed : (teacher.fixedSalary?.toString() ?? ""),
+            amount: byPercentage ? unpaidShare : (teacher.fixedSalary?.toString() ?? ""),
             method: "CASH",
             spentOn: today,
             branchId: branchOptions.length === 1 ? branchOptions[0].value : "",
@@ -104,8 +104,8 @@ export default async function TeacherPayDetailPage({
         />
         <StatCard label="Paid to them, in total" amount={paidEver} tone="muted" />
         <StatCard
-          label="Owed now"
-          amount={byPercentage ? owed : "0.00"}
+          label="Unpaid share"
+          amount={byPercentage ? unpaidShare : "0.00"}
           tone="balance"
           hint={byPercentage ? "Earned minus paid out" : "Fixed salaries are paid on schedule"}
         />
