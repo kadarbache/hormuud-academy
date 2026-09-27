@@ -32,6 +32,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import type { Role } from "@/lib/session";
 import { signOut } from "./actions";
@@ -135,12 +136,16 @@ const adminItems: NavItem[] = [
 ];
 
 function NavMenu({ items, pathname }: { items: NavItem[]; pathname: string }) {
+  // On a phone the menu slides over the page, so close it once a page is
+  // picked. On a computer it stays put and this does nothing.
+  const { setOpenMobile } = useSidebar();
+
   return (
     <SidebarMenu>
       {items.map((item) => (
         <SidebarMenuItem key={item.href}>
           <SidebarMenuButton asChild isActive={item.match(pathname)}>
-            <Link href={item.href}>
+            <Link href={item.href} onClick={() => setOpenMobile(false)}>
               <item.icon />
               <span>{item.label}</span>
             </Link>
