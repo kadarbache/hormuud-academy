@@ -951,7 +951,7 @@ Income and Expenses share a **period picker** at the top left: **One day**, **On
 
 ### Income
 
-Everything the college was paid. Filter by period, branch (admins), income category, payment method, student — by ID, phone or name, the same box as the student list — and, for admins, the teacher a payment earned a share for. Filtering by a teacher says so above the table, with a link to what they're owed.
+Everything the college was paid. Filter by period, branch (admins), income category, payment method, student — by ID, phone or name, the same box as the student list — and, for admins, the teacher a payment earned a share for. Filtering by a teacher says so above the table, with a link to their unpaid share.
 
 At the top, **Total income** for the period, then what came in as **Cash**, **ZAAD**, **eDahab** and **Bank / other**. Below that, a table with one row per income category — Registration fee, Monthly fee, Books, Examination fee, Other income — so a zero is visibly a zero rather than a missing line, and the total at the bottom.
 
@@ -986,13 +986,15 @@ Admins only, from the sidebar or the **Categories** button on Expenses. The list
 
 ### Teacher pay
 
-Admins only. Pick a month at the top. The four figures across the top are the fixed salaries due each month, what percentage teachers earned from the fees paid in that month, what was paid out for that month, and what percentage teachers are owed right now.
+Admins only. Pick a month at the top. The four figures across the top are the fixed salaries due each month, what percentage teachers earned from the fees paid in that month, what was paid out for that month, and the **unpaid teacher shares**: what percentage teachers have earned and the college hasn't handed over yet.
 
-The table lists every teacher with how they're paid, what they teach, what they earned in the month, what they've been paid for it and what they're owed. A fixed-salary teacher paid less than their salary for the month gets a yellow **Salary not paid in full** badge. Fixed-salary teachers show a dash under "Earned" and "Owed": student payments never add to their pay.
+The table lists every teacher with how they're paid, what they teach, what they earned in the month, what they've been paid for it and their **unpaid share**. A fixed-salary teacher paid less than their salary for the month gets a yellow **Salary not paid in full** badge. Fixed-salary teachers show a dash under "Earned" and "Unpaid share": student payments never add to their pay.
 
-**Pay** on a row opens the expense dialog with the teacher, the month and the amount already filled in — what a percentage teacher is owed, or a fixed teacher's monthly salary. It saves as an ordinary Teacher salary expense, so it shows up in the month's spending like every other cost. The amount box is checked: a percentage teacher can't be paid more than they're owed, and a fixed teacher can't be paid more than their monthly salary for that month across every payment for it, so a second full salary is refused. A fixed teacher with no salary set can't be paid until one is entered on the Teachers page. Editing a saved salary expense is checked the same way.
+"Unpaid share" is money the college still has to pay the teacher, never money the teacher owes the college. The screens keep the word "owed" for students, on Fees owed, so the two directions can't be mixed up. A student paying their fee earns the teacher a share, but the share only leaves the college when someone presses **Pay**.
 
-Clicking a teacher's name opens their own page: what they've earned in total, what they've been paid, what they're owed, which branches the earnings came from, the last 100 payments that earned them a share — with the student, the skill, the month, what the student paid and the rate it was worked out at — and every payment the college has made to them.
+**Pay** on a row opens the expense dialog with the teacher, the month and the amount already filled in — a percentage teacher's unpaid share, or a fixed teacher's monthly salary. It saves as an ordinary Teacher salary expense, so it shows up in the month's spending like every other cost. The amount box is checked: a percentage teacher can't be paid more than their unpaid share, and a fixed teacher can't be paid more than their monthly salary for that month across every payment for it, so a second full salary is refused. A fixed teacher with no salary set can't be paid until one is entered on the Teachers page. Editing a saved salary expense is checked the same way.
+
+Clicking a teacher's name opens their own page: what they've earned in total, what they've been paid, their unpaid share, which branches the earnings came from, the last 100 payments that earned them a share — with the student, the skill, the month, what the student paid and the rate it was worked out at — and every payment the college has made to them.
 
 ### Monthly budget
 
@@ -1036,7 +1038,7 @@ Admins only, and the first thing under Money. Pick a day, a month and optionally
 
 **A new kind of spending.** The college starts paying for a security guard. An admin opens Expense categories, presses Add category and types Security. It's in Record expense and the budget form straight away. If the college stops paying for it, Deactivate it: the months it was paid in still show it.
 
-**Paying a teacher.** An admin opens Teacher pay, picks the month and presses Pay on that teacher's row. A fixed salary comes up at their monthly amount; a percentage teacher comes up at what they're owed. Both save as a Teacher salary expense for that month.
+**Paying a teacher.** An admin opens Teacher pay, picks the month and presses Pay on that teacher's row. A fixed salary comes up at their monthly amount; a percentage teacher comes up at their unpaid share. Both save as a Teacher salary expense for that month.
 
 **Changing a teacher's percentage.** Edit the teacher and change the rate. Everything they've already earned keeps the rate it was worked out at; only fees paid from now on use the new one.
 

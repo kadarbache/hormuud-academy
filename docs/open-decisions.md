@@ -25,18 +25,19 @@ Leaning: block it. Not decided.
 
 ### 2. Switching a teacher from Fixed to Percentage
 
-A percentage teacher's balance is everything earned minus everything paid, and
-every salary already paid to them counts, including salaries paid while they
-were on a fixed pay. Demo Teacher 1's $200 September salary would make them
-"owed -$200.00" the moment they moved to a percentage. With payouts now limited
-to what's owed, they couldn't be paid again until their earnings covered it.
+A percentage teacher's unpaid share is everything earned minus everything paid,
+and every salary already paid to them counts, including salaries paid while
+they were on a fixed pay. Demo Teacher 1's $200 September salary would give
+them an unpaid share of -$200.00 the moment they moved to a percentage. With
+payouts now limited to the unpaid share, they couldn't be paid again until
+their earnings covered it.
 
 Options, not decided:
 
-- Don't count salaries paid before the switch against the percentage balance.
+- Don't count salaries paid before the switch against the unpaid share.
 - Warn the admin before the switch that past salaries will count.
-- Leave it, and show any negative balance as "Overpaid $4.00" with the top card
-  counting only what is really owed.
+- Leave it, and show a negative share as "Overpaid $4.00" with the top card
+  counting only what is really still to pay.
 
 ### 3. Should branches manage more of their own money?
 
@@ -114,6 +115,12 @@ adding a skill to an existing student, and finishing or dropping a skill.
 
 ## Decided
 
+- **"Unpaid share", not "owed", for teachers.** What a percentage teacher has
+  earned and the college hasn't handed over yet is their unpaid share, on the
+  Teacher pay screens, the pay dialog and its messages. "Owed" read as the
+  teacher owing the college, because Fees owed uses the same word for money
+  students owe. "Owed" now only ever means a student owing the college.
+  (27 Sep 2026)
 - **Expense categories are the admin's.** A new page, Money → Expense
   categories (`/finance/expense-categories`), adds, renames, deactivates and
   deletes them, A to Z. A category an expense or a budget plan uses can't be
@@ -139,7 +146,7 @@ adding a skill to an existing student, and finishing or dropping a skill.
   19 April is April to July. (21 Sep 2026)
 - **Teacher payouts.** A teacher is never paid more than they're due, and the
   app refuses it, both when the pay is recorded and when a saved one is edited.
-  A percentage teacher can be paid up to what they're owed. A fixed teacher can
+  A percentage teacher can be paid up to their unpaid share. A fixed teacher can
   be paid up to their monthly salary for the month, across every payment for
   it, so a second full salary is refused. A fixed teacher with no salary set
   can't be paid until one is entered. (21 Sep 2026)

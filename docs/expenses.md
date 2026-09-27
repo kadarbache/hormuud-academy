@@ -82,9 +82,10 @@ on a **fixed salary** is offered their monthly salary.
 
 The amount box is checked before anything is saved:
 
-- A **percentage teacher** can be paid up to what they're owed. Ask for more and
-  you get *"Amina is owed $120.00. Pay that or less."* If they're owed nothing
-  yet, it says so.
+- A **percentage teacher** can be paid up to their unpaid share: what they've
+  earned and haven't been handed yet. Ask for more and you get *"Amina's unpaid
+  share is $120.00. Pay that or less."* If there's nothing left to pay, it says
+  so.
 - A **fixed teacher** can be paid up to their monthly salary for the month the
   pay covers, counting everything already paid for that month. So two half
   payments are fine and a second full salary is refused: *"Amina has been paid
@@ -183,7 +184,7 @@ expenses. Add, rename and deactivate from there to suit the college.
 | --- | --- |
 | **Dashboard** | The day's spending and net balance, and the month's spending, broken down by category, with the net balance |
 | **Monthly budget** | What each branch actually spent that month, next to what it planned to spend, category by category |
-| **Teacher pay** | The "paid" side of every figure: what each teacher has been paid in total, what they've been paid for the month, and what they're still owed |
+| **Teacher pay** | The "paid" side of every figure: what each teacher has been paid in total, what they've been paid for the month, and their unpaid share |
 
 Nothing is ever recorded twice. A salary you enter on the Teacher pay screen is
 the same expense you'll find on the Expenses page, counted in the month's
@@ -200,7 +201,7 @@ each time a screen opens. Record one late and every screen shows it at once.
 | *"The date can't be in the future."* | Record the money on the day it went out, not the day it's due |
 | *"Rent has been deactivated. Pick another category."* | Somebody deactivated the category. Choose an active one, or activate that one again |
 | *"Pick the teacher being paid." / "Pick the month this pay covers."* | Teacher salary needs both, so the pay can be traced back to a person |
-| *"Amina is owed $120.00. Pay that or less."* | The teacher would be overpaid. Pay what's owed, or check whether the earlier payment was right |
+| *"Amina's unpaid share is $120.00. Pay that or less."* | The teacher would be overpaid. Pay their unpaid share or less, or check whether the earlier payment was right |
 | *"Amina has no monthly salary set."* | Set their salary on the Teachers page first |
 | *"Teacher salary can't be changed: teacher pay is recorded in it."* | That category is fixed. Nothing to do |
 | *"There's already an expense category with this name."* | Pick a different name — the one you typed exists, possibly in different capitals |

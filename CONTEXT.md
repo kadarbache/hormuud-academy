@@ -134,7 +134,7 @@ One fee month of one enrollment, paid. A month is paid in full or not at all, th
 _Avoid_: Instalment, invoice, bill
 
 **Owed**:
-A registration fee above zero, or a fee month the enrollment has reached, with no payment against it.
+A registration fee above zero, or a fee month the enrollment has reached, with no payment against it. Only ever money a student owes the college, never the other way round.
 _Avoid_: Arrears, balance, debt, outstanding
 
 **Expense**:
@@ -157,12 +157,12 @@ _Avoid_: Commission, cut
 What one monthly fee payment earned one teacher, worked out and kept on the payment when it's recorded. Raising a teacher's rate changes what they earn from then on and never rewrites what they earned before. Teachers are paid at the end of the month, and once one has been paid for a month, a payment taken in that month can't be removed: the college doesn't refund money whose share has already gone to the teacher.
 _Avoid_: Commission, accrual
 
-**Owed to a teacher**:
-Everything a percentage teacher has earned, minus everything the college has paid them. Nobody sets this by hand.
-_Avoid_: Balance, accrued earnings
+**Unpaid share**:
+Everything a percentage teacher has earned, minus everything the college has paid them: money the college has still to hand over. Nobody sets this by hand.
+_Avoid_: Owed, balance, accrued earnings
 
 **Teacher pay**:
-An expense in the Teacher salary category naming the teacher and the month it covers: a fixed salary for that month, or a settlement of what a percentage teacher has earned. A teacher is never paid more than they're due: a percentage teacher up to what they're owed, a fixed teacher up to their monthly salary for that month across every payment made for it. The app refuses more, whether it's recorded or edited later.
+An expense in the Teacher salary category naming the teacher and the month it covers: a fixed salary for that month, or a settlement of what a percentage teacher has earned. A teacher is never paid more than they're due: a percentage teacher up to their unpaid share, a fixed teacher up to their monthly salary for that month across every payment made for it. The app refuses more, whether it's recorded or edited later.
 _Avoid_: Payroll, payout, wages
 
 **Monthly budget**:
