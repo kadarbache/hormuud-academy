@@ -2,8 +2,14 @@
 // a dropdown, a table and a total never disagree. Safe to import from client
 // components: no database, no session.
 
-import type { IncomeCategory, PaymentMethod, SalaryType } from "@/generated/prisma/client";
+import type { Currency, IncomeCategory, PaymentMethod, SalaryType } from "@/generated/prisma/client";
 import type { Option } from "@/components/select-input";
+
+/** The two ledgers. Dollars first: fees are set in dollars. */
+export const currencyLabels: Record<Currency, string> = {
+  USD: "USD",
+  SLSH: "SLSH",
+};
 
 /** How money changed hands. Cash first: it's what most payments are. */
 export const paymentMethodLabels: Record<PaymentMethod, string> = {
@@ -37,10 +43,12 @@ function toOptions<T extends string>(labels: Record<T, string>): Option[] {
   return (Object.keys(labels) as T[]).map((value) => ({ value, label: labels[value] }));
 }
 
+export const currencyOptions = toOptions(currencyLabels);
 export const paymentMethodOptions = toOptions(paymentMethodLabels);
 export const incomeCategoryOptions = toOptions(incomeCategoryLabels);
 export const salaryTypeOptions = toOptions(salaryTypeLabels);
 
+export const currencies = Object.keys(currencyLabels) as Currency[];
 export const paymentMethods = Object.keys(paymentMethodLabels) as PaymentMethod[];
 export const incomeCategories = Object.keys(incomeCategoryLabels) as IncomeCategory[];
 

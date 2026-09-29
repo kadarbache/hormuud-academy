@@ -53,6 +53,40 @@ export const money = (message: string) =>
     .trim()
     .regex(/^\d{1,8}(\.\d{1,2})?$/, "Enter an amount like 20 or 20.50.");
 
+/**
+ * Whole Somaliland shillings, like 85000. Big shilling amounts are often
+ * typed with commas or spaces, so those are dropped. Zero is allowed.
+ */
+export const shillings = (message: string) =>
+  z
+    .string({ error: message })
+    .transform((value) => value.replace(/[\s,]/g, ""))
+    .pipe(z.string().regex(/^\d{1,12}$/, "Enter whole shillings, like 85000."));
+
+/** Which currency an amount is in, from a currency picker. */
+export const currency = (message = "Pick the currency.") =>
+  z.enum(["USD", "SLSH"], { error: message });
+
+/**
+ * An amount in the currency picked next to it: dollars and cents, or whole
+ * shillings. The currency comes straight from the form, so a bad one checks
+ * the amount as dollars and the currency picker gets its own error.
+ */
+export const moneyIn = (currencyValue: string | undefined, message: string) =>
+  currencyValue === "SLSH" ? shillings(message) : money(message);
+
+/** An exchange rate: how many shillings one dollar is, like 8550 or 8,550. */
+export const exchangeRate = (message = "Enter how many shillings one dollar is.") =>
+  z
+    .string({ error: message })
+    .transform((value) => value.replace(/[\s,]/g, ""))
+    .pipe(
+      z
+        .string()
+        .regex(/^\d{1,8}(\.\d{1,2})?$/, "Enter the rate like 8550.")
+        .refine((value) => Number(value) > 0, "The rate has to be above zero."),
+    );
+
 /** A percentage from 0 to 100, like 30 or 12.5. */
 export const percent = (message: string) =>
   z

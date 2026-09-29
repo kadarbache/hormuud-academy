@@ -1,17 +1,19 @@
 import type { Prisma } from "@/generated/prisma/client";
-import { percentOf } from "@/lib/money";
+import { dollarValue, percentOf, type Ledger } from "@/lib/money";
 
 /** What a payment records about the teacher it earned a share for. */
 export type TeacherShare = {
   teacherId: string | null;
   teacherSharePercent: string | null;
   teacherShare: string | null;
+  teacherShareUsdValue: string | null;
 };
 
 const NO_SHARE: TeacherShare = {
   teacherId: null,
   teacherSharePercent: null,
   teacherShare: null,
+  teacherShareUsdValue: null,
 };
 
 /**
@@ -21,18 +23,23 @@ const NO_SHARE: TeacherShare = {
  * whatever students hand over.
  *
  * The rate is stored alongside the amount, so raising a teacher's percentage
- * next month never rewrites what they earned last month.
+ * next month never rewrites what they earned last month. The share is in the
+ * currency the student paid in, so a fee paid in shillings earns shillings,
+ * and it keeps its dollar value at the payment's exchange rate.
  */
 export function teacherShareOf(
   amount: string,
+  ledger: Ledger,
   teacher: { id: string; salaryType: string; percentageRate: Prisma.Decimal | null } | null,
 ): TeacherShare {
   if (!teacher || teacher.salaryType !== "PERCENTAGE" || !teacher.percentageRate) return NO_SHARE;
 
   const percent = teacher.percentageRate.toString();
+  const share = percentOf(amount, percent, ledger.currency);
   return {
     teacherId: teacher.id,
     teacherSharePercent: percent,
-    teacherShare: percentOf(amount, percent),
+    teacherShare: share,
+    teacherShareUsdValue: dollarValue(share, ledger),
   };
 }

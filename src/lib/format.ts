@@ -1,3 +1,4 @@
+import type { Currency } from "@/generated/prisma/client";
 import { phoneSearch } from "@/lib/phone";
 
 const STUDENT_NUMBER = /^\s*stu[\s-]*0*(\d{1,9})\s*$/i;
@@ -35,10 +36,35 @@ export function parseStudentLookup(query: string): StudentLookup {
 }
 
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+// SLSH isn't an ISO currency code, so Intl can't write it; shillings are
+// written as a plain whole number with the code after it.
+const shillings = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+const rate = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 
-/** Fees are in US dollars. */
-export function formatMoney(value: string | number) {
-  return usd.format(Number(value));
+/**
+ * "$1,234.50", or "85,500 SLSH" for shillings, which have no cents. Fees are
+ * set in US dollars, so that's what an amount is unless it says otherwise.
+ */
+export function formatMoney(value: string | number, currency: Currency = "USD") {
+  return currency === "SLSH"
+    ? `${shillings.format(Number(value))} SLSH`
+    : usd.format(Number(value));
+}
+
+/** An exchange rate, as the number of shillings to one dollar: "8,550". */
+export function formatRate(value: string | number) {
+  return rate.format(Number(value));
+}
+
+/**
+ * Money in both currencies as one phrase, leaving out a currency with
+ * nothing in it: "$40.00 and 171,000 SLSH", "171,000 SLSH" or "$0.00".
+ */
+export function formatBoth(amounts: Record<Currency, string>) {
+  const parts = (["USD", "SLSH"] as const)
+    .filter((currency) => Number(amounts[currency]) !== 0)
+    .map((currency) => formatMoney(amounts[currency], currency));
+  return parts.length > 0 ? parts.join(" and ") : formatMoney(0);
 }
 
 export function formatMonths(months: number) {
