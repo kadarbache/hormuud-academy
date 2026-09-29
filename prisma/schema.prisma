@@ -40,6 +40,7 @@ model User {
   paymentsRecorded   Payment[]       @relation("PaymentRecordedBy")
   expensesRecorded   Expense[]       @relation("ExpenseRecordedBy")
   budgetsSaved       MonthlyBudget[] @relation("BudgetSavedBy")
+  exchangeRatesSet   ExchangeRate[]  @relation("ExchangeRateSetBy")
 
   @@unique([email])
   @@index([branchId])
@@ -193,8 +194,12 @@ model Teacher {
   /// How this teacher is paid. FIXED uses fixedSalary; PERCENTAGE earns a
   /// share of every monthly fee paid for the skills they teach.
   salaryType     SalaryType @default(FIXED)
-  /// What a FIXED teacher is paid each month. Null for a PERCENTAGE teacher.
-  fixedSalary    Decimal?   @db.Decimal(10, 2)
+  /// What a FIXED teacher is paid each month, in salaryCurrency. Null for a
+  /// PERCENTAGE teacher.
+  fixedSalary    Decimal?   @db.Decimal(14, 2)
+  /// The currency a FIXED teacher's salary is set and paid in. A PERCENTAGE
+  /// teacher earns in whatever currency each student paid, so it's unused.
+  salaryCurrency Currency   @default(USD)
   /// A PERCENTAGE teacher's share, as a percentage: 30 means 30%. Null for
   /// a FIXED teacher.
   percentageRate Decimal?   @db.Decimal(5, 2)
@@ -334,10 +339,37 @@ model Enrollment {
 // ---------------------------------------------------------------------------
 // Money
 //
-// Every dollar the college takes in is one Payment; every dollar it spends is
+// Every amount the college takes in is one Payment; every amount it spends is
 // one Expense. Both name the branch they happened at and the day they
 // happened, which is what the daily and monthly figures are built from.
+//
+// The college keeps two ledgers, US dollars and Somaliland shillings. A
+// payment or expense is in exactly one currency, and no stored total ever
+// mixes the two. Like a receipt, a shilling row keeps the exchange rate it
+// was recorded at and what it was worth in dollars that day. A screen that
+// shows both ledgers together in dollars uses today's rate instead: what the
+// money is worth now.
 // ---------------------------------------------------------------------------
+
+/// The two currencies the college takes and spends.
+enum Currency {
+  USD
+  SLSH
+}
+
+/// Every exchange rate the admin has set, oldest first. The latest one is the
+/// rate in force; the rest stay so it's clear who changed it and when.
+model ExchangeRate {
+  id        String   @id @default(cuid())
+  /// How many Somaliland shillings one US dollar is, like 8550.
+  rate      Decimal  @db.Decimal(10, 2)
+  setById   String
+  setBy     User     @relation("ExchangeRateSetBy", fields: [setById], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("exchange_rates")
+}
 
 /// How money changed hands. ZAAD and eDahab are the mobile money services.
 enum PaymentMethod {
@@ -381,18 +413,28 @@ enum SalaryType {
 /// Money received, whatever it was for. A registration fee is one of these,
 /// and so is each month a student pays for a skill.
 model Payment {
-  id       String         @id @default(cuid())
+  id           String         @id @default(cuid())
   /// Shown on receipts as PAY-00001. One sequence for the whole college.
-  number   Int            @unique @default(autoincrement())
-  category IncomeCategory
-  method   PaymentMethod
-  amount   Decimal        @db.Decimal(10, 2)
+  number       Int            @unique @default(autoincrement())
+  category     IncomeCategory
+  method       PaymentMethod
+  /// What was handed over, in currency. Shillings are whole numbers.
+  amount       Decimal        @db.Decimal(14, 2)
+  currency     Currency       @default(USD)
+  /// For a shilling payment, how many shillings a dollar was when it was
+  /// recorded. Null for a dollar payment. The database refuses anything else.
+  exchangeRate Decimal?       @db.Decimal(10, 2)
+  /// What the payment was worth in dollars the day it was recorded, to the
+  /// cent: the amount itself for a dollar payment, the shillings at
+  /// exchangeRate for a shilling one. Worked out once and never moved, like
+  /// the rest of the receipt. Totals use today's rate instead.
+  usdValue     Decimal        @db.Decimal(14, 2)
   /// The college day the money came in. Daily income counts by this, not by
   /// createdAt: a payment taken on Friday may be entered on Saturday.
-  paidOn   DateTime       @db.Date
+  paidOn       DateTime       @db.Date
   /// Where the money was taken. For a fee it's the branch teaching the skill.
-  branchId String
-  branch   Branch         @relation(fields: [branchId], references: [id])
+  branchId     String
+  branch       Branch         @relation(fields: [branchId], references: [id])
 
   /// Set for anything a student pays. Null for income with no student behind
   /// it, like a book sold over the counter.
@@ -407,11 +449,14 @@ model Payment {
 
   /// The teacher this payment earned a share for, set only when the skill's
   /// teacher is paid by percentage. The rate and the share are worked out
-  /// once, here, so a later rate change never rewrites what was earned.
-  teacherId           String?
-  teacher             Teacher? @relation(fields: [teacherId], references: [id])
-  teacherSharePercent Decimal? @db.Decimal(5, 2)
-  teacherShare        Decimal? @db.Decimal(10, 2)
+  /// once, here, so a later rate change never rewrites what was earned. The
+  /// share is in the payment's currency.
+  teacherId            String?
+  teacher              Teacher? @relation(fields: [teacherId], references: [id])
+  teacherSharePercent  Decimal? @db.Decimal(5, 2)
+  teacherShare         Decimal? @db.Decimal(14, 2)
+  /// The share's dollar value, worked out like usdValue.
+  teacherShareUsdValue Decimal? @db.Decimal(14, 2)
 
   note         String?
   recordedById String
@@ -435,16 +480,24 @@ model Payment {
 /// Money spent. A teacher's salary and a percentage teacher's payout are both
 /// expenses in the Teacher salary category, with the teacher named.
 model Expense {
-  id         String          @id @default(cuid())
-  number     Int             @unique @default(autoincrement())
-  categoryId String
-  category   ExpenseCategory @relation(fields: [categoryId], references: [id])
-  method     PaymentMethod
-  amount     Decimal         @db.Decimal(10, 2)
+  id           String          @id @default(cuid())
+  number       Int             @unique @default(autoincrement())
+  categoryId   String
+  category     ExpenseCategory @relation(fields: [categoryId], references: [id])
+  method       PaymentMethod
+  /// What was paid out, in currency. Shillings are whole numbers.
+  amount       Decimal         @db.Decimal(14, 2)
+  currency     Currency        @default(USD)
+  /// For a shilling expense, how many shillings a dollar was when it was
+  /// recorded. Null for a dollar expense, as on Payment.
+  exchangeRate Decimal?        @db.Decimal(10, 2)
+  /// What the expense was worth in dollars the day it was recorded, as on
+  /// Payment. Correcting the amount works it out again at the same rate.
+  usdValue     Decimal         @db.Decimal(14, 2)
   /// The college day the money went out.
-  spentOn    DateTime        @db.Date
-  branchId   String
-  branch     Branch          @relation(fields: [branchId], references: [id])
+  spentOn      DateTime        @db.Date
+  branchId     String
+  branch       Branch          @relation(fields: [branchId], references: [id])
 
   /// Set on a salary or payout so a teacher's pay can be traced.
   teacherId String?
