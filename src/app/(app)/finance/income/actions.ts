@@ -19,16 +19,18 @@ import {
   toDbDate,
   toDbMonth,
 } from "@/lib/dates";
+import { ledgerFields, NO_RATE_MESSAGE } from "@/lib/exchange-rate";
 import { formatMoney, parseStudentLookup } from "@/lib/format";
-import { isPositiveMoney } from "@/lib/money";
+import { dollarsToShillings, inLedger, isPositiveMoney } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, requireUser } from "@/lib/session";
 import { teacherShareOf } from "@/lib/teacher-share";
 import {
+  currency,
   formObject,
   isoDate,
   isoMonth,
-  money,
+  moneyIn,
   optionalText,
   paymentMethod,
 } from "@/lib/validation";
@@ -39,11 +41,17 @@ import { TEACHER_SALARY_ID, walkInIncomeCategories } from "../labels";
 // branch check and the teacher's share are worked out the same way whether
 // the payment is a registration fee, a month of a skill, or a book sold over
 // the counter.
+//
+// A payment is in dollars or in shillings, whichever the student handed over.
+// A shilling payment keeps the exchange rate in force as it's recorded, and
+// can't be recorded at all until the admin has set one.
 
 const paidOnField = isoDate("Pick the day the money came in.").refine(
   (value) => value <= collegeToday(),
   "The payment date can't be in the future.",
 );
+
+const noRate = () => failure("Check the highlighted fields.", { currency: [NO_RATE_MESSAGE] });
 
 /** An enrollment with everything a payment for it needs to know. */
 function findEnrollment(id: string) {
@@ -67,7 +75,7 @@ export async function recordRegistrationFee(
 ): Promise<ActionResult> {
   const user = await requireUser();
   const parsed = z
-    .object({ paidOn: paidOnField, method: paymentMethod() })
+    .object({ paidOn: paidOnField, method: paymentMethod(), currency: currency() })
     .safeParse(formObject(formData));
   if (!parsed.success) return invalid(parsed.error);
 
@@ -76,16 +84,23 @@ export async function recordRegistrationFee(
   if (!canActAtBranch(user, enrollment.branchSkill.branchId)) {
     return failure("Only staff at the skill's branch can record its payments.");
   }
-  if (!isPositiveMoney(enrollment.registrationFee.toString())) {
+  const fee = enrollment.registrationFee.toString();
+  if (!isPositiveMoney(fee)) {
     return failure("This skill has no registration fee to pay.");
   }
+
+  const ledger = await ledgerFields(parsed.data.currency);
+  if (!ledger) return noRate();
+  // The fee is set in dollars. Paid in shillings, it's the fee at the rate in
+  // force, to the nearest shilling.
+  const amount = ledger.exchangeRate ? dollarsToShillings(fee, ledger.exchangeRate) : fee;
 
   try {
     await prisma.payment.create({
       data: {
         category: "REGISTRATION_FEE",
         method: parsed.data.method,
-        amount: enrollment.registrationFee,
+        ...inLedger(amount, ledger),
         paidOn: toDbDate(parsed.data.paidOn),
         branchId: enrollment.branchSkill.branchId,
         studentId: enrollment.studentId,
@@ -103,7 +118,8 @@ export async function recordRegistrationFee(
   }
 
   refresh();
-  return success(`${enrollment.skill.name} registration fee recorded as paid.`);
+  const inShillings = ledger.exchangeRate ? ` (${formatMoney(amount, "SLSH")})` : "";
+  return success(`${enrollment.skill.name} registration fee recorded as paid${inShillings}.`);
 }
 
 export async function recordMonthlyFee(
@@ -111,14 +127,16 @@ export async function recordMonthlyFee(
   formData: FormData,
 ): Promise<ActionResult> {
   const user = await requireUser();
+  const values = formObject(formData);
   const parsed = z
     .object({
       month: isoMonth("Pick the month this pays for."),
-      amount: money("Enter the amount paid."),
+      currency: currency(),
+      amount: moneyIn(values.currency, "Enter the amount paid."),
       paidOn: paidOnField,
       method: paymentMethod(),
     })
-    .safeParse(formObject(formData));
+    .safeParse(values);
   if (!parsed.success) return invalid(parsed.error);
 
   const enrollment = await findEnrollment(enrollmentId);
@@ -148,14 +166,16 @@ export async function recordMonthlyFee(
     });
   }
 
-  const share = teacherShareOf(parsed.data.amount, enrollment.branchSkill.teacher);
+  const ledger = await ledgerFields(parsed.data.currency);
+  if (!ledger) return noRate();
+  const share = teacherShareOf(parsed.data.amount, ledger, enrollment.branchSkill.teacher);
 
   try {
     await prisma.payment.create({
       data: {
         category: "MONTHLY_FEE",
         method: parsed.data.method,
-        amount: parsed.data.amount,
+        ...inLedger(parsed.data.amount, ledger),
         paidOn: toDbDate(parsed.data.paidOn),
         forMonth: toDbMonth(parsed.data.month),
         branchId: enrollment.branchSkill.branchId,
@@ -175,7 +195,9 @@ export async function recordMonthlyFee(
   }
 
   refresh();
-  const earned = share.teacherShare ? ` The teacher earned ${formatMoney(share.teacherShare)}.` : "";
+  const earned = share.teacherShare
+    ? ` The teacher earned ${formatMoney(share.teacherShare, parsed.data.currency)}.`
+    : "";
   return success(
     `${formatMonth(parsed.data.month)} recorded for ${enrollment.skill.name}.${earned}`,
   );
@@ -192,7 +214,8 @@ export async function recordIncome(formData: FormData): Promise<ActionResult> {
   const parsed = z
     .object({
       category: z.enum(walkInIncomeCategories, { error: "Pick what the money was for." }),
-      amount: money("Enter the amount received."),
+      currency: currency(),
+      amount: moneyIn(values.currency, "Enter the amount received."),
       paidOn: paidOnField,
       method: paymentMethod(),
       note: optionalText(200),
@@ -232,11 +255,14 @@ export async function recordIncome(formData: FormData): Promise<ActionResult> {
     studentId = student.id;
   }
 
+  const ledger = await ledgerFields(parsed.data.currency);
+  if (!ledger) return noRate();
+
   await prisma.payment.create({
     data: {
       category: parsed.data.category,
       method: parsed.data.method,
-      amount: parsed.data.amount,
+      ...inLedger(parsed.data.amount, ledger),
       paidOn: toDbDate(parsed.data.paidOn),
       branchId,
       studentId,
@@ -246,7 +272,7 @@ export async function recordIncome(formData: FormData): Promise<ActionResult> {
   });
 
   refresh();
-  return success(`${formatMoney(parsed.data.amount)} recorded.`);
+  return success(`${formatMoney(parsed.data.amount, parsed.data.currency)} recorded.`);
 }
 
 /**
@@ -298,5 +324,7 @@ export async function deletePayment(id: string): Promise<ActionResult> {
       `${formatMonth(fromDbMonth(payment.forMonth))} is unpaid again for ${skillName ?? "the skill"}.`,
     );
   }
-  return success(`${formatMoney(payment.amount.toString())} removed from the books.`);
+  return success(
+    `${formatMoney(payment.amount.toString(), payment.currency)} removed from the books.`,
+  );
 }
