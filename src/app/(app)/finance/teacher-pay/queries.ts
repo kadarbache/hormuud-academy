@@ -1,9 +1,10 @@
 import "server-only";
-import type { Prisma } from "@/generated/prisma/client";
+import type { Currency, Prisma } from "@/generated/prisma/client";
 import { monthEnd, monthStart, toDbDate, toDbMonth } from "@/lib/dates";
-import { fromCents, subtractMoney, toCents } from "@/lib/money";
+import { subtractTotals, totalOf, ZERO_TOTAL, type LedgerSum, type MoneyTotal } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import { TEACHER_SALARY_ID } from "../labels";
+import { ledgerSum } from "../queries";
 
 // What each teacher has earned and what they have been paid.
 //
@@ -12,34 +13,47 @@ import { TEACHER_SALARY_ID } from "../labels";
 // their unpaid share is that minus the salary expenses paid to them. So the
 // three figures can never drift apart, and removing a payment recorded by
 // mistake takes its share back out on its own.
+//
+// Every figure is kept per currency. A share is earned in the currency the
+// student paid, so a teacher can be owed dollars and shillings at once, and
+// each is paid out of its own ledger.
 
-/** Sums a money column per teacher, as a map from teacher id to an amount. */
-function sumByTeacher(
-  rows: { teacherId: string | null; total: Prisma.Decimal | null }[],
-): Map<string, string> {
-  const totals = new Map<string, string>();
+/** Sums per teacher, as a map from teacher id to a total in both currencies. */
+function totalsByTeacher(rows: { teacherId: string | null; sum: LedgerSum }[]) {
+  const sums = new Map<string, LedgerSum[]>();
   for (const row of rows) {
-    if (row.teacherId) totals.set(row.teacherId, fromCents(toCents(row.total?.toString() ?? 0)));
+    if (!row.teacherId) continue;
+    sums.set(row.teacherId, [...(sums.get(row.teacherId) ?? []), row.sum]);
   }
-  return totals;
+  return new Map([...sums].map(([teacherId, list]) => [teacherId, totalOf(list)]));
 }
+
+/** A grouped row of shares as a ledger sum. */
+function shareSum(row: {
+  currency: LedgerSum["currency"];
+  _sum: { teacherShare: LedgerSum["amount"] };
+}): LedgerSum {
+  return { currency: row.currency, amount: row._sum.teacherShare };
+}
+
+const shareSums = { teacherShare: true } as const;
 
 async function shareTotals(where: Prisma.PaymentWhereInput) {
   const rows = await prisma.payment.groupBy({
-    by: ["teacherId"],
+    by: ["teacherId", "currency"],
     where: { ...where, teacherId: { not: null } },
-    _sum: { teacherShare: true },
+    _sum: shareSums,
   });
-  return sumByTeacher(rows.map((row) => ({ teacherId: row.teacherId, total: row._sum.teacherShare })));
+  return totalsByTeacher(rows.map((row) => ({ teacherId: row.teacherId, sum: shareSum(row) })));
 }
 
 async function payoutTotals(where: Prisma.ExpenseWhereInput) {
   const rows = await prisma.expense.groupBy({
-    by: ["teacherId"],
+    by: ["teacherId", "currency"],
     where: { ...where, categoryId: TEACHER_SALARY_ID, teacherId: { not: null } },
     _sum: { amount: true },
   });
-  return sumByTeacher(rows.map((row) => ({ teacherId: row.teacherId, total: row._sum.amount })));
+  return totalsByTeacher(rows.map((row) => ({ teacherId: row.teacherId, sum: ledgerSum(row) })));
 }
 
 function monthRange(month: string) {
@@ -51,22 +65,23 @@ export type TeacherPayRow = {
   name: string;
   active: boolean;
   salaryType: "FIXED" | "PERCENTAGE";
-  /** The monthly amount a fixed-salary teacher is due. "0.00" if unset. */
+  /** The monthly amount a fixed-salary teacher is due, in salaryCurrency. "0.00" if unset. */
   fixedSalary: string;
+  salaryCurrency: Currency;
   /** A percentage teacher's rate, like "30". Empty for a fixed teacher. */
   percentageRate: string;
   branchNames: string[];
   skillNames: string[];
   /** Shares earned from every payment ever recorded. */
-  earnedEver: string;
+  earnedEver: MoneyTotal;
   /** Shares earned from the payments taken in the chosen month. */
-  earnedInMonth: string;
+  earnedInMonth: MoneyTotal;
   /** Salary and payouts paid to them, ever. */
-  paidEver: string;
+  paidEver: MoneyTotal;
   /** Salary and payouts paid to them for the chosen month. */
-  paidForMonth: string;
-  /** Earned but not yet paid out. Percentage teachers only. */
-  unpaidShare: string;
+  paidForMonth: MoneyTotal;
+  /** Earned but not yet paid out, currency by currency. Percentage teachers only. */
+  unpaidShare: MoneyTotal;
 };
 
 export async function listTeacherPay(month: string): Promise<TeacherPayRow[]> {
@@ -87,22 +102,23 @@ export async function listTeacherPay(month: string): Promise<TeacherPayRow[]> {
   ]);
 
   return teachers.map((teacher) => {
-    const earned = earnedEver.get(teacher.id) ?? "0.00";
-    const paid = paidEver.get(teacher.id) ?? "0.00";
+    const earned = earnedEver.get(teacher.id) ?? ZERO_TOTAL;
+    const paid = paidEver.get(teacher.id) ?? ZERO_TOTAL;
     return {
       id: teacher.id,
       name: teacher.name,
       active: teacher.active,
       salaryType: teacher.salaryType,
       fixedSalary: teacher.fixedSalary?.toString() ?? "0.00",
+      salaryCurrency: teacher.salaryCurrency,
       percentageRate: teacher.percentageRate?.toString() ?? "",
       branchNames: teacher.branches.map((link) => link.branch.name),
       skillNames: teacher.branchSkills.map((bs) => bs.skill.name),
       earnedEver: earned,
-      earnedInMonth: earnedInMonth.get(teacher.id) ?? "0.00",
+      earnedInMonth: earnedInMonth.get(teacher.id) ?? ZERO_TOTAL,
       paidEver: paid,
-      paidForMonth: paidForMonth.get(teacher.id) ?? "0.00",
-      unpaidShare: teacher.salaryType === "PERCENTAGE" ? subtractMoney(earned, paid) : "0.00",
+      paidForMonth: paidForMonth.get(teacher.id) ?? ZERO_TOTAL,
+      unpaidShare: teacher.salaryType === "PERCENTAGE" ? subtractTotals(earned, paid) : ZERO_TOTAL,
     };
   });
 }
@@ -125,9 +141,9 @@ export async function getTeacherPay(id: string) {
 
   const [earningsByBranch, branches, payments, payouts, earnedEver, paidEver] = await Promise.all([
     prisma.payment.groupBy({
-      by: ["branchId"],
+      by: ["branchId", "currency"],
       where: { teacherId: id },
-      _sum: { teacherShare: true },
+      _sum: shareSums,
     }),
     prisma.branch.findMany({ select: { id: true, name: true } }),
     prisma.payment.findMany({
@@ -152,8 +168,13 @@ export async function getTeacherPay(id: string) {
   // Earnings can come from a branch the teacher has since stopped working at,
   // so the names come from the branches themselves, not their current links.
   const branchNames = new Map(branches.map((branch) => [branch.id, branch.name]));
-  const earned = earnedEver.get(id) ?? "0.00";
-  const paid = paidEver.get(id) ?? "0.00";
+  const earned = earnedEver.get(id) ?? ZERO_TOTAL;
+  const paid = paidEver.get(id) ?? ZERO_TOTAL;
+
+  const byBranch = new Map<string, LedgerSum[]>();
+  for (const row of earningsByBranch) {
+    byBranch.set(row.branchId, [...(byBranch.get(row.branchId) ?? []), shareSum(row)]);
+  }
 
   return {
     teacher,
@@ -161,49 +182,39 @@ export async function getTeacherPay(id: string) {
     payouts,
     earnedEver: earned,
     paidEver: paid,
-    unpaidShare: subtractMoney(earned, paid),
-    earningsByBranch: earningsByBranch.map((row) => ({
-      branchId: row.branchId,
-      branchName: branchNames.get(row.branchId) ?? "A closed branch",
-      amount: fromCents(toCents(row._sum.teacherShare?.toString() ?? 0)),
+    unpaidShare: subtractTotals(earned, paid),
+    earningsByBranch: [...byBranch].map(([branchId, sums]) => ({
+      branchId,
+      branchName: branchNames.get(branchId) ?? "A closed branch",
+      amount: totalOf(sums),
     })),
   };
 }
 
 /**
- * A percentage teacher's unpaid share right now: everything they've earned
- * minus everything paid to them. Pass the payout being edited to leave it out,
- * so changing an amount is checked against the share before it was paid.
+ * A percentage teacher's unpaid share right now, in each currency: everything
+ * they've earned minus everything paid to them. Pass the payout being edited
+ * to leave it out, so changing an amount is checked against the share before
+ * it was paid.
  */
-export async function unpaidShare(teacherId: string, leaveOut?: string): Promise<string> {
+export async function unpaidShare(teacherId: string, leaveOut?: string): Promise<MoneyTotal> {
   const [earned, paid] = await Promise.all([
-    prisma.payment.aggregate({ where: { teacherId }, _sum: { teacherShare: true } }),
-    prisma.expense.aggregate({
-      where: {
-        teacherId,
-        categoryId: TEACHER_SALARY_ID,
-        ...(leaveOut ? { id: { not: leaveOut } } : {}),
-      },
-      _sum: { amount: true },
-    }),
+    shareTotals({ teacherId }),
+    payoutTotals({ teacherId, ...(leaveOut ? { id: { not: leaveOut } } : {}) }),
   ]);
-  return subtractMoney(earned._sum.teacherShare?.toString() ?? 0, paid._sum.amount?.toString() ?? 0);
+  return subtractTotals(earned.get(teacherId) ?? ZERO_TOTAL, paid.get(teacherId) ?? ZERO_TOTAL);
 }
 
-/** What a teacher has been paid for one month, leaving out the payout being edited. */
+/** What a teacher has been paid for one month, in each currency, leaving out the payout being edited. */
 export async function paidForMonth(
   teacherId: string,
   month: string,
   leaveOut?: string,
-): Promise<string> {
-  const { _sum } = await prisma.expense.aggregate({
-    where: {
-      teacherId,
-      categoryId: TEACHER_SALARY_ID,
-      forMonth: toDbMonth(month),
-      ...(leaveOut ? { id: { not: leaveOut } } : {}),
-    },
-    _sum: { amount: true },
+): Promise<MoneyTotal> {
+  const paid = await payoutTotals({
+    teacherId,
+    forMonth: toDbMonth(month),
+    ...(leaveOut ? { id: { not: leaveOut } } : {}),
   });
-  return fromCents(toCents(_sum.amount?.toString() ?? 0));
+  return paid.get(teacherId) ?? ZERO_TOTAL;
 }

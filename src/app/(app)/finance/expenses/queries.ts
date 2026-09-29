@@ -1,9 +1,10 @@
 import "server-only";
-import type { Prisma } from "@/generated/prisma/client";
+import type { Currency, Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { one, type SearchParams } from "@/lib/search-params";
-import { ANY } from "../labels";
+import { ANY, currencies } from "../labels";
 import { periodFilter, readPeriod, type Period } from "../period";
+import type { TeacherOption } from "./expense-dialog";
 
 export const PAGE_SIZE = 25;
 
@@ -13,6 +14,8 @@ export type ExpenseFilters = {
   branchId: string;
   /** Empty means every category. */
   categoryId: string;
+  /** Empty means both. */
+  currency: Currency | "";
   teacherId: string;
   page: number;
 };
@@ -20,6 +23,7 @@ export type ExpenseFilters = {
 export function readExpenseFilters(params: SearchParams): ExpenseFilters {
   const branch = one(params, "branch");
   const category = one(params, "category");
+  const currency = one(params, "currency");
   const teacher = one(params, "teacher");
   const page = Number.parseInt(one(params, "page"), 10);
   // Expenses are read a month at a time far more often than a day at a time,
@@ -29,6 +33,7 @@ export function readExpenseFilters(params: SearchParams): ExpenseFilters {
     period: readPeriod({ ...params, period }),
     branchId: branch === ANY ? "" : branch,
     categoryId: category === ANY ? "" : category,
+    currency: (currencies as string[]).includes(currency) ? (currency as Currency) : "",
     teacherId: teacher === ANY ? "" : teacher,
     page: Number.isFinite(page) && page > 0 ? page : 1,
   };
@@ -40,6 +45,7 @@ export function expenseWhere(filters: ExpenseFilters): Prisma.ExpenseWhereInput 
   const spentOn = periodFilter(filters.period);
   if (spentOn) conditions.push({ spentOn });
   if (filters.categoryId) conditions.push({ categoryId: filters.categoryId });
+  if (filters.currency) conditions.push({ currency: filters.currency });
   if (filters.teacherId) conditions.push({ teacherId: filters.teacherId });
   return { AND: conditions };
 }
@@ -73,12 +79,19 @@ export async function branchChoices() {
   return branches;
 }
 
-/** Teachers a salary can be paid to. */
-export async function teacherChoices() {
+/**
+ * Teachers a salary can be paid to. A fixed salary is paid in the currency
+ * it's set in, so the dialog fixes the currency for those teachers.
+ */
+export async function teacherChoices(): Promise<TeacherOption[]> {
   const teachers = await prisma.teacher.findMany({
     where: { active: true },
     orderBy: { name: "asc" },
-    select: { id: true, name: true },
+    select: { id: true, name: true, salaryType: true, salaryCurrency: true },
   });
-  return teachers.map((teacher) => ({ value: teacher.id, label: teacher.name }));
+  return teachers.map((teacher) => ({
+    value: teacher.id,
+    label: teacher.name,
+    salaryCurrency: teacher.salaryType === "FIXED" ? teacher.salaryCurrency : null,
+  }));
 }

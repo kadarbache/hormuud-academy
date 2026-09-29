@@ -1,11 +1,11 @@
 import "server-only";
-import type { IncomeCategory, PaymentMethod, Prisma } from "@/generated/prisma/client";
+import type { Currency, IncomeCategory, PaymentMethod, Prisma } from "@/generated/prisma/client";
 import { parseStudentLookup } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { one, type SearchParams } from "@/lib/search-params";
 import type { CurrentUser } from "@/lib/session";
 import { reportBranchId, visiblePayments } from "../access";
-import { ANY, incomeCategories, paymentMethods } from "../labels";
+import { ANY, currencies, incomeCategories, paymentMethods } from "../labels";
 import { periodFilter, readPeriod, type Period } from "../period";
 
 export const PAGE_SIZE = 25;
@@ -16,6 +16,8 @@ export type IncomeFilters = {
   branchId: string;
   category: IncomeCategory | "";
   method: PaymentMethod | "";
+  /** Empty means both. Picking one is how a cash drawer is counted. */
+  currency: Currency | "";
   teacherId: string;
   /** A student ID, phone or name. */
   q: string;
@@ -35,6 +37,7 @@ export function readIncomeFilters(params: SearchParams): IncomeFilters {
     branchId: branch === ANY ? "" : branch,
     category: pick(one(params, "category"), incomeCategories),
     method: pick(one(params, "method"), paymentMethods),
+    currency: pick(one(params, "currency"), currencies),
     teacherId: teacher === ANY ? "" : teacher,
     q: one(params, "q").trim(),
     page: Number.isFinite(page) && page > 0 ? page : 1,
@@ -52,6 +55,7 @@ export function incomeWhere(user: CurrentUser, filters: IncomeFilters): Prisma.P
 
   if (filters.category) conditions.push({ category: filters.category });
   if (filters.method) conditions.push({ method: filters.method });
+  if (filters.currency) conditions.push({ currency: filters.currency });
   if (filters.teacherId) conditions.push({ teacherId: filters.teacherId });
 
   if (filters.q) {

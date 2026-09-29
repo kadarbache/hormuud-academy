@@ -1,14 +1,20 @@
 import "server-only";
 import { monthEnd, monthStart, toDbDate, toDbMonth } from "@/lib/dates";
-import { fromCents, subtractMoney, sumMoney, toCents } from "@/lib/money";
+import { currentRate } from "@/lib/exchange-rate";
+import { combinedAt, fromCents, subtractMoney, sumMoney, toCents, totalOf, type LedgerSum } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import { listExpenseCategories } from "../expense-categories/queries";
+import { ledgerSum } from "../queries";
 
 // The plan for a month, next to what actually happened.
 //
 // Only the plan is stored. The actual figures are counted from the payments
 // and expenses every time the screen is opened, so a payment recorded late
 // shows up in last month's comparison the moment it's entered.
+//
+// A plan is written in dollars, so the actual figures are both currencies
+// together in dollars at today's rate, the same combined figures every other
+// screen shows.
 
 function monthRange(month: string) {
   return { gte: toDbDate(monthStart(month)), lte: toDbDate(monthEnd(month)) };
@@ -16,6 +22,13 @@ function monthRange(month: string) {
 
 function amount(value: { toString(): string } | null | undefined) {
   return fromCents(toCents(value?.toString() ?? 0));
+}
+
+/** Grouped sums as a map from key to what they come to in dollars at a rate. */
+function combinedBy(rows: { key: string; sum: LedgerSum }[], rate: string | null) {
+  const sums = new Map<string, LedgerSum[]>();
+  for (const row of rows) sums.set(row.key, [...(sums.get(row.key) ?? []), row.sum]);
+  return new Map([...sums].map(([key, list]) => [key, combinedAt(totalOf(list), rate)]));
 }
 
 export type BranchMonth = {
@@ -33,20 +46,31 @@ export type BranchMonth = {
 /** Every branch's plan against its actuals for one month. */
 export async function budgetOverview(month: string): Promise<BranchMonth[]> {
   const paidOn = monthRange(month);
-  const [branches, budgets, income, expenses] = await Promise.all([
+  const [branches, budgets, income, expenses, rate] = await Promise.all([
     prisma.branch.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
     prisma.monthlyBudget.findMany({ where: { month: toDbMonth(month) }, include: { lines: true } }),
-    prisma.payment.groupBy({ by: ["branchId"], where: { paidOn }, _sum: { amount: true } }),
+    prisma.payment.groupBy({
+      by: ["branchId", "currency"],
+      where: { paidOn },
+      _sum: { amount: true },
+    }),
     prisma.expense.groupBy({
-      by: ["branchId"],
+      by: ["branchId", "currency"],
       where: { spentOn: paidOn },
       _sum: { amount: true },
     }),
+    currentRate(),
   ]);
 
   const byBranch = new Map(budgets.map((budget) => [budget.branchId, budget]));
-  const incomeBy = new Map(income.map((row) => [row.branchId, amount(row._sum.amount)]));
-  const expensesBy = new Map(expenses.map((row) => [row.branchId, amount(row._sum.amount)]));
+  const incomeBy = combinedBy(
+    income.map((row) => ({ key: row.branchId, sum: ledgerSum(row) })),
+    rate,
+  );
+  const expensesBy = combinedBy(
+    expenses.map((row) => ({ key: row.branchId, sum: ledgerSum(row) })),
+    rate,
+  );
 
   return branches.map((branch) => {
     const budget = byBranch.get(branch.id);
@@ -83,26 +107,34 @@ export type BudgetLine = {
 /** One branch's plan for one month, with the actual figures beside it. */
 export async function branchBudget(branchId: string, month: string) {
   const paidOn = monthRange(month);
-  const [branch, budget, income, byCategory, categories] = await Promise.all([
+  const [branch, budget, income, byCategory, categories, rate] = await Promise.all([
     prisma.branch.findUnique({ where: { id: branchId }, select: { id: true, name: true } }),
     prisma.monthlyBudget.findUnique({
       where: { branchId_month: { branchId, month: toDbMonth(month) } },
       include: { lines: true, savedBy: { select: { name: true } } },
     }),
-    prisma.payment.aggregate({ where: { branchId, paidOn }, _sum: { amount: true } }),
+    prisma.payment.groupBy({
+      by: ["currency"],
+      where: { branchId, paidOn },
+      _sum: { amount: true },
+    }),
     prisma.expense.groupBy({
-      by: ["categoryId"],
+      by: ["categoryId", "currency"],
       where: { branchId, spentOn: paidOn },
       _sum: { amount: true },
     }),
     listExpenseCategories(),
+    currentRate(),
   ]);
   if (!branch) return null;
 
   const plannedBy = new Map(
     (budget?.lines ?? []).map((line) => [line.categoryId, line.amount.toString()]),
   );
-  const actualBy = new Map(byCategory.map((row) => [row.categoryId, amount(row._sum.amount)]));
+  const actualBy = combinedBy(
+    byCategory.map((row) => ({ key: row.categoryId, sum: ledgerSum(row) })),
+    rate,
+  );
 
   // Every active category, and a deactivated one only when this month planned
   // or spent something on it.
@@ -122,7 +154,7 @@ export async function branchBudget(branchId: string, month: string) {
     });
 
   const expectedIncome = amount(budget?.expectedIncome);
-  const actualIncome = amount(income._sum.amount);
+  const actualIncome = combinedAt(totalOf(income.map(ledgerSum)), rate);
   const plannedExpenses = sumMoney(lines.map((line) => line.planned));
   const actualExpenses = sumMoney(lines.map((line) => line.actual));
 
