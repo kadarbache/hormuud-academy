@@ -118,7 +118,7 @@ export function RegistrationForm({
               options={options}
               picked={picked}
               onPickedChange={setPicked}
-              errors={fieldErrors.branchSkillIds}
+              errors={fieldErrors}
               emptyMessage={
                 branchId
                   ? "This branch has no open skills. An admin sets them up under Skills."

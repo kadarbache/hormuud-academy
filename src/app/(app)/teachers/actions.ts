@@ -2,6 +2,7 @@
 
 import { refresh } from "next/cache";
 import { z } from "zod";
+import { inUse } from "@/lib/clashes";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
 import { failure, invalid, success, type ActionResult } from "@/lib/action-result";
@@ -111,16 +112,21 @@ export async function updateTeacher(id: string, formData: FormData): Promise<Act
     parsed.data;
   if (await unknownBranches(branchIds)) return failure("One of those branches no longer exists.");
 
-  // Unticking a branch where this teacher still runs a skill would leave that
-  // skill with a teacher who doesn't work there.
-  const stillTeaching = await prisma.branchSkill.findFirst({
-    where: { teacherId: id, branchId: { notIn: branchIds } },
-    include: { skill: { select: { name: true } }, branch: { select: { name: true } } },
+  // Unticking a branch where this teacher still has a class time would leave
+  // it with a teacher who doesn't work there.
+  const stillTeaching = await prisma.classTime.findFirst({
+    where: { teacherId: id, branchSkill: { branchId: { notIn: branchIds } } },
+    include: {
+      branchSkill: {
+        select: { skill: { select: { name: true } }, branch: { select: { name: true } } },
+      },
+    },
   });
   if (stillTeaching) {
+    const { skill, branch } = stillTeaching.branchSkill;
     return failure("Check the highlighted fields.", {
       branchIds: [
-        `${name} still teaches ${stillTeaching.skill.name} at ${stillTeaching.branch.name}. Give that skill another teacher first.`,
+        `${name} still teaches ${skill.name} at ${branch.name}. Give that class time another teacher on the Skills page first.`,
       ],
     });
   }
@@ -147,13 +153,18 @@ export async function setTeacherActive(id: string, active: boolean): Promise<Act
   await requireAdmin();
 
   if (!active) {
-    const teaching = await prisma.branchSkill.findFirst({
-      where: { teacherId: id, active: true },
-      include: { skill: { select: { name: true } }, branch: { select: { name: true } } },
+    const teaching = await prisma.classTime.findFirst({
+      where: { teacherId: id, ...inUse },
+      include: {
+        branchSkill: {
+          select: { skill: { select: { name: true } }, branch: { select: { name: true } } },
+        },
+      },
     });
     if (teaching) {
+      const { skill, branch } = teaching.branchSkill;
       return failure(
-        `This teacher still runs ${teaching.skill.name} at ${teaching.branch.name}. Give that skill another teacher first.`,
+        `This teacher still teaches ${skill.name} at ${branch.name}. Give that class time another teacher on the Skills page first.`,
       );
     }
   }
@@ -167,11 +178,11 @@ export async function deleteTeacher(id: string): Promise<ActionResult> {
   await requireAdmin();
   const teacher = await prisma.teacher.findUnique({
     where: { id },
-    include: { _count: { select: { branchSkills: true, payments: true, payouts: true } } },
+    include: { _count: { select: { classTimes: true, payments: true, payouts: true } } },
   });
   if (!teacher) return failure("That teacher no longer exists.");
-  if (teacher._count.branchSkills > 0) {
-    return failure("This teacher is set on a skill. Deactivate them instead.");
+  if (teacher._count.classTimes > 0) {
+    return failure("This teacher is set on a class time. Deactivate them instead.");
   }
   // Deleting them would take their earnings and their pay out of the books.
   if (teacher._count.payments > 0 || teacher._count.payouts > 0) {

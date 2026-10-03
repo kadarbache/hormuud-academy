@@ -1,6 +1,22 @@
 // Plain shapes handed from server pages to the student forms. Kept apart from
 // queries.ts, which is server-only, so client components can import them.
 
+/**
+ * The form field that carries the class time picked for one skill on the
+ * registration form. Here, not in the form, so the server action reads the
+ * same name the form writes.
+ */
+export const classTimeFieldName = (branchSkillId: string) => `classTime-${branchSkillId}`;
+
+/** One class time a student can join, ready to show in a picker. */
+export type ClassTimeOption = {
+  id: string;
+  /** "4:00–6:00 pm, Sat Mon Wed" */
+  when: string;
+  classroomName: string;
+  teacherName: string;
+};
+
 /** A skill as offered at one branch, ready to show in a picker. */
 export type BranchSkillOption = {
   id: string;
@@ -9,8 +25,8 @@ export type BranchSkillOption = {
   skillId: string;
   skillName: string;
   categoryName: string;
-  teacherName: string;
-  classroomName: string;
+  /** The class times taking students, by the clock. None means nobody can join yet. */
+  classTimes: ClassTimeOption[];
   durationMonths: number;
   registrationFee: string;
   monthlyFee: string;

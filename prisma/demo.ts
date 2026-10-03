@@ -1,6 +1,6 @@
-// Sample branches, classes, teachers, skills, students and money for trying
-// the app on a local database. Never run this against the college's real
-// database.
+// Sample branches, classes, teachers, skills and their class times,
+// students and money for trying the app on a local database. Never run this
+// against the college's real database.
 //
 //   pnpm db:seed && pnpm db:demo
 import "dotenv/config";
@@ -70,6 +70,7 @@ async function main() {
     prisma.classroom.create({ data: { name: "Room B", branchId: second.id } }),
   ]);
 
+
   // Two teachers on a fixed salary, one of them paid in shillings, and two
   // on a share of the fees they bring in.
   const teacher = (
@@ -111,29 +112,56 @@ async function main() {
   const offer = (
     s: typeof computer,
     branchId: string,
-    teacherId: string,
-    classroomId: string,
     pricing: { registrationFee?: string; monthlyFee?: string } = {},
   ) =>
     prisma.branchSkill.create({
       data: {
         skillId: s.id,
         branchId,
-        teacherId,
-        classroomId,
         durationMonths: s.durationMonths,
         registrationFee: pricing.registrationFee ?? s.registrationFee,
         monthlyFee: pricing.monthlyFee ?? s.monthlyFee,
       },
     });
   const [mainComputer, mainDesign, mainTailoring, secondComputer, secondElectrical] = await Promise.all([
-    offer(computer, main.id, t1.id, lab.id),
-    offer(design, main.id, t2.id, lab.id),
-    offer(tailoring, main.id, t3.id, room1.id),
+    offer(computer, main.id),
+    offer(design, main.id),
+    offer(tailoring, main.id),
     // The second branch is in a smaller town and charges less.
-    offer(computer, second.id, t4.id, roomA.id, { registrationFee: "5", monthlyFee: "12" }),
-    offer(electrical, second.id, t3.id, roomB.id),
+    offer(computer, second.id, { registrationFee: "5", monthlyFee: "12" }),
+    offer(electrical, second.id),
   ]);
+
+  // Where, when and with whom, from and to the hour. The Computer Lab holds
+  // Computer Basics from 4 to 6 and Graphic Design after it, Computer Basics
+  // also runs in the morning, and Tailoring takes Room 1 for one hour.
+  const SAT_TO_THU = ["SATURDAY", "SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY"] as const;
+  const classTime = (
+    bs: typeof mainComputer,
+    classroomId: string,
+    hours: [start: number, end: number],
+    teacherId: string,
+    days: readonly (typeof SAT_TO_THU)[number][] = SAT_TO_THU,
+  ) =>
+    prisma.classTime.create({
+      data: {
+        branchSkillId: bs.id,
+        classroomId,
+        startMinute: hours[0] * 60,
+        endMinute: hours[1] * 60,
+        teacherId,
+        days: [...days],
+      },
+    });
+  const [computerMorning, , designEvening, tailoringAfternoon, secondComputerAfternoon, electricalMorning] =
+    await Promise.all([
+      classTime(mainComputer, lab.id, [8, 10], t1.id),
+      classTime(mainComputer, lab.id, [16, 18], t1.id),
+      classTime(mainDesign, lab.id, [18, 20], t2.id, ["SATURDAY", "MONDAY", "WEDNESDAY"]),
+      classTime(mainTailoring, room1.id, [16, 17], t3.id),
+      classTime(secondComputer, roomA.id, [16, 18], t4.id),
+      classTime(secondElectrical, roomB.id, [8, 10], t3.id),
+    ]);
 
   const staffPassword = randomBytes(9).toString("base64url");
   await auth.api.createUser({
@@ -152,13 +180,21 @@ async function main() {
   type Offer = Omit<typeof mainComputer, "registrationFee" | "monthlyFee"> & {
     registrationFee: string;
     fee: string;
+    classTimeId: string;
+    teacherId: string;
     /** The percentage the teacher earns, or null when they're on a salary. */
     rate: string | null;
   };
-  const withTeacher = (bs: typeof mainComputer, teach: typeof t1): Offer => ({
+  const withTeacher = (
+    bs: typeof mainComputer,
+    ct: typeof computerMorning,
+    teach: typeof t1,
+  ): Offer => ({
     ...bs,
     registrationFee: bs.registrationFee.toString(),
     fee: bs.monthlyFee.toString(),
+    classTimeId: ct.id,
+    teacherId: teach.id,
     rate: teach.salaryType === "PERCENTAGE" ? (teach.percentageRate?.toString() ?? null) : null,
   });
 
@@ -189,13 +225,13 @@ async function main() {
       registered: monthsAgo(1),
       skills: [
         {
-          offer: withTeacher(mainComputer, t1),
+          offer: withTeacher(mainComputer, computerMorning, t1),
           start: monthsAgo(1),
           paid: true,
           monthsPaid: 2,
         },
         {
-          offer: withTeacher(mainTailoring, t3),
+          offer: withTeacher(mainTailoring, tailoringAfternoon, t3),
           start: monthsAgo(1),
           paid: true,
           monthsPaid: 1,
@@ -212,7 +248,7 @@ async function main() {
       // Never paid the registration fee, and two months are still owed.
       skills: [
         {
-          offer: withTeacher(mainDesign, t2),
+          offer: withTeacher(mainDesign, designEvening, t2),
           start: monthsAgo(5),
           paid: false,
           monthsPaid: 2,
@@ -230,14 +266,14 @@ async function main() {
       // shillings, so her teacher's share is in shillings too.
       skills: [
         {
-          offer: withTeacher(secondElectrical, t3),
+          offer: withTeacher(secondElectrical, electricalMorning, t3),
           start: monthsAgo(2),
           paid: true,
           monthsPaid: 3,
           currency: "SLSH",
         },
         {
-          offer: withTeacher(mainDesign, t2),
+          offer: withTeacher(mainDesign, designEvening, t2),
           start: monthsAgo(1),
           paid: false,
           monthsPaid: 1,
@@ -252,7 +288,7 @@ async function main() {
       registered: monthsAgo(8),
       skills: [
         {
-          offer: withTeacher(secondComputer, t4),
+          offer: withTeacher(secondComputer, secondComputerAfternoon, t4),
           start: monthsAgo(8),
           paid: true,
           monthsPaid: 3,
@@ -283,6 +319,7 @@ async function main() {
         data: {
           studentId: created.id,
           branchSkillId: offer.id,
+          classTimeId: offer.classTimeId,
           skillId: offer.skillId,
           startDate: toDbDate(start),
           endDate: toDbDate(addMonths(start, offer.durationMonths)),

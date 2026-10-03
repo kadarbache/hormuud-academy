@@ -1,5 +1,6 @@
 import "server-only";
 import type { Currency, Prisma } from "@/generated/prisma/client";
+import { inUse } from "@/lib/clashes";
 import { monthEnd, monthStart, toDbDate, toDbMonth } from "@/lib/dates";
 import { subtractTotals, totalOf, ZERO_TOTAL, type LedgerSum, type MoneyTotal } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
@@ -90,7 +91,10 @@ export async function listTeacherPay(month: string): Promise<TeacherPayRow[]> {
       orderBy: [{ active: "desc" }, { name: "asc" }],
       include: {
         branches: { include: { branch: { select: { name: true } } } },
-        branchSkills: { include: { skill: { select: { name: true } } } },
+        classTimes: {
+          where: inUse,
+          select: { branchSkill: { select: { skill: { select: { name: true } } } } },
+        },
       },
     }),
     shareTotals({}),
@@ -113,7 +117,10 @@ export async function listTeacherPay(month: string): Promise<TeacherPayRow[]> {
       salaryCurrency: teacher.salaryCurrency,
       percentageRate: teacher.percentageRate?.toString() ?? "",
       branchNames: teacher.branches.map((link) => link.branch.name),
-      skillNames: teacher.branchSkills.map((bs) => bs.skill.name),
+      // A teacher with two class times of one skill teaches it once.
+      skillNames: [
+        ...new Set(teacher.classTimes.map((classTime) => classTime.branchSkill.skill.name)),
+      ].sort(),
       earnedEver: earned,
       earnedInMonth: earnedInMonth.get(teacher.id) ?? ZERO_TOTAL,
       paidEver: paid,
@@ -129,12 +136,6 @@ export async function getTeacherPay(id: string) {
     where: { id },
     include: {
       branches: { include: { branch: { select: { id: true, name: true } } } },
-      branchSkills: {
-        include: {
-          skill: { select: { name: true } },
-          branch: { select: { name: true } },
-        },
-      },
     },
   });
   if (!teacher) return null;

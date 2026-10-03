@@ -10,6 +10,15 @@ import {
   photoUploadEnabled,
   uploadStudentPhoto,
 } from "@/lib/cloudinary";
+import {
+  formatDayList,
+  formatHours,
+  sharedDays,
+  slotOf,
+  slotsClash,
+  type ClassTimeHours,
+} from "@/lib/class-times";
+import { studentClash } from "@/lib/clashes";
 import { addMonths, collegeToday, toDbDate } from "@/lib/dates";
 import { ledgerFields, NO_RATE_MESSAGE } from "@/lib/exchange-rate";
 import { formatMoney, formatStudentNumber } from "@/lib/format";
@@ -35,7 +44,7 @@ import {
 } from "@/lib/validation";
 import { registrationFeePayment } from "../finance/payments";
 import { canEditStudent } from "./access";
-import type { PhoneMatch } from "./types";
+import { classTimeFieldName, type PhoneMatch } from "./types";
 
 const profileSchema = z.object({
   fullName: requiredText("Enter the student's full name.", 120),
@@ -117,12 +126,14 @@ function enrollmentData(
   createdById: string,
   startDate: string,
   bs: BranchSkillForEnrollment,
+  classTimeId: string,
   paid: FeePaidNow,
 ) {
   const owed = bs.registrationFee.gt(0);
   return {
     studentId,
     branchSkillId: bs.id,
+    classTimeId,
     skillId: bs.skillId,
     startDate: toDbDate(startDate),
     endDate: toDbDate(addMonths(startDate, bs.durationMonths)),
@@ -174,6 +185,55 @@ async function readFeePaidNow(
   return { paid: { on: paidOn, method: method.data, ledger }, errors };
 }
 
+/** A class time as picking one needs it: when it meets. */
+type OpenClassTime = { id: string } & ClassTimeHours;
+
+/** The class times a skill is taking students in, when they meet. */
+const openClassTimes = {
+  where: { active: true },
+  select: { id: true, startMinute: true, endMinute: true, days: true },
+} satisfies Prisma.BranchSkill$classTimesArgs;
+
+/**
+ * The class time picked for each skill on the registration form, which has
+ * to be one the skill is still taking students in. A skill with one class
+ * time sends it without asking. Two picks at the same moment would put the
+ * student in two places at once, so that's refused too.
+ */
+function pickClassTimes<T extends { id: string; skill: { name: string }; classTimes: OpenClassTime[] }>(
+  branchSkills: T[],
+  values: Record<string, string>,
+): { picks: { bs: T; classTime: OpenClassTime }[] } | { errors: FieldErrors } {
+  const errors: FieldErrors = {};
+  const picks: { bs: T; classTime: OpenClassTime }[] = [];
+  for (const bs of branchSkills) {
+    const field = classTimeFieldName(bs.id);
+    const [only] = bs.classTimes.length === 1 ? bs.classTimes : [];
+    const pickedId = values[field] || only?.id;
+    const classTime = bs.classTimes.find((open) => open.id === pickedId);
+    if (classTime) picks.push({ bs, classTime });
+    // A skill with one class time has no picker to show an error on.
+    else if (bs.classTimes.length > 1) {
+      errors[field] = [pickedId ? "That class time isn't taking students now. Pick another." : "Pick a class time."];
+    } else {
+      errors.branchSkillIds = [`${bs.skill.name} has no class time taking students now. Untick it, or ask the admin to add one.`];
+    }
+  }
+
+  for (const [index, first] of picks.entries()) {
+    const firstSlot = slotOf(first.classTime);
+    for (const second of picks.slice(index + 1)) {
+      const secondSlot = slotOf(second.classTime);
+      if (firstSlot && secondSlot && slotsClash(firstSlot, secondSlot)) {
+        errors.branchSkillIds = [
+          `${first.bs.skill.name} and ${second.bs.skill.name} are both at ${formatHours(firstSlot)} on ${formatDayList(sharedDays(firstSlot.days, secondSlot.days))}. Pick other class times or other skills.`,
+        ];
+      }
+    }
+  }
+  return Object.keys(errors).length > 0 ? { errors } : { picks };
+}
+
 export async function registerStudent(formData: FormData): Promise<ActionResult<{ id: string }>> {
   const user = await requireUser();
   const values = formObject(formData);
@@ -208,10 +268,13 @@ export async function registerStudent(formData: FormData): Promise<ActionResult<
   const branchSkillIds = [...new Set(skills.data.branchSkillIds)];
   const branchSkills = await prisma.branchSkill.findMany({
     where: { id: { in: branchSkillIds }, branchId: homeBranchId, active: true, skill: { active: true } },
+    include: { skill: { select: { name: true } }, classTimes: openClassTimes },
   });
   if (branchSkills.length !== branchSkillIds.length) {
     return failure("One of the skills is no longer open at this branch. Reload the page and pick again.");
   }
+  const placed = pickClassTimes(branchSkills, values);
+  if ("errors" in placed) return failure("Check the highlighted fields.", placed.errors);
 
   // Upload first: if it fails, nothing has been saved yet.
   const uploaded = photo.file ? await uploadStudentPhoto(photo.file) : null;
@@ -231,13 +294,14 @@ export async function registerStudent(formData: FormData): Promise<ActionResult<
       });
       // One at a time, not createMany: each enrollment's registration fee
       // payment needs the id of the enrollment it belongs to.
-      for (const bs of branchSkills) {
+      for (const { bs, classTime } of placed.picks) {
         await tx.enrollment.create({
           data: enrollmentData(
             created.id,
             user.id,
             skills.data.startDate,
             { ...bs, branchId: homeBranchId },
+            classTime.id,
             fee.paid,
           ),
         });
@@ -320,6 +384,7 @@ export async function enrollStudent(studentId: string, formData: FormData): Prom
   const parsed = z
     .object({
       branchSkillId: z.string({ error: "Pick a skill." }).min(1, "Pick a skill."),
+      classTimeId: z.string({ error: "Pick a class time." }).min(1, "Pick a class time."),
       startDate: isoDate("Pick the start date."),
     })
     .safeParse(values);
@@ -329,7 +394,7 @@ export async function enrollStudent(studentId: string, formData: FormData): Prom
     prisma.student.findUnique({ where: { id: studentId } }),
     prisma.branchSkill.findUnique({
       where: { id: parsed.data.branchSkillId },
-      include: { skill: true, branch: true },
+      include: { skill: true, branch: true, classTimes: openClassTimes },
     }),
   ]);
   if (!student) return failure("That student no longer exists.");
@@ -339,6 +404,14 @@ export async function enrollStudent(studentId: string, formData: FormData): Prom
   if (!canActAtBranch(user, branchSkill.branchId)) {
     return failure("You can only enroll students in skills at your own branch.");
   }
+  const classTime = branchSkill.classTimes.find((open) => open.id === parsed.data.classTimeId);
+  if (!classTime) {
+    return failure("That class time isn't taking students now. Close this and try again.");
+  }
+  // The student can't be in two places at once, at this branch or another.
+  const slot = slotOf(classTime);
+  const clash = slot ? await studentClash([student.id], slot) : null;
+  if (clash) return failure(`${clash} Pick another class time or another skill.`);
 
   // Paid now means paid today, whatever the start date.
   const fee = await readFeePaidNow(values, collegeToday());
@@ -348,7 +421,14 @@ export async function enrollStudent(studentId: string, formData: FormData): Prom
 
   try {
     await prisma.enrollment.create({
-      data: enrollmentData(student.id, user.id, parsed.data.startDate, branchSkill, fee.paid),
+      data: enrollmentData(
+        student.id,
+        user.id,
+        parsed.data.startDate,
+        branchSkill,
+        classTime.id,
+        fee.paid,
+      ),
     });
   } catch (error) {
     // The database allows one active enrollment per skill per student, at any branch.

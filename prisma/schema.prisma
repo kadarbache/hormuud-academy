@@ -147,9 +147,9 @@ model Category {
 }
 
 /// One entry in the college-wide catalog. Head office owns it; every branch
-/// shares it. Branch-specific details (teacher, class, fees, duration) live on
-/// BranchSkill. The duration and fees here are only the defaults a branch
-/// starts from when the skill is added to it.
+/// shares it. Branch-specific details (fees, duration) live on BranchSkill,
+/// and when and where it's taught on ClassTime. The duration and fees here
+/// are only the defaults a branch starts from when the skill is added to it.
 model Skill {
   id              String   @id @default(cuid())
   name            String   @unique
@@ -180,10 +180,56 @@ model Classroom {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  branchSkills BranchSkill[]
+  classTimes ClassTime[]
 
   @@unique([branchId, name])
   @@map("classrooms")
+}
+
+/// The days of the week, in the order the college's week runs.
+enum Weekday {
+  SATURDAY
+  SUNDAY
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+}
+
+/// One branch skill taught in one class, from a start time to an end time on
+/// chosen days, by one teacher: "Graphic Design, Room 3, 4–6 pm, Sat Mon Wed,
+/// Ali". Each sets its own hours, so a two-hour class and a one-hour class
+/// can share an afternoon. A branch skill can run at several class times,
+/// and every enrollment is in one.
+model ClassTime {
+  id            String      @id @default(cuid())
+  branchSkillId String
+  branchSkill   BranchSkill @relation(fields: [branchSkillId], references: [id])
+  classroomId   String
+  classroom     Classroom   @relation(fields: [classroomId], references: [id])
+  /// Minutes after midnight: 4 pm is 960. Null, with no days, only for a
+  /// class time carried over from before class times had hours, until the
+  /// admin sets them. The database keeps the start before the end within the
+  /// day, and refuses hours without days or days without hours.
+  startMinute   Int?
+  endMinute     Int?
+  days          Weekday[]   @default([])
+  teacherId     String
+  teacher       Teacher     @relation(fields: [teacherId], references: [id])
+  active        Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  enrollments Enrollment[]
+
+  /// Lets an enrollment name its class time and branch skill together, so
+  /// the database refuses a class time that belongs to another skill.
+  @@unique([id, branchSkillId])
+  @@index([branchSkillId])
+  @@index([classroomId])
+  @@index([teacherId])
+  @@map("class_times")
 }
 
 model Teacher {
@@ -207,10 +253,10 @@ model Teacher {
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
-  branches     TeacherBranch[]
-  branchSkills BranchSkill[]
-  payments     Payment[]
-  payouts      Expense[]
+  branches   TeacherBranch[]
+  classTimes ClassTime[]
+  payments   Payment[]
+  payouts    Expense[]
 
   @@map("teachers")
 }
@@ -227,27 +273,25 @@ model TeacherBranch {
   @@map("teacher_branches")
 }
 
-/// A skill as it runs at one branch: one teacher, one class, and the fees and
-/// duration that branch charges. A branch in a poorer city can charge less.
-/// Students enroll in this, not in the catalog skill directly.
+/// A skill as it runs at one branch: the fees and duration that branch
+/// charges, the same at every class time. A branch in a poorer city can
+/// charge less. Students enroll in this, in one of its class times, not in
+/// the catalog skill directly.
 model BranchSkill {
-  id              String    @id @default(cuid())
+  id              String   @id @default(cuid())
   skillId         String
-  skill           Skill     @relation(fields: [skillId], references: [id])
+  skill           Skill    @relation(fields: [skillId], references: [id])
   branchId        String
-  branch          Branch    @relation(fields: [branchId], references: [id])
-  teacherId       String
-  teacher         Teacher   @relation(fields: [teacherId], references: [id])
-  classroomId     String
-  classroom       Classroom @relation(fields: [classroomId], references: [id])
+  branch          Branch   @relation(fields: [branchId], references: [id])
   durationMonths  Int
   /// Paid once for every enrollment here, on top of the monthly fee.
-  registrationFee Decimal   @db.Decimal(10, 2)
-  monthlyFee      Decimal   @db.Decimal(10, 2)
-  active          Boolean   @default(true)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  registrationFee Decimal  @db.Decimal(10, 2)
+  monthlyFee      Decimal  @db.Decimal(10, 2)
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
+  classTimes  ClassTime[]
   enrollments Enrollment[]
 
   @@unique([skillId, branchId])
@@ -306,6 +350,10 @@ model Enrollment {
   student         Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
   branchSkillId   String
   branchSkill     BranchSkill      @relation(fields: [branchSkillId], references: [id])
+  /// The class time the student comes to, always one of the branch skill's.
+  /// Moving to another one changes nothing about the fees.
+  classTimeId     String
+  classTime       ClassTime        @relation(fields: [classTimeId, branchSkillId], references: [id, branchSkillId])
   /// Copied from the branch skill so the database itself can refuse a second
   /// active enrollment in the same skill, even across branches.
   skillId         String
@@ -332,6 +380,7 @@ model Enrollment {
   @@unique([studentId, skillId], where: raw("status = 'ACTIVE'"), map: "enrollments_one_active_per_skill")
   @@index([studentId])
   @@index([branchSkillId, status])
+  @@index([classTimeId, status])
   @@index([skillId])
   @@map("enrollments")
 }

@@ -47,7 +47,7 @@ export async function createClassroom(formData: FormData): Promise<ActionResult>
   return success(`${parsed.data.name} added to ${branch.name}.`);
 }
 
-/** A class can be renamed but not moved: skills at its branch already use it. */
+/** A class can be renamed but not moved: class times at its branch already use it. */
 export async function renameClassroom(id: string, formData: FormData): Promise<ActionResult> {
   await requireAdmin();
   const parsed = classSchema.pick({ name: true }).safeParse(formObject(formData));
@@ -81,11 +81,11 @@ export async function deleteClassroom(id: string): Promise<ActionResult> {
   await requireAdmin();
   const classroom = await prisma.classroom.findUnique({
     where: { id },
-    include: { _count: { select: { branchSkills: true } } },
+    include: { _count: { select: { classTimes: true } } },
   });
   if (!classroom) return failure("That class no longer exists.");
-  if (classroom._count.branchSkills > 0) {
-    return failure("A skill is taught in this class. Deactivate it instead.");
+  if (classroom._count.classTimes > 0) {
+    return failure("A class time uses this class. Deactivate it instead.");
   }
 
   await prisma.classroom.delete({ where: { id } });

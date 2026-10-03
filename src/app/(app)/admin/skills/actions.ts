@@ -113,47 +113,15 @@ export async function deleteSkill(id: string): Promise<ActionResult> {
 
 // --- The skill at one branch -------------------------------------------------
 
-const branchSkillSchema = pricingSchema.extend({
-  teacherId: requiredId("Pick the teacher."),
-  classroomId: requiredId("Pick the class."),
-});
-
-/** Checks that the teacher works at the branch and the class is in it. */
-async function checkPlacement(branchId: string, teacherId: string, classroomId: string) {
-  const [teacher, classroom] = await Promise.all([
-    prisma.teacher.findUnique({
-      where: { id: teacherId },
-      include: { branches: { where: { branchId } } },
-    }),
-    prisma.classroom.findUnique({ where: { id: classroomId } }),
-  ]);
-
-  if (!teacher?.active || teacher.branches.length === 0) {
-    return failure("Check the highlighted fields.", {
-      teacherId: ["Pick an active teacher who works at this branch."],
-    });
-  }
-  if (!classroom?.active || classroom.branchId !== branchId) {
-    return failure("Check the highlighted fields.", {
-      classroomId: ["Pick an active class at this branch."],
-    });
-  }
-  return null;
-}
-
 export async function addBranchSkill(skillId: string, formData: FormData): Promise<ActionResult> {
   await requireAdmin();
-  const values = formObject(formData);
-  const parsed = branchSkillSchema
+  const parsed = pricingSchema
     .extend({ branchId: requiredId("Pick the branch.") })
-    .safeParse(values);
+    .safeParse(formObject(formData));
   if (!parsed.success) return invalid(parsed.error);
-  const { branchId, teacherId, classroomId } = parsed.data;
 
-  const branch = await prisma.branch.findUnique({ where: { id: branchId } });
+  const branch = await prisma.branch.findUnique({ where: { id: parsed.data.branchId } });
   if (!branch?.active) return failure("Pick an active branch.");
-  const placementProblem = await checkPlacement(branchId, teacherId, classroomId);
-  if (placementProblem) return placementProblem;
 
   try {
     await prisma.branchSkill.create({ data: { skillId, ...parsed.data } });
@@ -167,7 +135,7 @@ export async function addBranchSkill(skillId: string, formData: FormData): Promi
   }
 
   refresh();
-  return success(`${branch.name} now teaches this skill.`);
+  return success(`${branch.name} now teaches this skill. Add its class times so students can join.`);
 }
 
 /**
@@ -176,17 +144,11 @@ export async function addBranchSkill(skillId: string, formData: FormData): Promi
  */
 export async function updateBranchSkill(id: string, formData: FormData): Promise<ActionResult> {
   await requireAdmin();
-  const parsed = branchSkillSchema.safeParse(formObject(formData));
+  const parsed = pricingSchema.safeParse(formObject(formData));
   if (!parsed.success) return invalid(parsed.error);
 
   const branchSkill = await prisma.branchSkill.findUnique({ where: { id } });
   if (!branchSkill) return failure("That branch setup no longer exists.");
-  const placementProblem = await checkPlacement(
-    branchSkill.branchId,
-    parsed.data.teacherId,
-    parsed.data.classroomId,
-  );
-  if (placementProblem) return placementProblem;
 
   await prisma.branchSkill.update({ where: { id }, data: parsed.data });
   refresh();
@@ -219,7 +181,11 @@ export async function deleteBranchSkill(id: string): Promise<ActionResult> {
     return failure("Students have taken this skill at this branch. Deactivate it instead.");
   }
 
-  await prisma.branchSkill.delete({ where: { id } });
+  // Nobody ever joined, so its class times go with it.
+  await prisma.$transaction([
+    prisma.classTime.deleteMany({ where: { branchSkillId: id } }),
+    prisma.branchSkill.delete({ where: { id } }),
+  ]);
   refresh();
   return success(`Removed from ${branchSkill.branch.name}.`);
 }

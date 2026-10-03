@@ -23,7 +23,13 @@ import { formatMoney, formatMonths, formatRate } from "@/lib/format";
 import { dollarsToShillings } from "@/lib/money";
 import { currencyOptions, paymentMethodOptions } from "../finance/labels";
 import { findStudentsByPhone } from "./actions";
-import type { BranchSkillOption, PhoneMatch, StudentFormValues } from "./types";
+import {
+  classTimeFieldName,
+  type BranchSkillOption,
+  type ClassTimeOption,
+  type PhoneMatch,
+  type StudentFormValues,
+} from "./types";
 
 const sexOptions = [
   { value: "MALE", label: "Male" },
@@ -203,7 +209,50 @@ export function feesText(
     : `${monthly}, no registration fee`;
 }
 
-/** One checkbox card per skill the branch offers. */
+/** "4:00–6:00 pm, Sat Mon Wed in Room 3 with Ali" */
+export function classTimeText(classTime: ClassTimeOption) {
+  return `${classTime.when} in ${classTime.classroomName} with ${classTime.teacherName}`;
+}
+
+/**
+ * Which of a skill's class times the student comes to. A skill with one
+ * class time sends it without asking; with several, staff pick one.
+ */
+export function ClassTimeField({
+  option,
+  name,
+  label = "Class time",
+  errors,
+}: {
+  option: Pick<BranchSkillOption, "classTimes">;
+  name: string;
+  label?: string;
+  errors?: string[];
+}) {
+  const [only] = option.classTimes;
+  if (option.classTimes.length === 1 && only) {
+    return <input type="hidden" name={name} value={only.id} />;
+  }
+  return (
+    <SelectField
+      label={label}
+      name={name}
+      options={option.classTimes.map((classTime) => ({
+        value: classTime.id,
+        label: classTimeText(classTime),
+      }))}
+      placeholder="Pick a class time"
+      defaultValue=""
+      errors={errors}
+    />
+  );
+}
+
+/**
+ * One checkbox card per skill the branch offers, and a class time picker for
+ * each ticked skill that runs at more than one. A skill with no class time
+ * can't be ticked: there's nowhere for the student to sit yet.
+ */
 export function SkillPicker({
   options,
   picked,
@@ -216,47 +265,69 @@ export function SkillPicker({
   picked: string[];
   /** Takes an update function, like a state setter, so quick ticks don't overwrite each other. */
   onPickedChange: (update: (picked: string[]) => string[]) => void;
-  errors?: string[];
+  /** Every field error on the form: the skills' own, and each class time picker's. */
+  errors: FieldErrors;
   emptyMessage: string;
 }) {
   const id = useId();
+  const skillErrors = errors.branchSkillIds;
+  const pickedOptions = options.filter((option) => picked.includes(option.id));
 
   return (
-    <FieldSet data-invalid={errors?.length ? true : undefined}>
-      <FieldLegend variant="label">Skills</FieldLegend>
-      {options.length === 0 ? (
-        <FieldDescription>{emptyMessage}</FieldDescription>
-      ) : (
-        <div className="grid gap-2 sm:grid-cols-2">
-          {options.map((option) => (
-            <FieldLabel key={option.id} htmlFor={`${id}-${option.id}`}>
-              <Field orientation="horizontal">
-                <Checkbox
-                  id={`${id}-${option.id}`}
-                  name="branchSkillIds"
-                  value={option.id}
-                  checked={picked.includes(option.id)}
-                  onCheckedChange={(checked) =>
-                    onPickedChange((current) =>
-                      checked === true
-                        ? [...current, option.id]
-                        : current.filter((pickedId) => pickedId !== option.id),
-                    )
-                  }
-                />
-                <FieldContent>
-                  <FieldTitle>{option.skillName}</FieldTitle>
-                  <FieldDescription>
-                    {option.teacherName}, {option.classroomName}. {feesText(option)}.
-                  </FieldDescription>
-                </FieldContent>
-              </Field>
-            </FieldLabel>
-          ))}
-        </div>
-      )}
-      <FieldError errors={errors?.map((message) => ({ message }))} />
-    </FieldSet>
+    <>
+      <FieldSet data-invalid={skillErrors?.length ? true : undefined}>
+        <FieldLegend variant="label">Skills</FieldLegend>
+        {options.length === 0 ? (
+          <FieldDescription>{emptyMessage}</FieldDescription>
+        ) : (
+          <div className="grid gap-2 sm:grid-cols-2">
+            {options.map((option) => {
+              const [only] = option.classTimes;
+              const where =
+                option.classTimes.length === 0
+                  ? "No class time yet, so nobody can join. The admin adds one under Skills."
+                  : option.classTimes.length === 1 && only
+                    ? `${classTimeText(only)}. ${feesText(option)}.`
+                    : `${option.classTimes.length} class times. ${feesText(option)}.`;
+              return (
+                <FieldLabel key={option.id} htmlFor={`${id}-${option.id}`}>
+                  <Field orientation="horizontal">
+                    <Checkbox
+                      id={`${id}-${option.id}`}
+                      name="branchSkillIds"
+                      value={option.id}
+                      disabled={option.classTimes.length === 0}
+                      checked={picked.includes(option.id)}
+                      onCheckedChange={(checked) =>
+                        onPickedChange((current) =>
+                          checked === true
+                            ? [...current, option.id]
+                            : current.filter((pickedId) => pickedId !== option.id),
+                        )
+                      }
+                    />
+                    <FieldContent>
+                      <FieldTitle>{option.skillName}</FieldTitle>
+                      <FieldDescription>{where}</FieldDescription>
+                    </FieldContent>
+                  </Field>
+                </FieldLabel>
+              );
+            })}
+          </div>
+        )}
+        <FieldError errors={skillErrors?.map((message) => ({ message }))} />
+      </FieldSet>
+      {pickedOptions.map((option) => (
+        <ClassTimeField
+          key={option.id}
+          option={option}
+          name={classTimeFieldName(option.id)}
+          label={`${option.skillName} class time`}
+          errors={errors[classTimeFieldName(option.id)]}
+        />
+      ))}
+    </>
   );
 }
 

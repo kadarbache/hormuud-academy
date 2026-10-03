@@ -59,11 +59,10 @@ function findEnrollment(id: string) {
     where: { id },
     include: {
       skill: { select: { name: true } },
-      branchSkill: {
-        select: {
-          branchId: true,
-          teacher: { select: { id: true, salaryType: true, percentageRate: true } },
-        },
+      branchSkill: { select: { branchId: true } },
+      // The teacher of the student's class time earns any share of the fee.
+      classTime: {
+        select: { teacher: { select: { id: true, salaryType: true, percentageRate: true } } },
       },
     },
   });
@@ -168,7 +167,7 @@ export async function recordMonthlyFee(
 
   const ledger = await ledgerFields(parsed.data.currency);
   if (!ledger) return noRate();
-  const share = teacherShareOf(parsed.data.amount, ledger, enrollment.branchSkill.teacher);
+  const share = teacherShareOf(parsed.data.amount, ledger, enrollment.classTime.teacher);
 
   try {
     await prisma.payment.create({

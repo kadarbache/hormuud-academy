@@ -5,7 +5,12 @@ import { FormDialog } from "@/components/form-dialog";
 import { SelectField, TextField } from "@/components/form-fields";
 import type { ActionResult } from "@/lib/action-result";
 import { addMonths, formatDate, isIsoDate } from "@/lib/dates";
-import { feesText, RegistrationFeePaidField } from "../student-fields";
+import {
+  ClassTimeField,
+  classTimeText,
+  feesText,
+  RegistrationFeePaidField,
+} from "../student-fields";
 import type { BranchSkillOption } from "../types";
 
 export function EnrollDialog({
@@ -27,7 +32,13 @@ export function EnrollDialog({
 }) {
   const [selectedId, setSelectedId] = useState("");
   const [startDate, setStartDate] = useState(today);
-  const selected = options.find((option) => option.id === selectedId);
+  // A skill with no class time has nowhere for the student to sit yet.
+  const open = options.filter((option) => option.classTimes.length > 0);
+  const waiting = options.filter((option) => option.classTimes.length === 0);
+  const selected = open.find((option) => option.id === selectedId);
+  const [only] = selected?.classTimes.length === 1 ? selected.classTimes : [];
+  const nameOf = (option: BranchSkillOption) =>
+    showBranch ? `${option.skillName} (${option.branchName})` : option.skillName;
 
   return (
     <FormDialog
@@ -43,15 +54,25 @@ export function EnrollDialog({
           <SelectField
             label="Skill"
             name="branchSkillId"
-            options={options.map((option) => ({
-              value: option.id,
-              label: showBranch ? `${option.skillName} (${option.branchName})` : option.skillName,
-            }))}
+            options={open.map((option) => ({ value: option.id, label: nameOf(option) }))}
             placeholder="Pick a skill"
             value={selectedId}
             onValueChange={setSelectedId}
+            description={
+              waiting.length > 0
+                ? `Not listed until the admin gives them a class time: ${waiting.map(nameOf).join(", ")}.`
+                : undefined
+            }
             errors={errors.branchSkillId}
           />
+          {selected && (
+            <ClassTimeField
+              key={selected.id}
+              option={selected}
+              name="classTimeId"
+              errors={errors.classTimeId}
+            />
+          )}
           <TextField
             label="Start date"
             name="startDate"
@@ -63,8 +84,9 @@ export function EnrollDialog({
           />
           {selected && isIsoDate(startDate) && (
             <p className="rounded-md bg-muted p-3 text-sm">
-              {selected.teacherName} teaches it in {selected.classroomName}. {feesText(selected)}. It
-              ends around {formatDate(addMonths(startDate, selected.durationMonths))}.
+              {only && `${classTimeText(only)}. `}
+              {feesText(selected)}. It ends around{" "}
+              {formatDate(addMonths(startDate, selected.durationMonths))}.
             </p>
           )}
           {selected && (

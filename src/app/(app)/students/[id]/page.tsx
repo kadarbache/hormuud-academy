@@ -11,6 +11,7 @@ import { DataTable } from "@/components/data-table";
 import { EmptyRow } from "@/components/status-badge";
 import type { Currency, Prisma } from "@/generated/prisma/client";
 import { canActAtBranch } from "@/lib/access";
+import { formatSlot } from "@/lib/class-times";
 import {
   collegeToday,
   formatDate,
@@ -347,7 +348,7 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
           <DataTable
             columns={[
               { label: "Skill" },
-              { label: "Teacher and class" },
+              { label: "Class time" },
               { label: "Dates" },
               { label: "Registration fee" },
               { label: "Monthly fee", className: "text-right tabular-nums" },
@@ -371,11 +372,11 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
                       </div>
                     </>
                   ),
-                  "Teacher and class": (
+                  "Class time": (
                     <>
-                      <div>{enrollment.branchSkill.teacher.name}</div>
+                      <div>{formatSlot(enrollment.classTime)}</div>
                       <div className="text-xs text-muted-foreground">
-                        {enrollment.branchSkill.classroom.name}
+                        {enrollment.classTime.classroom.name} with {enrollment.classTime.teacher.name}
                       </div>
                     </>
                   ),

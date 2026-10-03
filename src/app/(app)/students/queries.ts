@@ -1,5 +1,6 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
+import { formatSlot } from "@/lib/class-times";
 import { collegeToday, toDbDate } from "@/lib/dates";
 import { parseStudentLookup } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
@@ -182,11 +183,15 @@ export async function getStudentProfile(user: CurrentUser, id: string) {
             include: { recordedBy: { select: { name: true } } },
           },
           branchSkill: {
+            select: { branchId: true, branch: { select: { name: true } } },
+          },
+          classTime: {
             select: {
-              branchId: true,
-              branch: { select: { name: true } },
-              teacher: { select: { name: true } },
+              startMinute: true,
+              endMinute: true,
+              days: true,
               classroom: { select: { name: true } },
+              teacher: { select: { name: true } },
             },
           },
         },
@@ -221,8 +226,13 @@ export async function enrollableBranchSkills(branchId?: string): Promise<BranchS
     orderBy: [{ branch: { name: "asc" } }, { skill: { name: "asc" } }],
     include: {
       branch: { select: { name: true } },
-      teacher: { select: { name: true } },
-      classroom: { select: { name: true } },
+      classTimes: {
+        where: { active: true },
+        include: {
+          classroom: { select: { name: true } },
+          teacher: { select: { name: true } },
+        },
+      },
       skill: {
         select: {
           name: true,
@@ -239,8 +249,14 @@ export async function enrollableBranchSkills(branchId?: string): Promise<BranchS
     skillId: row.skillId,
     skillName: row.skill.name,
     categoryName: row.skill.category.name,
-    teacherName: row.teacher.name,
-    classroomName: row.classroom.name,
+    classTimes: row.classTimes
+      .toSorted((a, b) => (a.startMinute ?? -1) - (b.startMinute ?? -1))
+      .map((classTime) => ({
+        id: classTime.id,
+        when: formatSlot(classTime),
+        classroomName: classTime.classroom.name,
+        teacherName: classTime.teacher.name,
+      })),
     durationMonths: row.durationMonths,
     registrationFee: row.registrationFee.toString(),
     monthlyFee: row.monthlyFee.toString(),

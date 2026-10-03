@@ -5,6 +5,7 @@ import { ActionButton } from "@/components/action-button";
 import { DataTable } from "@/components/data-table";
 import { PageHeader } from "@/components/page-header";
 import { ActiveBadge, EmptyRow } from "@/components/status-badge";
+import { formatSlot } from "@/lib/class-times";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { AddClassDialog, RenameClassDialog } from "./class-dialog";
@@ -28,8 +29,17 @@ export default async function ClassesPage() {
       orderBy: [{ branch: { name: "asc" } }, { name: "asc" }],
       include: {
         branch: { select: { name: true } },
-        branchSkills: {
-          select: { skill: { select: { name: true } }, teacher: { select: { name: true } } },
+        classTimes: {
+          select: {
+            active: true,
+            days: true,
+            startMinute: true,
+            endMinute: true,
+            enrollments: { where: { status: "ACTIVE" }, select: { id: true }, take: 1 },
+            branchSkill: { select: { skill: { select: { name: true } } } },
+            teacher: { select: { name: true } },
+          },
+          orderBy: { startMinute: "asc" },
         },
       },
     }),
@@ -42,8 +52,8 @@ export default async function ClassesPage() {
         title="Classes"
         description={
           isAdmin
-            ? "The rooms at each branch. Every skill at a branch is taught in one class."
-            : "The rooms at your branch and the skills taught in each. Only the admin can change them."
+            ? "The rooms at each branch. A class holds different skills at different times, set as class times on the Skills page."
+            : "The rooms at your branch and the class times in each. Only the admin can change them."
         }
       >
         {isAdmin && (
@@ -76,8 +86,8 @@ export default async function ClassesPage() {
             { label: "Class", className: "font-medium" },
             ...(isAdmin ? [{ label: "Branch" }] : []),
             {
-              label: "Skills taught here",
-              className: "max-w-72 whitespace-normal text-muted-foreground",
+              label: "Class times",
+              className: "max-w-96 whitespace-normal text-muted-foreground",
             },
             { label: "Status" },
             ...(isAdmin ? [{ label: "Actions", actions: true, className: "text-right" }] : []),
@@ -89,10 +99,16 @@ export default async function ClassesPage() {
             cells: {
               Class: classroom.name,
               Branch: classroom.branch.name,
-              "Skills taught here":
-                classroom.branchSkills
-                  .map((bs) => `${bs.skill.name} (${bs.teacher.name})`)
-                  .join(", ") || "None",
+              // What still meets here: class times that are active or still
+              // have students.
+              "Class times":
+                classroom.classTimes
+                  .filter((classTime) => classTime.active || classTime.enrollments.length > 0)
+                  .map(
+                    (classTime) =>
+                      `${classTime.branchSkill.skill.name}, ${formatSlot(classTime)} (${classTime.teacher.name})`,
+                  )
+                  .join("; ") || "None",
               Status: <ActiveBadge active={classroom.active} />,
               Actions: (
                 <div className="flex justify-end gap-1">
@@ -112,7 +128,7 @@ export default async function ClassesPage() {
                   >
                     {classroom.active ? "Deactivate" : "Activate"}
                   </ActionButton>
-                  {classroom.branchSkills.length === 0 && (
+                  {classroom.classTimes.length === 0 && (
                     <ActionButton
                       variant="ghost"
                       size="sm"
@@ -120,7 +136,7 @@ export default async function ClassesPage() {
                       action={deleteClassroom.bind(null, classroom.id)}
                       confirm={{
                         title: `Delete ${classroom.name}?`,
-                        description: "No skill is taught in this class, so it can be deleted for good.",
+                        description: "No class time uses this class, so it can be deleted for good.",
                         confirmLabel: "Delete class",
                         destructive: true,
                       }}
