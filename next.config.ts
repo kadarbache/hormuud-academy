@@ -12,6 +12,9 @@ const nextConfig: NextConfig = {
       // rejects anything over 5 MB; the extra room is multipart overhead.
       bodySizeLimit: "6mb",
     },
+    // When the connection drops, page loads and saves wait and retry once it's
+    // back instead of failing. The offline banner tells staff why it's waiting.
+    useOffline: true,
   },
 };
 
