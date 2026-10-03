@@ -132,8 +132,76 @@ also passed: scoped lists, blocked admin pages, registering a student with the
 registration fee paid, a monthly fee and a books sale. Not covered as staff:
 adding a skill to an existing student, and finishing or dropping a skill.
 
+**Class times, before it goes live.** Built and committed on 3 Oct 2026, not
+pushed: class times on each skill's page with the clash checks, picking a
+class time when registering a student or adding a skill, and a percentage
+teacher's share coming from the class time's teacher. It began with a
+Shifts page too, dropped the same day (below). Tried in
+the browser the same day, after the migration ran locally without asking
+for another: the migration made one class time per branch skill and put
+all 17 enrollments in them; shifts added, a backwards one and an
+overlapping one refused; setting the time on a carried-over class time; a
+second Computer Basics class time; a room clash, a teacher clash, a
+student clash (naming the student and "2 more") and a teacher clash across
+branches through Change hours all refused; deactivating a shift in use
+refused; Add skill with two class times (picker, "Pick a class time",
+saved) and a clashing one refused; the registration picker asking for a
+class time; the Classes, Shifts and Teachers lists. A monthly fee earns the
+share for the class time's teacher: with Computer Basics' morning class time
+given to Demo Teacher 2 (30%), October's $20 from a student in it earned
+Demo Teacher 2 $6.00 (PAY-00170), and September's from a student in the
+afternoon class time, under fixed-salary Demo Teacher 1, earned nobody a
+share (PAY-00171).
+
+The same day the fixed shifts went: each class time now types its own start
+and end, so a two-hour class and one-hour classes can share an afternoon.
+The `20261003120000_class_time_hours` migration copies each class time's
+hours from its shift and drops the shifts. Tried in the browser after it ran
+locally without asking for another: every class time kept its hours; a
+backwards time refused; Room 1 on Mondays holding Graphic Design 4–5 pm,
+Tailoring 5–6 pm and Tailoring 6–8 pm, with Demo Teacher 2 teaching the
+first two back to back; a 4:30–5:30 pm class in Room 1 refused as a clash;
+the Classes page listing them in clock order; /shifts gone.
+
+Still to build: moving a student to another class time, and the room
+timetable on the Classes page. Production needs the
+`20261003090000_class_times` and `20261003120000_class_time_hours`
+migrations applied, in that order and after a backup, *before* the push, or
+every student and skill screen breaks. Then the admin sets the hours and
+days on every class time the migration made, which show "Time not set"
+until then.
+
 ## Decided
 
+- **Class times: a class hosts different skills at different times, and a
+  skill can run more than once at a branch.** Room 3 can have Graphic Design
+  4–6 pm and Tailoring 6–8 pm, and Graphic Design can also run 8–10 am in
+  Room 1. Partly built; see "Still to do". (3 Oct 2026)
+  - A **class time** is one branch skill in one class, from a start time to
+    an end time on chosen days, with one teacher: "Graphic Design, Room 3,
+    4–6 pm, Sat Mon Wed, Ali". A branch skill can have several. Its fees and
+    duration stay on the branch skill, the same at every class time.
+  - Each class time types its own hours. Fixed shifts per branch were chosen
+    first and built, then dropped the same day: they forced every class at a
+    branch into the same blocks, so a one-hour class couldn't sit beside a
+    two-hour one.
+  - Each class time has its own teacher, who can be the same person for
+    several. A percentage teacher earns from the students in their own class
+    times.
+  - Every enrollment is in one class time. Staff pick it when registering or
+    enrolling (it's picked for them when there's only one) and can move a
+    student to another class time later without touching fees or payments.
+    A branch skill with no class time takes no students.
+  - The app refuses a clash, by the clock: two class times in the same class
+    at overlapping hours on a shared day, one teacher in two places at once
+    (across branches too), or one student in two places at once.
+  - No seat counts for now. The Classes page shows each room's timetable and
+    how many students each class time has.
+  - Going live: every existing branch skill becomes one class time in its
+    current class with its current teacher, and its students go into it.
+    The admin then sets each one's hours and days. CONTEXT.md gets Class
+    time, and the system guide drops "no morning and evening groups" from
+    its limits.
 - **Two currencies, two ledgers: USD and SLSH.** The client wants Somaliland
   shillings next to dollars. Built on 29 Sep 2026; see "Still to do" for
   going live, and [ADR 0007](adr/0007-two-currencies-two-ledgers.md).
