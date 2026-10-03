@@ -33,12 +33,16 @@ A group of skills, like Technology Skills or Hand Skills.
 _Avoid_: Type, department
 
 **Branch skill**:
-A skill as taught at one branch, with that branch's teacher, class, duration, registration fee and monthly fee. A skill taught at three branches has three branch skills, and each can charge a different amount. Only the admin sets them.
+A skill as taught at one branch, with that branch's duration, registration fee and monthly fee, the same at every one of its class times. A skill taught at three branches has three branch skills, and each can charge a different amount. Only the admin sets them.
 _Avoid_: Offering, section, course run
 
 **Class**:
-A room at a branch where a skill is taught, like Room 3. Never a group of students.
+A room at a branch, like Room 3, holding different skills at different times of the day. Never a group of students.
 _Avoid_: Group, batch, section
+
+**Class time**:
+One branch skill taught in one class, from a start time to an end time on chosen days, by one teacher, like Graphic Design in Room 3 from 4 to 6 pm on Saturday, Monday and Wednesday. Each sets its own hours, a branch skill can run at several, and no class, teacher or student is ever in two class times at once.
+_Avoid_: Shift, group, session, section, batch, slot
 
 **Teacher**:
 A person who teaches skills at one or more branches. Not a staff account.
@@ -87,7 +91,7 @@ Adding a new student to the college, along with the first skills they take. Happ
 _Avoid_: Admission, sign-up
 
 **Enrollment**:
-One student taking one branch skill from a start date, keeping the monthly fee and registration fee from the day they joined. Its status is Active, Finished or Dropped.
+One student taking one branch skill in one of its class times, from a start date, keeping the monthly fee and registration fee from the day they joined; moving to another class time changes neither. Its status is Active, Finished or Dropped.
 _Avoid_: Registration, subscription
 
 **Finished**:
@@ -108,7 +112,7 @@ _Avoid_: Overdue, expired
 A student with at least one Active enrollment, at any branch. Every other student is an Inactive student. Nobody sets this by hand: to take a student out of their classes, drop their skills. A student who has paid even one monthly fee can never be deleted, so dropping is the only way out; deleting is for duplicates and typing mistakes.
 
 **Deactivate**:
-Take a branch, category, expense category, skill, branch skill, teacher, class or staff account out of new use while keeping its history. Deleting is only for records nothing uses yet.
+Take a branch, category, expense category, skill, branch skill, teacher, class, class time or staff account out of new use while keeping its history. Deleting is only for records nothing uses yet.
 _Avoid_: Archive, disable
 
 ### Money
@@ -170,7 +174,7 @@ The share of every monthly fee a percentage-paid teacher earns, written as a per
 _Avoid_: Commission, cut
 
 **Teacher share**:
-What one monthly fee payment earned one teacher, worked out and kept on the payment when it's recorded, in the currency the student paid. Raising a teacher's rate changes what they earn from then on and never rewrites what they earned before. Teachers are paid at the end of the month, and once one has been paid for a month, a payment taken in that month can't be removed: the college doesn't refund money whose share has already gone to the teacher.
+What one monthly fee payment earned the teacher of the student's class time, worked out and kept on the payment when it's recorded, in the currency the student paid. Raising a teacher's rate changes what they earn from then on and never rewrites what they earned before. Teachers are paid at the end of the month, and once one has been paid for a month, a payment taken in that month can't be removed: the college doesn't refund money whose share has already gone to the teacher.
 _Avoid_: Commission, accrual
 
 **Unpaid share**:
