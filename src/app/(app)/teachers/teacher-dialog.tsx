@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { Fragment, useId, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Field,
@@ -11,8 +11,10 @@ import {
 } from "@/components/ui/field";
 import { FormDialog } from "@/components/form-dialog";
 import { PhoneField, SelectField, TextField, type Option } from "@/components/form-fields";
+import type { Currency } from "@/generated/prisma/client";
 import type { ActionResult } from "@/lib/action-result";
 import { phoneEntry } from "@/lib/phone";
+import { AmountFields } from "../finance/amount-fields";
 import { salaryTypeOptions } from "../finance/labels";
 
 function BranchCheckboxes({
@@ -51,17 +53,21 @@ function BranchCheckboxes({
 export function TeacherDialog({
   action,
   branches,
+  rate,
   teacher,
   trigger,
 }: {
   action: (formData: FormData) => Promise<ActionResult>;
   branches: Option[];
+  /** Shillings to the dollar right now, or null before the admin sets it. */
+  rate: string | null;
   teacher?: {
     name: string;
     phone: string | null;
     branchIds: string[];
     salaryType: string;
     fixedSalary: string;
+    salaryCurrency: Currency;
     percentageRate: string;
   };
   trigger: React.ReactNode;
@@ -100,17 +106,23 @@ export function TeacherDialog({
           {/* Each box has its own key, so switching how they're paid starts a
               fresh box instead of carrying over what was typed in the other. */}
           {salaryType === "FIXED" ? (
-            <TextField
-              key="fixedSalary"
-              label="Monthly salary (USD)"
-              name="fixedSalary"
-              inputMode="decimal"
-              defaultValue={teacher?.fixedSalary ?? ""}
-              placeholder="200"
-              description="Paid every month whatever their students pay."
-              required
-              errors={errors.fixedSalary}
-            />
+            <Fragment key="fixedSalary">
+              <AmountFields
+                label="Monthly salary"
+                name="fixedSalary"
+                currencyName="salaryCurrency"
+                rate={rate}
+                defaultCurrency={teacher?.salaryCurrency ?? "USD"}
+                defaultAmounts={
+                  teacher?.fixedSalary
+                    ? { [teacher.salaryCurrency]: teacher.fixedSalary }
+                    : {}
+                }
+                placeholders={{ USD: "200", SLSH: "1700000" }}
+                description="Paid every month whatever their students pay, in this currency."
+                errors={errors}
+              />
+            </Fragment>
           ) : (
             <TextField
               key="percentageRate"

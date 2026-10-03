@@ -5,7 +5,14 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
 import { failure, invalid, success, type ActionResult } from "@/lib/action-result";
-import { formObject, money, optionalPhone, percent, requiredText } from "@/lib/validation";
+import {
+  currency,
+  formObject,
+  moneyIn,
+  optionalPhone,
+  percent,
+  requiredText,
+} from "@/lib/validation";
 
 const teacherSchema = z
   .object({
@@ -14,18 +21,38 @@ const teacherSchema = z
     branchIds: z.array(z.string().min(1)).min(1, "Pick at least one branch."),
     salaryType: z.enum(["FIXED", "PERCENTAGE"], { error: "Pick how this teacher is paid." }),
     fixedSalary: z.string().optional(),
+    salaryCurrency: z.string().optional(),
     percentageRate: z.string().optional(),
   })
-  // Only the field that belongs to the chosen way of paying is checked, and
-  // the other is cleared, so a teacher never carries both a salary and a rate.
+  // Only the fields that belong to the chosen way of paying are checked, and
+  // the others are cleared, so a teacher never carries both a salary and a
+  // rate. A percentage teacher earns in whatever currency each student pays,
+  // so only a fixed salary has a currency of its own.
   .transform((values, ctx) => {
     if (values.salaryType === "FIXED") {
-      const salary = money("Enter the monthly salary.").safeParse(values.fixedSalary ?? "");
+      const salaryCurrency = currency("Pick the currency of the salary.").safeParse(
+        values.salaryCurrency,
+      );
+      const salary = moneyIn(values.salaryCurrency, "Enter the monthly salary.").safeParse(
+        values.fixedSalary ?? "",
+      );
+      if (!salaryCurrency.success) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["salaryCurrency"],
+          message: "Pick the currency of the salary.",
+        });
+      }
       if (!salary.success) {
         ctx.addIssue({ code: "custom", path: ["fixedSalary"], message: "Enter the monthly salary." });
-        return z.NEVER;
       }
-      return { ...values, fixedSalary: salary.data, percentageRate: null };
+      if (!salaryCurrency.success || !salary.success) return z.NEVER;
+      return {
+        ...values,
+        fixedSalary: salary.data,
+        salaryCurrency: salaryCurrency.data,
+        percentageRate: null,
+      };
     }
 
     const rate = percent("Enter the percentage they earn.").safeParse(values.percentageRate ?? "");
@@ -37,7 +64,7 @@ const teacherSchema = z
       });
       return z.NEVER;
     }
-    return { ...values, fixedSalary: null, percentageRate: rate.data };
+    return { ...values, fixedSalary: null, salaryCurrency: "USD" as const, percentageRate: rate.data };
   });
 
 function readTeacher(formData: FormData) {
@@ -56,7 +83,8 @@ export async function createTeacher(formData: FormData): Promise<ActionResult> {
   await requireAdmin();
   const parsed = readTeacher(formData);
   if (!parsed.success) return invalid(parsed.error);
-  const { name, phone, branchIds, salaryType, fixedSalary, percentageRate } = parsed.data;
+  const { name, phone, branchIds, salaryType, fixedSalary, salaryCurrency, percentageRate } =
+    parsed.data;
   if (await unknownBranches(branchIds)) return failure("One of those branches no longer exists.");
 
   await prisma.teacher.create({
@@ -65,6 +93,7 @@ export async function createTeacher(formData: FormData): Promise<ActionResult> {
       phone,
       salaryType,
       fixedSalary,
+      salaryCurrency,
       percentageRate,
       branches: { create: [...new Set(branchIds)].map((branchId) => ({ branchId })) },
     },
@@ -78,7 +107,8 @@ export async function updateTeacher(id: string, formData: FormData): Promise<Act
   await requireAdmin();
   const parsed = readTeacher(formData);
   if (!parsed.success) return invalid(parsed.error);
-  const { name, phone, branchIds, salaryType, fixedSalary, percentageRate } = parsed.data;
+  const { name, phone, branchIds, salaryType, fixedSalary, salaryCurrency, percentageRate } =
+    parsed.data;
   if (await unknownBranches(branchIds)) return failure("One of those branches no longer exists.");
 
   // Unticking a branch where this teacher still runs a skill would leave that
@@ -100,7 +130,7 @@ export async function updateTeacher(id: string, formData: FormData): Promise<Act
   await prisma.$transaction([
     prisma.teacher.update({
       where: { id },
-      data: { name, phone, salaryType, fixedSalary, percentageRate },
+      data: { name, phone, salaryType, fixedSalary, salaryCurrency, percentageRate },
     }),
     prisma.teacherBranch.deleteMany({ where: { teacherId: id, branchId: { notIn: branchIds } } }),
     prisma.teacherBranch.createMany({

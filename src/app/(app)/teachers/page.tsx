@@ -6,6 +6,7 @@ import { ActionButton } from "@/components/action-button";
 import { DataTable } from "@/components/data-table";
 import { PageHeader } from "@/components/page-header";
 import { ActiveBadge, EmptyRow } from "@/components/status-badge";
+import { currentRate } from "@/lib/exchange-rate";
 import { formatMoney } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
@@ -24,7 +25,7 @@ export default async function TeachersPage() {
   // check that again on the server.
   const branchId = user.branchId ?? "";
 
-  const [teachers, branches] = await Promise.all([
+  const [teachers, branches, rate] = await Promise.all([
     prisma.teacher.findMany({
       where: isAdmin ? {} : { branches: { some: { branchId } } },
       orderBy: { name: "asc" },
@@ -41,6 +42,7 @@ export default async function TeachersPage() {
       },
     }),
     isAdmin ? prisma.branch.findMany({ orderBy: { name: "asc" } }) : [],
+    isAdmin ? currentRate() : null,
   ]);
 
   const activeBranches = branches
@@ -61,6 +63,7 @@ export default async function TeachersPage() {
           <TeacherDialog
             action={createTeacher}
             branches={activeBranches}
+            rate={rate}
             trigger={
               <Button disabled={activeBranches.length === 0}>
                 <Plus />
@@ -123,7 +126,7 @@ export default async function TeachersPage() {
                         ? teacher.percentageRate
                           ? `${teacher.percentageRate.toString()}% of monthly fees`
                           : "No rate set"
-                        : `${formatMoney(teacher.fixedSalary?.toString() ?? "0")} a month`}
+                        : `${formatMoney(teacher.fixedSalary?.toString() ?? "0", teacher.salaryCurrency)} a month`}
                     </div>
                   </>
                 ),
@@ -141,12 +144,14 @@ export default async function TeachersPage() {
                     <TeacherDialog
                       action={updateTeacher.bind(null, teacher.id)}
                       branches={branchOptions}
+                      rate={rate}
                       teacher={{
                         name: teacher.name,
                         phone: teacher.phone,
                         branchIds,
                         salaryType: teacher.salaryType,
                         fixedSalary: teacher.fixedSalary?.toString() ?? "",
+                        salaryCurrency: teacher.salaryCurrency,
                         percentageRate: teacher.percentageRate?.toString() ?? "",
                       }}
                       trigger={
