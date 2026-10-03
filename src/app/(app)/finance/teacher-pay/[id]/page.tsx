@@ -7,15 +7,18 @@ import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table";
 import { EmptyRow } from "@/components/status-badge";
 import { collegeMonth, collegeToday, formatDate, formatMonth, fromDbMonth } from "@/lib/dates";
-import { formatMoney, formatStudentNumber } from "@/lib/format";
+import { currentRate } from "@/lib/exchange-rate";
+import { formatBoth, formatMoney, formatStudentNumber } from "@/lib/format";
+import { ZERO_TOTAL } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
 import { expenseCategoryOptions, listExpenseCategories } from "../../expense-categories/queries";
 import { createExpense } from "../../expenses/actions";
 import { ExpenseDialog } from "../../expenses/expense-dialog";
 import { branchChoices, teacherChoices } from "../../expenses/queries";
-import { Breakdown, StatCard, StatRow } from "../../figures";
+import { Amount, Breakdown, StatCard, StatRow } from "../../figures";
 import { paymentMethodLabels, salaryTypeLabels, TEACHER_SALARY_ID } from "../../labels";
+import { payDefaults } from "../pay";
 import { getTeacherPay } from "../queries";
 
 export async function generateMetadata({
@@ -37,14 +40,22 @@ export default async function TeacherPayDetailPage({
   const { teacher, payments, payouts, earnedEver, paidEver, unpaidShare, earningsByBranch } = pay;
   const byPercentage = teacher.salaryType === "PERCENTAGE";
   const today = collegeToday();
-  const [branches, teacherOptions, categories] = await Promise.all([
+  const [branches, teacherOptions, categories, rate] = await Promise.all([
     branchChoices(),
     teacherChoices(),
     listExpenseCategories(),
+    currentRate(),
   ]);
   const branchOptions = branches
     .filter((branch) => branch.active)
     .map((branch) => ({ value: branch.id, label: branch.name }));
+  const salary = formatMoney(teacher.fixedSalary?.toString() ?? "0", teacher.salaryCurrency);
+  const payNow = payDefaults({
+    salaryType: teacher.salaryType,
+    fixedSalary: teacher.fixedSalary?.toString() ?? "0",
+    salaryCurrency: teacher.salaryCurrency,
+    unpaidShare,
+  });
 
   return (
     <>
@@ -64,7 +75,7 @@ export default async function TeacherPayDetailPage({
               ? teacher.percentageRate
                 ? `, ${teacher.percentageRate}% of every monthly fee their students pay`
                 : ", no rate set yet"
-              : `, ${formatMoney(teacher.fixedSalary?.toString() ?? "0")} a month`}
+              : `, ${salary} a month`}
             {". "}
             {teacher.branches.map((link) => link.branch.name).join(", ")}
           </p>
@@ -74,17 +85,18 @@ export default async function TeacherPayDetailPage({
           title={`Pay ${teacher.name}`}
           description={
             byPercentage
-              ? `${teacher.name}'s unpaid share is ${formatMoney(unpaidShare)}.`
-              : `Their salary is ${formatMoney(teacher.fixedSalary?.toString() ?? "0")} a month.`
+              ? `${teacher.name}'s unpaid share is ${formatBoth(unpaidShare)}.`
+              : `Their salary is ${salary} a month.`
           }
           submitLabel="Record payment"
           categories={expenseCategoryOptions(categories)}
           branches={branchOptions}
           teachers={teacherOptions}
+          rate={rate}
           today={today}
           defaults={{
             categoryId: TEACHER_SALARY_ID,
-            amount: byPercentage ? unpaidShare : (teacher.fixedSalary?.toString() ?? ""),
+            ...payNow,
             method: "CASH",
             spentOn: today,
             branchId: branchOptions.length === 1 ? branchOptions[0].value : "",
@@ -105,7 +117,7 @@ export default async function TeacherPayDetailPage({
         <StatCard label="Paid to them, in total" amount={paidEver} tone="muted" />
         <StatCard
           label="Unpaid share"
-          amount={byPercentage ? unpaidShare : "0.00"}
+          amount={byPercentage ? unpaidShare : ZERO_TOTAL}
           tone="balance"
           hint={byPercentage ? "Earned minus paid out" : "Fixed salaries are paid on schedule"}
         />
@@ -154,8 +166,8 @@ export default async function TeacherPayDetailPage({
             ]}
             rows={payments.map((payment) => ({
               key: payment.id,
-              title: formatMoney(payment.teacherShare?.toString() ?? "0"),
-              description: `Their share of ${formatMoney(payment.amount.toString())} on ${formatDate(payment.paidOn)}`,
+              title: formatMoney(payment.teacherShare?.toString() ?? "0", payment.currency),
+              description: `Their share of ${formatMoney(payment.amount.toString(), payment.currency)} on ${formatDate(payment.paidOn)}`,
               cells: {
                 Date: formatDate(payment.paidOn),
                 Student: (
@@ -180,10 +192,19 @@ export default async function TeacherPayDetailPage({
                 Skill: payment.enrollment?.skill.name ?? "—",
                 Month: payment.forMonth ? formatMonth(fromDbMonth(payment.forMonth)) : "—",
                 Branch: payment.branch.name,
-                "Student paid": formatMoney(payment.amount.toString()),
+                "Student paid": (
+                  <Amount
+                    amount={payment.amount}
+                    currency={payment.currency}
+                    exchangeRate={payment.exchangeRate}
+                    usdValue={payment.usdValue}
+                  />
+                ),
                 "Their share": (
                   <>
-                    <span>{formatMoney(payment.teacherShare?.toString() ?? "0")}</span>
+                    <span>
+                      {formatMoney(payment.teacherShare?.toString() ?? "0", payment.currency)}
+                    </span>
                     {payment.teacherSharePercent && (
                       <div className="text-xs text-muted-foreground">
                         at {payment.teacherSharePercent.toString()}%
@@ -214,7 +235,7 @@ export default async function TeacherPayDetailPage({
             ]}
             rows={payouts.map((payout) => ({
               key: payout.id,
-              title: formatMoney(payout.amount.toString()),
+              title: formatMoney(payout.amount.toString(), payout.currency),
               description: `Paid on ${formatDate(payout.spentOn)}`,
               cells: {
                 "Paid on": formatDate(payout.spentOn),
@@ -232,7 +253,14 @@ export default async function TeacherPayDetailPage({
                 ),
                 Branch: payout.branch.name,
                 "Paid by": paymentMethodLabels[payout.method],
-                Amount: formatMoney(payout.amount.toString()),
+                Amount: (
+                  <Amount
+                    amount={payout.amount}
+                    currency={payout.currency}
+                    exchangeRate={payout.exchangeRate}
+                    usdValue={payout.usdValue}
+                  />
+                ),
                 "Recorded by": payout.recordedBy.name,
               },
             }))}

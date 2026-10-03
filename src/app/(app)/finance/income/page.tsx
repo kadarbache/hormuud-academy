@@ -11,11 +11,13 @@ import { PageHeader } from "@/components/page-header";
 import { SelectInput } from "@/components/select-input";
 import { EmptyRow } from "@/components/status-badge";
 import { collegeToday, formatDate, formatMonth, fromDbMonth } from "@/lib/dates";
+import { currentRate } from "@/lib/exchange-rate";
 import { formatMoney, formatStudentNumber } from "@/lib/format";
 import { requireUser } from "@/lib/session";
-import { Breakdown, StatCard, StatRow } from "../figures";
+import { Amount, Breakdown, StatCard, StatRow } from "../figures";
 import {
   ANY,
+  currencyOptions,
   incomeCategories,
   incomeCategoryLabels,
   incomeCategoryOptions,
@@ -47,6 +49,7 @@ function pageHref(filters: IncomeFilters, page: number) {
   if (filters.branchId) params.set("branch", filters.branchId);
   if (filters.category) params.set("category", filters.category);
   if (filters.method) params.set("method", filters.method);
+  if (filters.currency) params.set("currency", filters.currency);
   if (filters.teacherId) params.set("teacher", filters.teacherId);
   if (filters.q) params.set("q", filters.q);
   if (page > 1) params.set("page", String(page));
@@ -80,7 +83,7 @@ export default async function IncomePage({ searchParams }: PageProps<"/finance/i
   const filters = readIncomeFilters(await searchParams);
   const where = incomeWhere(user, filters);
 
-  const [byMethod, byCategory, { rows, total, pageCount }, branches, recordable, teachers] =
+  const [byMethod, byCategory, { rows, total, pageCount }, branches, recordable, teachers, rate] =
     await Promise.all([
       incomeByMethod(where),
       incomeByCategory(where),
@@ -89,12 +92,18 @@ export default async function IncomePage({ searchParams }: PageProps<"/finance/i
       recordableBranches(user),
       // Only the admin sees teacher shares, so only they can filter by one.
       isAdmin ? earningTeacherOptions() : [],
+      currentRate(),
     ]);
 
   const when = periodLabel(filters.period);
   const firstShown = (filters.page - 1) * PAGE_SIZE + 1;
   const filtered = Boolean(
-    filters.branchId || filters.category || filters.method || filters.teacherId || filters.q,
+    filters.branchId ||
+      filters.category ||
+      filters.method ||
+      filters.currency ||
+      filters.teacherId ||
+      filters.q,
   );
   const filteredTeacher = teachers.find((teacher) => teacher.value === filters.teacherId);
 
@@ -111,6 +120,7 @@ export default async function IncomePage({ searchParams }: PageProps<"/finance/i
         <IncomeDialog
           action={recordIncome}
           branches={recordable}
+          rate={rate}
           today={collegeToday()}
           trigger={
             <Button disabled={recordable.length === 0}>
@@ -164,6 +174,17 @@ export default async function IncomePage({ searchParams }: PageProps<"/finance/i
             options={withAnyOption(paymentMethodOptions, "Every method")}
             defaultValue={filters.method || ANY}
             className="w-40"
+          />
+        </div>
+
+        <div className="grid gap-1.5">
+          <Label htmlFor="currency">Currency</Label>
+          <SelectInput
+            id="currency"
+            name="currency"
+            options={withAnyOption(currencyOptions, "Both")}
+            defaultValue={filters.currency || ANY}
+            className="w-32"
           />
         </div>
 
@@ -263,7 +284,7 @@ export default async function IncomePage({ searchParams }: PageProps<"/finance/i
                 return {
                   key: payment.id,
                   title: `Receipt ${payment.number}`,
-                  description: `${formatMoney(payment.amount.toString())} on ${formatDate(payment.paidOn)}`,
+                  description: `${formatMoney(payment.amount.toString(), payment.currency)} on ${formatDate(payment.paidOn)}`,
                   cells: {
                     Receipt: payment.number,
                     Date: formatDate(payment.paidOn),
@@ -292,13 +313,20 @@ export default async function IncomePage({ searchParams }: PageProps<"/finance/i
                     ),
                     Branch: payment.branch.name,
                     "Paid by": paymentMethodLabels[payment.method],
-                    Amount: formatMoney(payment.amount.toString()),
+                    Amount: (
+                      <Amount
+                        amount={payment.amount}
+                        currency={payment.currency}
+                        exchangeRate={payment.exchangeRate}
+                        usdValue={payment.usdValue}
+                      />
+                    ),
                     "Teacher share": payment.teacherShare ? (
                       <Link
                         href={`/finance/teacher-pay/${payment.teacherId}`}
                         className="hover:underline"
                       >
-                        {formatMoney(payment.teacherShare.toString())}
+                        {formatMoney(payment.teacherShare.toString(), payment.currency)}
                       </Link>
                     ) : (
                       <span className="text-muted-foreground">&mdash;</span>
@@ -313,7 +341,7 @@ export default async function IncomePage({ searchParams }: PageProps<"/finance/i
                           action={deletePayment.bind(null, payment.id)}
                           confirm={{
                             title: `Remove receipt ${payment.number}?`,
-                            description: `${formatMoney(payment.amount.toString())} comes out of the books, and out of any teacher's share it earned. Use this only for a payment recorded by mistake.`,
+                            description: `${formatMoney(payment.amount.toString(), payment.currency)} comes out of the books, and out of any teacher's share it earned. Use this only for a payment recorded by mistake.`,
                             confirmLabel: "Remove payment",
                             destructive: true,
                           }}

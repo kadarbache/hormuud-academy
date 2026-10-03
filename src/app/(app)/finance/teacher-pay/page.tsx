@@ -9,16 +9,18 @@ import { DataTable } from "@/components/data-table";
 import { PageHeader } from "@/components/page-header";
 import { EmptyRow } from "@/components/status-badge";
 import { collegeMonth, collegeToday, formatMonth, isIsoMonth } from "@/lib/dates";
-import { formatMoney } from "@/lib/format";
-import { isPositiveMoney, sumMoney } from "@/lib/money";
+import { currentRate } from "@/lib/exchange-rate";
+import { formatBoth, formatMoney } from "@/lib/format";
+import { isPositiveMoney, sumMoney, sumTotals, toCents } from "@/lib/money";
 import { one } from "@/lib/search-params";
 import { requireAdmin } from "@/lib/session";
 import { expenseCategoryOptions, listExpenseCategories } from "../expense-categories/queries";
 import { ExpenseDialog } from "../expenses/expense-dialog";
 import { branchChoices, teacherChoices } from "../expenses/queries";
 import { createExpense } from "../expenses/actions";
-import { StatCard, StatRow } from "../figures";
+import { MoneyLines, StatCard, StatRow } from "../figures";
 import { salaryTypeLabels, TEACHER_SALARY_ID } from "../labels";
+import { paidInSalaryCurrency, payDefaults } from "./pay";
 import { listTeacherPay } from "./queries";
 
 export const metadata: Metadata = { title: "Teacher pay" };
@@ -29,24 +31,29 @@ export default async function TeacherPayPage({ searchParams }: PageProps<"/finan
   const month = isIsoMonth(requested) ? requested : collegeMonth();
   const today = collegeToday();
 
-  const [teachers, branches, teacherOptions, categories] = await Promise.all([
+  const [teachers, branches, teacherOptions, categories, rate] = await Promise.all([
     listTeacherPay(month),
     branchChoices(),
     teacherChoices(),
     listExpenseCategories(),
+    currentRate(),
   ]);
 
   const categoryOptions = expenseCategoryOptions(categories);
   const branchOptions = branches
     .filter((branch) => branch.active)
     .map((branch) => ({ value: branch.id, label: branch.name }));
+  const onlyBranch = branchOptions.length === 1 ? branchOptions[0].value : "";
 
   const percentage = teachers.filter((teacher) => teacher.salaryType === "PERCENTAGE");
-  const fixed = teachers.filter((teacher) => teacher.salaryType === "FIXED");
-  const unpaidShares = sumMoney(percentage.map((teacher) => teacher.unpaidShare));
-  const earnedInMonth = sumMoney(teachers.map((teacher) => teacher.earnedInMonth));
-  const paidForMonth = sumMoney(teachers.map((teacher) => teacher.paidForMonth));
-  const fixedDue = sumMoney(fixed.filter((t) => t.active).map((teacher) => teacher.fixedSalary));
+  const fixed = teachers.filter((teacher) => teacher.salaryType === "FIXED" && teacher.active);
+  const unpaidShares = sumTotals(percentage.map((teacher) => teacher.unpaidShare));
+  const earnedInMonth = sumTotals(teachers.map((teacher) => teacher.earnedInMonth));
+  const paidForMonth = sumTotals(teachers.map((teacher) => teacher.paidForMonth));
+  const fixedDue = {
+    USD: sumMoney(fixed.filter((t) => t.salaryCurrency === "USD").map((t) => t.fixedSalary)),
+    SLSH: sumMoney(fixed.filter((t) => t.salaryCurrency === "SLSH").map((t) => t.fixedSalary)),
+  };
 
   return (
     <>
@@ -62,13 +69,15 @@ export default async function TeacherPayPage({ searchParams }: PageProps<"/finan
           categories={categoryOptions}
           branches={branchOptions}
           teachers={teacherOptions}
+          rate={rate}
           today={today}
           defaults={{
             categoryId: TEACHER_SALARY_ID,
-            amount: "",
+            currency: "USD",
+            amounts: {},
             method: "CASH",
             spentOn: today,
-            branchId: branchOptions.length === 1 ? branchOptions[0].value : "",
+            branchId: onlyBranch,
             teacherId: "",
             forMonth: month,
             note: "",
@@ -95,7 +104,7 @@ export default async function TeacherPayPage({ searchParams }: PageProps<"/finan
         <StatCard
           label="Fixed salaries due each month"
           amount={fixedDue}
-          hint={`${fixed.filter((t) => t.active).length} teachers on a fixed salary`}
+          hint={`${fixed.length} teachers on a fixed salary`}
         />
         <StatCard
           label={`Percentage earned, ${formatMonth(month)}`}
@@ -129,13 +138,16 @@ export default async function TeacherPayPage({ searchParams }: PageProps<"/finan
           ]}
           rows={teachers.map((teacher) => {
             const byPercentage = teacher.salaryType === "PERCENTAGE";
+            const salary = formatMoney(teacher.fixedSalary, teacher.salaryCurrency);
             // A fixed teacher is short for the month while what they've
             // been paid for it is under their salary.
             const salaryShort =
               !byPercentage &&
               teacher.active &&
               isPositiveMoney(teacher.fixedSalary) &&
-              Number(teacher.paidForMonth) < Number(teacher.fixedSalary);
+              toCents(paidInSalaryCurrency(teacher.paidForMonth, teacher.salaryCurrency, rate)) <
+                toCents(teacher.fixedSalary);
+            const pay = payDefaults(teacher);
 
             return {
               key: teacher.id,
@@ -163,19 +175,19 @@ export default async function TeacherPayPage({ searchParams }: PageProps<"/finan
                         ? teacher.percentageRate
                           ? `${teacher.percentageRate}% of monthly fees`
                           : "No rate set"
-                        : `${formatMoney(teacher.fixedSalary)} a month`}
+                        : `${salary} a month`}
                     </div>
                   </>
                 ),
                 Teaches: teacher.skillNames.join(", ") || "Nothing yet",
                 [`Earned ${formatMonth(month)}`]: byPercentage ? (
-                  formatMoney(teacher.earnedInMonth)
+                  <MoneyLines amount={teacher.earnedInMonth} />
                 ) : (
                   <span className="text-muted-foreground">&mdash;</span>
                 ),
                 [`Paid for ${formatMonth(month)}`]: (
                   <>
-                    <div>{formatMoney(teacher.paidForMonth)}</div>
+                    <MoneyLines amount={teacher.paidForMonth} />
                     {salaryShort && (
                       <Badge
                         variant="outline"
@@ -187,7 +199,7 @@ export default async function TeacherPayPage({ searchParams }: PageProps<"/finan
                   </>
                 ),
                 "Unpaid share": byPercentage ? (
-                  formatMoney(teacher.unpaidShare)
+                  <MoneyLines amount={teacher.unpaidShare} />
                 ) : (
                   <span className="text-muted-foreground">&mdash;</span>
                 ),
@@ -198,20 +210,21 @@ export default async function TeacherPayPage({ searchParams }: PageProps<"/finan
                       title={`Pay ${teacher.name}`}
                       description={
                         byPercentage
-                          ? `${teacher.name}'s unpaid share is ${formatMoney(teacher.unpaidShare)}.`
-                          : `Their salary is ${formatMoney(teacher.fixedSalary)} a month.`
+                          ? `${teacher.name}'s unpaid share is ${formatBoth(teacher.unpaidShare)}.`
+                          : `Their salary is ${salary} a month.`
                       }
                       submitLabel="Record payment"
                       categories={categoryOptions}
                       branches={branchOptions}
                       teachers={teacherOptions}
+                      rate={rate}
                       today={today}
                       defaults={{
                         categoryId: TEACHER_SALARY_ID,
-                        amount: byPercentage ? teacher.unpaidShare : teacher.fixedSalary,
+                        ...pay,
                         method: "CASH",
                         spentOn: today,
-                        branchId: branchOptions.length === 1 ? branchOptions[0].value : "",
+                        branchId: onlyBranch,
                         teacherId: teacher.id,
                         forMonth: month,
                         note: "",

@@ -3,6 +3,7 @@
 import { FormDialog } from "@/components/form-dialog";
 import { SelectField, TextField, type Option } from "@/components/form-fields";
 import type { ActionResult } from "@/lib/action-result";
+import { AmountFields } from "../amount-fields";
 import { paymentMethodOptions, walkInIncomeOptions } from "../labels";
 
 /**
@@ -13,12 +14,15 @@ import { paymentMethodOptions, walkInIncomeOptions } from "../labels";
 export function IncomeDialog({
   action,
   branches,
+  rate,
   today,
   trigger,
 }: {
   action: (formData: FormData) => Promise<ActionResult>;
   /** The branches this user may record income at. One means no picker. */
   branches: Option[];
+  /** Shillings to the dollar right now, or null before the admin sets it. */
+  rate: string | null;
   today: string;
   trigger: React.ReactNode;
 }) {
@@ -41,15 +45,8 @@ export function IncomeDialog({
             placeholder="Pick one"
             errors={errors.category}
           />
+          <AmountFields label="Amount" rate={rate} errors={errors} />
           <div className="grid gap-4 sm:grid-cols-2">
-            <TextField
-              label="Amount (USD)"
-              name="amount"
-              inputMode="decimal"
-              placeholder="30"
-              required
-              errors={errors.amount}
-            />
             <SelectField
               label="Paid by"
               name="method"
@@ -57,8 +54,6 @@ export function IncomeDialog({
               placeholder="Pick one"
               errors={errors.method}
             />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
             <TextField
               label="Received on"
               name="paidOn"
@@ -68,18 +63,18 @@ export function IncomeDialog({
               required
               errors={errors.paidOn}
             />
-            {onlyBranch ? (
-              <input type="hidden" name="branchId" value={onlyBranch} />
-            ) : (
-              <SelectField
-                label="Branch"
-                name="branchId"
-                options={branches}
-                placeholder="Pick a branch"
-                errors={errors.branchId}
-              />
-            )}
           </div>
+          {onlyBranch ? (
+            <input type="hidden" name="branchId" value={onlyBranch} />
+          ) : (
+            <SelectField
+              label="Branch"
+              name="branchId"
+              options={branches}
+              placeholder="Pick a branch"
+              errors={errors.branchId}
+            />
+          )}
           <TextField
             label="Student ID"
             name="student"

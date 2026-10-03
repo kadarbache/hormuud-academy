@@ -47,16 +47,22 @@ function Difference({ amount, overIsBad }: { amount: string; overIsBad: boolean 
 
 function MonthPicker({ month, branchId }: { month: string; branchId: string }) {
   return (
-    <Form action="/finance/budget" className="flex flex-wrap items-end gap-3">
-      <div className="grid gap-1.5">
-        <Label htmlFor="month">Month</Label>
-        <Input id="month" name="month" type="month" defaultValue={month} className="w-44" />
-      </div>
-      {branchId && <input type="hidden" name="branch" value={branchId} />}
-      <Button type="submit" variant="secondary">
-        Show
-      </Button>
-    </Form>
+    <>
+      <Form action="/finance/budget" className="flex flex-wrap items-end gap-3">
+        <div className="grid gap-1.5">
+          <Label htmlFor="month">Month</Label>
+          <Input id="month" name="month" type="month" defaultValue={month} className="w-44" />
+        </div>
+        {branchId && <input type="hidden" name="branch" value={branchId} />}
+        <Button type="submit" variant="secondary">
+          Show
+        </Button>
+      </Form>
+      <p className="text-sm text-muted-foreground">
+        A plan is in US dollars. The actual figures are dollars and shillings together at
+        today&apos;s rate, so a month&apos;s result moves when the rate does.
+      </p>
+    </>
   );
 }
 

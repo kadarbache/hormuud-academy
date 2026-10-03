@@ -16,9 +16,11 @@ import {
   isIsoMonth,
   monthEnd,
   monthStart,
+  toCollegeDate,
   toDbDate,
 } from "@/lib/dates";
-import { formatMoney } from "@/lib/format";
+import { latestRate } from "@/lib/exchange-rate";
+import { formatBoth, formatRate } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { one } from "@/lib/search-params";
 import { requireAdmin } from "@/lib/session";
@@ -34,6 +36,7 @@ import {
 } from "./labels";
 import {
   expensesByCategory,
+  hasMoney,
   incomeByCategory,
   incomeByMethod,
   netBalance,
@@ -75,6 +78,7 @@ export default async function FinancePage({ searchParams }: PageProps<"/finance"
     monthExpensesByCategory,
     monthIncome,
     monthTeacherShare,
+    rate,
   ] = await Promise.all([
     prisma.branch.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
     incomeByMethod(onDay),
@@ -83,6 +87,7 @@ export default async function FinancePage({ searchParams }: PageProps<"/finance"
     expensesByCategory(spentInMonth),
     totalIncome(inMonth),
     totalTeacherShare(inMonth),
+    latestRate(),
   ]);
 
   const dayNet = netBalance(dayByMethod.total, dayExpenses);
@@ -100,6 +105,24 @@ export default async function FinancePage({ searchParams }: PageProps<"/finance"
         title="Financial dashboard"
         description={`Where ${scope} stands, on the day and over the month.`}
       />
+
+      <p className="text-sm text-muted-foreground">
+        Dollars and shillings are counted apart. A combined figure is what the two are worth
+        together now, at today&apos;s rate, so it moves when the rate does; each receipt keeps the
+        rate it was taken at.{" "}
+        {rate ? (
+          <>
+            Today&apos;s rate is {formatRate(rate.rate.toString())} shillings to the dollar, set{" "}
+            {formatDate(toCollegeDate(rate.createdAt))}. Change it in{" "}
+          </>
+        ) : (
+          <>No exchange rate is set yet, so shillings can&apos;t be recorded. Set it in </>
+        )}
+        <Link href="/admin/settings" className="underline">
+          Settings
+        </Link>
+        .
+      </p>
 
       <Form action="/finance" className="flex flex-wrap items-end gap-3">
         <div className="grid gap-1.5">
@@ -220,8 +243,8 @@ export default async function FinancePage({ searchParams }: PageProps<"/finance"
               rows={monthExpensesByCategory.rows.map((row) => ({
                 ...row,
                 hint:
-                  row.key === TEACHER_SALARY_ID && Number(row.amount) > 0
-                    ? `Salaries and percentage payouts. Earned this month: ${formatMoney(monthTeacherShare)}`
+                  row.key === TEACHER_SALARY_ID && hasMoney(row.amount)
+                    ? `Salaries and percentage payouts. Earned this month: ${formatBoth(monthTeacherShare)}`
                     : undefined,
               }))}
               total={monthExpensesByCategory.total}
