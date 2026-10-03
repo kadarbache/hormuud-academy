@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -14,8 +14,20 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  applicationName: "Hormuud Academy",
   title: { default: "Hormuud Academy", template: "%s · Hormuud Academy" },
   description: "Student registration and skills for every branch of Hormuud Academy.",
+  // Opens full screen when added to an iPhone's home screen.
+  appleWebApp: { capable: true, title: "Hormuud", statusBarStyle: "default" },
+  // Stops iOS turning phone numbers in tables into call links.
+  formatDetection: { telephone: false },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+  ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
