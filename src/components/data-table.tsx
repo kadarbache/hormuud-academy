@@ -45,7 +45,7 @@ export type DataTableRow = {
 };
 
 /** Clicks on these do their own thing, so they never open the dialog. */
-const INTERACTIVE = "a, button, input, select, textarea, label, [role='menuitem'], [role='checkbox']";
+const INTERACTIVE = "a, button, input, select, textarea, label, [role='checkbox']";
 
 function isInteractive(target: EventTarget | null) {
   return target instanceof Element && target.closest(INTERACTIVE) !== null;
@@ -94,7 +94,12 @@ export function DataTable({
                 aria-haspopup="dialog"
                 aria-label={typeof row.title === "string" ? row.title : undefined}
                 onClick={(event) => {
-                  // Let a link or a menu handle its own click, and let someone
+                  // A dialog, menu or dropdown opened from this row draws in a
+                  // portal elsewhere on the page, but React still bubbles its
+                  // clicks up through the row. Only a click on the row counts.
+                  if (!(event.target instanceof Node)) return;
+                  if (!event.currentTarget.contains(event.target)) return;
+                  // Let a link or a button handle its own click, and let someone
                   // finish selecting text without a dialog jumping up.
                   if (isInteractive(event.target)) return;
                   if (window.getSelection()?.toString()) return;
