@@ -29,6 +29,7 @@ Hormuud Academy is one college with several branches. The system keeps track of:
 - the students, and which skills each student is taking
 - the registration fee a student pays for each skill they start, and whether it's paid
 - every payment the college takes, by day, by category and by how it was paid
+- in two currencies, US dollars and Somaliland shillings, kept apart like two separate books
 - every month of every skill: paid, or still owed
 - what the college spends, at which branch and on what
 - what each teacher earns, whether that's a fixed salary or a share of the fees they bring in
@@ -47,16 +48,18 @@ Skill            Graphic Design, defaults: 4 months,          (one for the whole
 
 A skill is defined once. Each branch that teaches it gets a **branch skill**, which says who teaches it there, in which class, how long it runs and what it costs. Branches are in different cities, so a small town can charge $5 a month for what costs $10 in the capital. The skill's own fees and duration are only the defaults a new branch starts from. When a student starts a skill, the system creates an **enrollment** that links the student to that branch skill. The enrollment keeps the branch skill's two fees and its end date from that day. A student taking three skills has three enrollments, and three registration fees, and the skills can be at different branches.
 
-Money hangs off that same chain. Every dollar in is a **payment**, and every payment says what it was for, which branch took it and how it was paid:
+Money hangs off that same chain. Every amount in is a **payment**, and every payment says what it was for, which branch took it, how it was paid and in which currency:
 
 ```
 Enrollment   STU-00003 takes Graphic Design at Main Branch, $30 a month
-├─ Payment   Registration fee   $15   ZAAD    19 Aug 2026
-├─ Payment   Aug 2026           $30   Cash     5 Sept 2026   → teacher earns $9
-└─ Payment   Sept 2026          $30   eDahab   4 Sept 2026   → teacher earns $9
+├─ Payment   Registration fee   $15            ZAAD    19 Aug 2026
+├─ Payment   Aug 2026           $30            Cash     5 Sept 2026   → teacher earns $9
+└─ Payment   Sept 2026          256,500 SLSH   eDahab   4 Sept 2026   → teacher earns 76,950 SLSH
 ```
 
 A monthly fee payment names the **month it pays for**, not just the day the money arrived, so the system can say which months a student has settled and which they still owe. Money out is an **expense**, which always names a branch. Nothing stores a running total: a day's takings, a month's spending and a teacher's earnings are counted from those rows every time a screen asks.
+
+Fees are set in dollars, but a student can pay in dollars or in Somaliland shillings. The two are never added together: every screen shows dollars and shillings separately, and underneath them what the two are worth together in dollars at today's rate. The admin sets the exchange rate on the Settings page. Each shilling payment keeps the rate it was recorded at, like a receipt, while the totals always use today's.
 
 Two kinds of people log in:
 
@@ -276,6 +279,7 @@ hormuud-academy/
 │   │       │   ├── period.ts    Day, month or everything, read from the query string
 │   │       │   ├── queries.ts   The totals every money screen is built from
 │   │       │   ├── figures.tsx  The stat cards and the breakdown table
+│   │       │   ├── amount-fields.tsx The amount box and its USD / SLSH dropdown
 │   │       │   ├── fee-months.ts Which months an enrollment owes a fee for
 │   │       │   ├── payments.ts  The registration fee written with a new enrollment
 │   │       │   ├── income/      Income, and every action that records a payment
@@ -291,13 +295,15 @@ hormuud-academy/
 │   │           ├── branches/
 │   │           ├── categories/
 │   │           ├── skills/      The skill list, and [id]/ for one skill's page
-│   │           └── staff/
+│   │           ├── staff/
+│   │           └── settings/    The exchange rate and its history
 │   ├── components/
 │   │   ├── ui/                  shadcn/ui components
 │   │   └── *.tsx                Shared pieces: DataTable, FormDialog, ActionButton, fields, badges
 │   ├── hooks/                   useFormAction and useIsMobile
-│   ├── lib/                     auth, session, prisma, access, dates, money, teacher-share,
-│   │                            format, validation, search-params, cloudinary, rate-limit
+│   ├── lib/                     auth, session, prisma, access, dates, money, exchange-rate,
+│   │                            teacher-share, format, validation, search-params, cloudinary,
+│   │                            rate-limit
 │   └── generated/prisma/        The generated Prisma client (not in git)
 ├── docs/                        This guide and the decision records
 ├── CONTEXT.md                   The glossary
@@ -424,15 +430,30 @@ A month is written `2026-09`, which is what an `<input type="month">` gives, and
 
 ### Money
 
-Every amount is stored as `DECIMAL(10, 2)`, exact to the cent, and shown in US dollars. Ordinary floating-point numbers can't hold an amount like 0.10 exactly, which is why no amount is one. Prisma hands these back as `Decimal` objects; the code turns them into strings like `"20.50"` and adds them with the helpers in `src/lib/money.ts`, which work in whole cents so `10.10 + 15.20` comes out as `25.30` and not `25.299999999999997`.
+Every amount is stored as a `DECIMAL`, exact to the cent: `DECIMAL(14, 2)` for payments, expenses and salaries, which can be millions of shillings, and `DECIMAL(10, 2)` for fees and budgets, which are in dollars. Ordinary floating-point numbers can't hold an amount like 0.10 exactly, which is why no amount is one. Prisma hands these back as `Decimal` objects; the code turns them into strings like `"20.50"` and adds them with the helpers in `src/lib/money.ts`, which work in whole cents so `10.10 + 15.20` comes out as `25.30` and not `25.299999999999997`.
 
 Each enrollment copies the skill's monthly fee and registration fee on the day the student joins, so a later price change doesn't touch current students.
 
-**Every dollar in is a payment.** One row in `payments` holds the amount, the day the money came in, the branch that took it, what it was for and how it was paid. Registration fees used to live on the enrollment; [ADR 0004](adr/0004-one-ledger-for-every-payment.md) explains why they moved here and why nothing stores a running total. The enrollment still keeps the fee it *owes*, because that's a price the admin can waive; whether it was paid is the ledger's answer.
+**Every amount in is a payment.** One row in `payments` holds the amount, its currency, the day the money came in, the branch that took it, what it was for and how it was paid. Registration fees used to live on the enrollment; [ADR 0004](adr/0004-one-ledger-for-every-payment.md) explains why they moved here and why nothing stores a running total. The enrollment still keeps the fee it *owes*, because that's a price the admin can waive; whether it was paid is the ledger's answer.
 
 A fee is paid in full or not at all, whether it's a registration fee or one month of a skill. There are no part payments. A monthly fee payment carries a **fee month**, so September stays September's however late the money arrived, and the database refuses a second payment for a month already settled.
 
-**Every dollar out is an expense**, and every expense names the branch it was spent for. A teacher's pay is an expense in the Teacher salary category that also names the teacher and the month it covers.
+**Every amount out is an expense**, and every expense names the branch it was spent for. A teacher's pay is an expense in the Teacher salary category that also names the teacher and the month it covers.
+
+### Two currencies
+
+The college takes and spends two currencies, US dollars (`USD`) and Somaliland shillings (`SLSH`). Think of them as two separate account books. [ADR 0007](adr/0007-two-currencies-two-ledgers.md) explains the choice; here is how it works.
+
+- **Every payment and expense is in exactly one currency.** Each form that takes money has a Currency dropdown next to the amount, dollars by default. Shillings are whole numbers, because there's no coin smaller than one shilling. A box accepts `250000`, `250,000` or `250 000`.
+- **No stored total ever mixes the two.** Every total on every screen is shown per currency: the dollars, the shillings, and underneath them the **combined** figure, which is what the two are worth together in dollars at today's rate.
+- **The exchange rate** is how many shillings one dollar is, like 8,550. The admin sets it on the Settings page (`src/app/(app)/admin/settings`). Every change is a new row in `exchange_rates`, so the page can show who changed it and when; the latest row is the rate in force. `src/lib/exchange-rate.ts` reads it. Until a rate is set, nothing can be recorded in shillings.
+- **A shilling row keeps its rate, like a receipt.** When a shilling payment or expense is recorded, the rate in force is copied onto it (`exchangeRate`), and what it was worth in dollars that day is worked out once, to the cent, and stored with it (`usdValue`). A dollar row's `usdValue` is simply its amount. Neither ever changes: a new rate doesn't rewrite a receipt. The row shows it under the shillings, like "≈ $5.00 at 8,550". Correcting a shilling expense's amount works its dollar value out again at the rate it was first recorded at.
+- **Totals use today's rate.** A combined figure says what the college's money is worth now, so it's the dollars plus the shillings at today's rate, worked out each time a screen opens, and it moves when the rate does: if a dollar was 10,000 shillings last month and is 12,000 now, last month's shillings count for less. That's why the ≈ figures on the rows, which are each at their own day's rate, don't add up to the totals. Every screen uses the same rate, so they all agree on the same total.
+- **Fees stay priced in dollars.** Paying a monthly fee in shillings, the amount box starts at the fee at today's rate (a $20 fee at 8,550 is 171,000 shillings) and can be lowered for a discount like a dollar amount. A registration fee paid in shillings is the fee at today's rate, to the nearest shilling. **Fees owed** stay in dollars, because that's what the fees are set in.
+- **Teacher pay follows the ledgers.** A fixed salary is set in one currency, on the teacher, and paid in that currency: the pay dialog fixes the dropdown, and the server refuses the other one. A percentage teacher earns their share in whatever currency the student paid, so their unpaid share has a dollar part and a shilling part, and each is paid out of its own ledger.
+- **The monthly budget is planned in dollars**, and compared against the combined figures, at today's rate like everywhere else.
+
+`src/lib/money.ts` holds the currency helpers: `inLedger()` gives the columns a new payment or expense needs (amount, currency, rate and dollar value), `dollarsToShillings()` turns a fee into shillings, `totalOf()` adds grouped sums into a `MoneyTotal` (`{ USD, SLSH }`), the shape every query returns, and `totalAtRate()` adds its combined figure at a rate. The stat cards and breakdown tables in `finance/figures.tsx` read today's rate themselves, so every figure on a page uses the same one. The database checks that a dollar row has no rate and is worth its amount, and that a shilling row has a rate above zero and a dollar value within a cent of its shillings at that rate.
 
 **Expense categories are a list the admin keeps**, not codes fixed in the program. Teacher salary is the exception: teacher pay is found by it, so it has the fixed id `teacher_salary` and can't be renamed, deactivated or deleted. A category that an expense or a budget plan uses can only be deactivated, never deleted, so past months keep adding up. [ADR 0006](adr/0006-expense-categories-are-kept-by-the-admin.md) explains why.
 
@@ -511,6 +532,7 @@ erDiagram
     Branch ||--o{ MonthlyBudget : "plans"
     MonthlyBudget ||--o{ MonthlyBudgetLine : "plans to spend"
     User ||--o{ MonthlyBudget : "saved"
+    User ||--o{ ExchangeRate : "set"
 
     Branch {
         string id PK
@@ -590,6 +612,9 @@ erDiagram
         enum category "REGISTRATION_FEE, MONTHLY_FEE, BOOKS, EXAMINATION_FEE, OTHER"
         enum method "CASH, ZAAD, EDAHAB or BANK"
         decimal amount
+        enum currency "USD or SLSH"
+        decimal exchangeRate "set for shillings only"
+        decimal usdValue "what it's worth in dollars"
         date paidOn "the day the money came in"
         string branchId FK
         string studentId FK "empty for a walk-in sale"
@@ -597,7 +622,8 @@ erDiagram
         date forMonth "the month a monthly fee pays for"
         string teacherId FK "set when it earned a share"
         decimal teacherSharePercent
-        decimal teacherShare
+        decimal teacherShare "in the payment's currency"
+        decimal teacherShareUsdValue
         string note
         string recordedById FK
     }
@@ -612,12 +638,21 @@ erDiagram
         string categoryId FK
         enum method "CASH, ZAAD, EDAHAB or BANK"
         decimal amount
+        enum currency "USD or SLSH"
+        decimal exchangeRate "set for shillings only"
+        decimal usdValue "what it's worth in dollars"
         date spentOn
         string branchId FK
         string teacherId FK "set on a teacher's pay"
         date forMonth "the month a salary covers"
         string note
         string recordedById FK
+    }
+    ExchangeRate {
+        string id PK
+        decimal rate "shillings to one dollar"
+        string setById FK
+        datetime createdAt "the latest is in force"
     }
     MonthlyBudget {
         string id PK
@@ -658,7 +693,7 @@ The code uses the model names on the left. The actual table names in Postgres ar
 
 **Classroom** (`classrooms`). A room at a branch, like Room 3. The screens call it a "Class". Each class belongs to one branch, and names are unique within a branch. The code says Classroom so nobody mistakes it for a group of students.
 
-**Teacher** (`teachers`). A person who teaches. Name, phone, `active`, and how they're paid: `salaryType` is `FIXED` with a `fixedSalary` each month, or `PERCENTAGE` with a `percentageRate` such as 30 for 30%. Never both — the form clears the one that doesn't apply. A teacher is not a login account.
+**Teacher** (`teachers`). A person who teaches. Name, phone, `active`, and how they're paid: `salaryType` is `FIXED` with a `fixedSalary` each month in its `salaryCurrency` (dollars or shillings), or `PERCENTAGE` with a `percentageRate` such as 30 for 30%. Never both — the form clears the one that doesn't apply. A percentage teacher earns in whatever currency each student pays, so their `salaryCurrency` means nothing. A teacher is not a login account.
 
 **TeacherBranch** (`teacher_branches`). A link table: one row for each branch a teacher works at. It lets one teacher work at several branches without being entered twice.
 
@@ -698,17 +733,22 @@ A student has no status column. They are Active when at least one of their enrol
 | `number` | The receipt number, from a sequence, counted across the whole college |
 | `category` | `REGISTRATION_FEE`, `MONTHLY_FEE`, `BOOKS`, `EXAMINATION_FEE` or `OTHER` |
 | `method` | `CASH`, `ZAAD`, `EDAHAB` or `BANK` (bank or anything else) |
-| `amount`, `paidOn` | How much, and the college day the money came in. Daily income counts by `paidOn`, not by when the row was typed |
+| `amount`, `currency` | How much, in `USD` or `SLSH`. Shillings are whole numbers |
+| `exchangeRate` | For shillings, the rate in force when it was recorded. Empty for dollars |
+| `usdValue` | What it was worth in dollars the day it was recorded: the amount itself for dollars, the shillings at `exchangeRate` for shillings. Worked out once and never changed, like the rest of the receipt. Totals use today's rate instead |
+| `paidOn` | The college day the money came in. Daily income counts by `paidOn`, not by when the row was typed |
 | `branchId` | Where the money was taken. For a fee, the branch teaching the skill |
 | `studentId` | Empty for income with nobody behind it, like a book sold over the counter |
 | `enrollmentId` | Set for a registration fee or a monthly fee, which always belong to one skill |
 | `forMonth` | The month a monthly fee pays for, as that month's first day |
-| `teacherId`, `teacherSharePercent`, `teacherShare` | Filled in only when the skill's teacher is paid by percentage. The rate is kept beside the amount so a later change never rewrites it |
+| `teacherId`, `teacherSharePercent`, `teacherShare`, `teacherShareUsdValue` | Filled in only when the skill's teacher is paid by percentage. The share is in the payment's currency, with its dollar value beside it. The rate is kept beside the amount so a later change never rewrites it |
 | `note`, `recordedById` | A free note, and the account that recorded it |
 
 **ExpenseCategory** (`expense_categories`). What money goes on, like Rent. Name (unique) and `active`. The migration that made the table started it with nine: Rent, Electricity, Teacher salary, Staff salary, Internet, Stationery, Transportation, Maintenance and Other expenses, with ids made from their old codes (`rent`, `teacher_salary` and so on). Categories the admin adds get ordinary ids. Teacher salary's id, `teacher_salary`, never changes: teacher pay is found by it.
 
-**Expense** (`expenses`). Money spent. A number, a category, a method, an amount, the day it went out, the branch it was spent for, a note and who recorded it. A teacher's pay also carries `teacherId` and the `forMonth` it covers.
+**Expense** (`expenses`). Money spent. A number, a category, a method, an amount with its `currency`, `exchangeRate` and `usdValue` (as on a payment), the day it went out, the branch it was spent for, a note and who recorded it. A teacher's pay also carries `teacherId` and the `forMonth` it covers.
+
+**ExchangeRate** (`exchange_rates`). Every exchange rate the admin has set: the `rate` (shillings to one dollar), who set it and when. Nothing is ever changed or deleted here, so it's also the history the Settings page shows. The newest row is the rate in force.
 
 **MonthlyBudget** (`monthly_budgets`) and **MonthlyBudgetLine** (`monthly_budget_lines`). One branch's plan for one month: the income it expects, a note, and one line per expense category it plans to spend on. A category with no line simply wasn't planned for. Nothing about what *actually* happened is stored here — that's counted from the payments and expenses each time the screen opens, so the comparison always matches the ledger.
 
@@ -726,6 +766,7 @@ These hold even if a bug slips into the code:
 - One active enrollment per student per skill, at any branch. This is a **partial unique index**: it only counts rows whose status is `ACTIVE`, so a student can finish a skill and take it again later.
 - One registration fee per enrollment, and one monthly fee payment per enrollment per fee month. Both are partial unique indexes too, counting only rows of that category. Two clicks on Record payment can't charge a student twice, whatever the code does.
 - One budget per branch per month.
+- A dollar payment or expense has no exchange rate and is worth exactly its amount. A shilling one has a rate above zero, and a dollar value within a cent of its shillings at that rate. The same goes for a teacher's share. These are **check constraints**, written by hand in the migrations because Prisma's schema can't describe them. An exchange rate is always above zero.
 - A row can't be deleted while other rows point at it. You can't delete a teacher a branch skill still uses, for example. The exceptions are deliberate: deleting a student deletes their enrollments and every payment they made, deleting an enrollment deletes its payments, deleting a budget deletes its lines, deleting a teacher deletes their branch links, and deleting a user deletes their sessions and accounts. The app refuses to delete a teacher who has any money on record, so nobody's earnings vanish by accident.
 
 The app adds its own checks on top. Names are compared ignoring upper and lower case, so "main branch" is refused when "Main Branch" exists. The database compares exact text only.
@@ -742,6 +783,8 @@ The app adds its own checks on top. Names are compared ignoring upper and lower 
 | `20260921180000_branch_skill_pricing` | Gives each branch skill its own duration, registration fee and monthly fee, copied from its skill so nothing changes until the admin edits a branch |
 | `20260922090000_rate_limit` | Adds the `rateLimit` table, which counts login attempts so someone can't guess a password by trying thousands |
 | `20260925120000_expense_categories` | Turns the fixed list of expense categories into the `expense_categories` table. The nine old categories become its first rows, and every expense and budget line keeps its category |
+| `20260929090000_two_currencies` | Gives every payment and expense a currency and, for shillings, an exchange rate, and teachers a salary currency. Adds the `exchange_rates` table and widens the money columns so large shilling amounts fit. Everything already recorded becomes dollars, so no amount changes |
+| `20260929130000_dollar_values` | Gives every payment, expense and teacher share its dollar value, worked out at the row's own rate, and adds the checks that keep those values right |
 
 ### Looking at the data yourself
 
@@ -778,6 +821,8 @@ The app adds its own checks on top. Names are compared ignoring upper and lower 
 | Branches, skills, categories | Yes | No, those pages aren't in their menu and are blocked |
 | Expense categories | Yes | No, the page is blocked |
 | Staff accounts | Yes | No |
+| Record money in shillings | Yes | Yes, wherever they can record dollars |
+| Set the exchange rate (Settings) | Yes | No, the page is blocked |
 
 A staff account that has no branch set sees a notice asking them to contact the admin, and can't do anything else.
 
@@ -793,7 +838,7 @@ To log out, use **Log out** at the bottom of the sidebar.
 
 ### The screen layout
 
-- **The sidebar** on the left. Students (**Students** and **Register student**) is there for everyone. Admins also get Money (**Dashboard**, **Income**, **Fees owed**, **Expenses**, **Expense categories**, **Teacher pay**, **Monthly budget**) and Admin (**Branches**, **Skills**, **Categories**, **Teachers**, **Classes**, **Staff accounts**). Branch staff get Your branch instead (**Income**, **Fees owed**, **Teachers** and **Classes**), which shows only their own branch; the teachers and classes there can't be changed. The bottom shows your name, your role and your branch.
+- **The sidebar** on the left. Students (**Students** and **Register student**) is there for everyone. Admins also get Money (**Dashboard**, **Income**, **Fees owed**, **Expenses**, **Expense categories**, **Teacher pay**, **Monthly budget**) and Admin (**Branches**, **Skills**, **Categories**, **Teachers**, **Classes**, **Staff accounts**, **Settings**). Branch staff get Your branch instead (**Income**, **Fees owed**, **Teachers** and **Classes**), which shows only their own branch; the teachers and classes there can't be changed. The bottom shows your name, your role and your branch.
 - **The header** shows "All branches" for an admin, or your branch's name for branch staff. The button on the left of the header hides and shows the sidebar.
 - **On a phone**, the sidebar folds away. Open it with the button at the top left.
 - **Tables** are wider than a phone, so the last columns sit off the side. Instead of scrolling across, tap a row: a pop-up lists everything in it, one line per column, with that row's buttons at the bottom. Tapping a link inside the row, such as a student's name, still opens that page. The same click works on a computer.
@@ -810,6 +855,7 @@ Log in as the admin and do these in order, because each step needs the one befor
 5. **Skills.** Add each skill with its category, duration, registration fee and monthly fee. After saving, the app opens the skill's page.
 6. **On each skill's page**, press **Add to a branch** for every branch that teaches it and pick that branch's teacher and class. A skill no branch teaches can't be taken by anyone.
 7. **Staff accounts.** Create an account for each person at each branch with their Gmail address, and tell them to sign in with Google.
+8. **Settings.** Set the exchange rate, so staff can take shillings.
 
 After that, staff can register students.
 
@@ -835,7 +881,7 @@ Branch staff see this page too, with only their branch's classes and no buttons.
 
 #### Teachers
 
-Add a teacher with a name, an optional phone, and at least one branch. When you edit a teacher, you can't untick a branch where they still teach a skill: give that skill another teacher first. You also can't deactivate a teacher who still runs an active skill. The table shows every skill each teacher teaches, and where.
+Add a teacher with a name, an optional phone, at least one branch, and how they're paid. A fixed salary has a Currency dropdown beside it: the salary is set in that currency, and their pay is always recorded in it. When you edit a teacher, you can't untick a branch where they still teach a skill: give that skill another teacher first. You also can't deactivate a teacher who still runs an active skill. The table shows every skill each teacher teaches, and where.
 
 Branch staff see this page too, with only the teachers at their branch, the skills each one teaches there and in which class, and no buttons.
 
@@ -860,6 +906,12 @@ On a **skill's page** you can:
 - **Deactivate** logs the person out everywhere and blocks their login. Their students and records stay. **Turn back on** reverses it. You can't deactivate yourself.
 
 Accounts can't be deleted, because students and enrollments record who created them.
+
+#### Settings
+
+The exchange rate lives here: how many Somaliland shillings one US dollar is, like 8,550. The page shows the rate in force with who set it and when, a box to set a new one (8,550 and 8550 both work), and the history of every rate set before, newest first.
+
+A new rate changes every combined figure straight away, because those say what the money is worth now. Every shilling payment and expense already recorded keeps the rate it was recorded at, like a receipt. Until the first rate is set, the page says so, and nothing can be recorded in shillings anywhere.
 
 ### Student screens
 
@@ -895,7 +947,7 @@ Press **Register student**. The form has two parts.
 
 - **Start date** is today by default. Every skill you tick starts on this day.
 - **Skills** lists the skills open at the home branch, each with its teacher, class, registration fee, monthly fee and duration. Tick at least one.
-- **Registration fee paid** appears once you tick a skill that has a registration fee. It shows the total, and each skill's share when there's more than one. Tick it if the student paid now, then pick **Paid by**: Cash, ZAAD, eDahab or Bank / other. The fees are recorded as paid on the registration date, which is also right for a student from the old system who paid long ago. Leave it empty if they'll pay later. The tick clears itself when you change the skills, so you always confirm the final amount.
+- **Registration fee paid** appears once you tick a skill that has a registration fee. It shows the total, and each skill's share when there's more than one. Tick it if the student paid now, then pick **Paid by** (Cash, ZAAD, eDahab or Bank / other) and **Paid in** (USD or SLSH). In shillings, the form shows what the fees come to at today's rate, and that's what's recorded. The fees are recorded as paid on the registration date, which is also right for a student from the old system who paid long ago. Leave it empty if they'll pay later. The tick clears itself when you change the skills, so you always confirm the final amount.
 
 Press **Register student**. If something is missing, every problem shows at once under its field and nothing you typed is lost. When it works, you see "registered as STU-00006" and the app opens the student's page.
 
@@ -914,12 +966,12 @@ The top shows the photo, name, student ID and Active or Inactive. The buttons ar
 The **Registration fee** column shows one of three things:
 
 - The amount with a yellow **Unpaid** badge.
-- The amount with the day it was paid, how it was paid, and who recorded it.
+- The amount with the day it was paid, how it was paid, and who recorded it. A fee paid in shillings also says how many shillings.
 - **Nothing to pay**, when the skill has no registration fee or the admin waived it.
 
 Its buttons appear only while the fee is unpaid:
 
-- **Record payment**, for staff at the skill's branch and admins. Pick the day the student paid — today by default, never in the future — and how they paid: Cash, ZAAD, eDahab or Bank / other. This writes a payment into the books, which is why the method has to be asked for.
+- **Record payment**, for staff at the skill's branch and admins. Pick the day the student paid — today by default, never in the future — how they paid (Cash, ZAAD, eDahab or Bank / other) and the currency. Paid in shillings, the dialog shows the fee at today's rate, and that's the amount recorded. This writes a payment into the books, which is why the method has to be asked for.
 - **Change fee**, for admins only. Enter a lower amount, or 0 to waive it. Only this student's fee for this skill changes.
 
 To take a recorded payment back, an admin removes it on the [Income screen](#income), where the receipt lives.
@@ -934,10 +986,10 @@ When the last Active skill is finished or dropped, the student becomes Inactive 
 
 **Monthly fees** is below the Skills table, one panel per skill. Each panel has a box per month, from the month the student joined up to this one, stopping at the skill's last month or the month the student dropped it. A skill that lasts four months has four boxes, so a student who joins on 19 April owes April to July, not August: the end date, 19 August, falls in the month after the last one taught. Nobody owes for a month that hasn't happened.
 
-- A **grey box** is a month that's been paid. It shows the amount, and hovering over it says when it was paid, how, and who recorded it.
-- A **yellow box** is a month still owed. Staff at the skill's branch click it to record that month: the amount starts at the fee the student joined at and can be lowered for a discount, then pick the day and the method. Whatever is recorded settles that month — there are no part payments.
+- A **grey box** is a month that's been paid. It shows the amount in the currency it was paid in, and hovering over it says when it was paid, how, and who recorded it.
+- A **yellow box** is a month still owed. Staff at the skill's branch click it to record that month: the amount starts at the fee the student joined at and can be lowered for a discount, then pick the day and the method. Pick **SLSH** in the Currency dropdown and the amount switches to the fee at today's rate, with what it comes to in dollars underneath. Whatever is recorded settles that month — there are no part payments.
 
-The panel's heading counts the months paid, what's been collected and what's still owed, and the badge beside the student's name at the top adds up everything they owe, registration fees included. **Every payment they made** opens the Income screen filtered to that student.
+The panel's heading counts the months paid, what's been collected in each currency and what's still owed, and the badge beside the student's name at the top adds up everything they owe, registration fees included. **Every payment they made** opens the Income screen filtered to that student.
 
 #### Editing a student
 
@@ -949,15 +1001,17 @@ Branch staff get **Income** and **Fees owed** for their own branch, because they
 
 Income and Expenses share a **period picker** at the top left: **One day**, **One month** or **Everything**. The choice travels in the address, so any filtered view can be bookmarked or sent to somebody else. The dashboard takes a day and a month together, teacher pay and the budget take a month, and Fees owed is always "as things stand now".
 
+Every figure is in both currencies. A box shows the dollars and the shillings, and under a line, **Combined at today's rate**: what the two are worth together in dollars now. A breakdown table has a USD column, an SLSH column and a Combined at today's rate column. A shilling amount on a single row shows what it was worth the day it was recorded, like "≈ $20.00 at 8,550", so those don't add up to today's totals. See [Two currencies](#two-currencies) for how it works.
+
 ### Income
 
-Everything the college was paid. Filter by period, branch (admins), income category, payment method, student — by ID, phone or name, the same box as the student list — and, for admins, the teacher a payment earned a share for. Filtering by a teacher says so above the table, with a link to their unpaid share.
+Everything the college was paid. Filter by period, branch (admins), income category, payment method, currency, student — by ID, phone or name, the same box as the student list — and, for admins, the teacher a payment earned a share for. Filtering by a teacher says so above the table, with a link to their unpaid share. The currency filter is how a cash drawer is counted: one day, Cash, SLSH gives the shillings that should be in it.
 
 At the top, **Total income** for the period, then what came in as **Cash**, **ZAAD**, **eDahab** and **Bank / other**. Below that, a table with one row per income category — Registration fee, Monthly fee, Books, Examination fee, Other income — so a zero is visibly a zero rather than a missing line, and the total at the bottom.
 
 Then every payment, newest first, 25 per page: receipt number, date, student, what it was for, branch, method, amount, the teacher's share (admins only) and who recorded it. Admins get **Remove** on each row, after confirming, for money recorded by mistake; the day's income and any teacher's share change with it. A monthly fee that earned a percentage teacher a share can't be removed once that teacher has been paid for the month it was taken in: the college doesn't refund money whose share has already gone out.
 
-**Record income** at the top right is for money that isn't a fee: **Books**, **Examination fee** or **Other income**. Give the amount, the method, the day, the branch, and a note. A student ID like `STU-00042` is optional — fill it in and the payment shows on that student's record too. Registration and monthly fees aren't in this list, because they're recorded on the student's own page where the amount, the skill and the teacher's share are already known.
+**Record income** at the top right is for money that isn't a fee: **Books**, **Examination fee** or **Other income**. Give the amount and its currency, the method, the day, the branch, and a note. A student ID like `STU-00042` is optional — fill it in and the payment shows on that student's record too. Registration and monthly fees aren't in this list, because they're recorded on the student's own page where the amount, the skill and the teacher's share are already known.
 
 ### Fees owed
 
@@ -967,13 +1021,15 @@ The three figures at the top are what's owed altogether and how many students th
 
 A month only counts once it has started, and a student who dropped a skill in March isn't chased for April. Nothing here is stored: it's worked out from the enrollments and their payments each time the screen opens.
 
+What's owed is in dollars, because that's what fees are set in. A month paid in shillings is paid like any other.
+
 ### Expenses
 
-Admins only. The same period picker, plus branch, category and teacher filters. At the top, the total spent and how it was paid out; below it, one row per active expense category with the total. A deactivated category gets a row only when money went on it in the period, so old spending still adds up. The category filter lists deactivated categories too, marked "(inactive)", so their old expenses can still be found.
+Admins only. The same period picker, plus branch, category, currency and teacher filters. At the top, the total spent and how it was paid out; below it, one row per active expense category with the total. A deactivated category gets a row only when money went on it in the period, so old spending still adds up. The category filter lists deactivated categories too, marked "(inactive)", so their old expenses can still be found.
 
-**Record expense** asks for the category, amount, method, day, branch and a note. Only active categories are offered. Choose **Teacher salary** and two more fields appear: which teacher, and which month the pay covers. That's what makes a salary traceable back to a person, which is why it isn't optional.
+**Record expense** asks for the category, amount and currency, method, day, branch and a note. Only active categories are offered. Choose **Teacher salary** and two more fields appear: which teacher, and which month the pay covers. That's what makes a salary traceable back to a person, which is why it isn't optional. A fixed-salary teacher is paid in their salary's currency, so picking one fixes the Currency dropdown.
 
-Each row can be edited or removed. An expense in a category that has since been deactivated keeps it when edited, but can't be moved into another deactivated one.
+Each row can be edited or removed. An expense in a category that has since been deactivated keeps it when edited, but can't be moved into another deactivated one. A shilling expense keeps the rate it was recorded at when it's edited, and the dialog shows its dollar value at that rate rather than today's.
 
 ### Expense categories
 
@@ -986,13 +1042,15 @@ Admins only, from the sidebar or the **Categories** button on Expenses. The list
 
 ### Teacher pay
 
-Admins only. Pick a month at the top. The four figures across the top are the fixed salaries due each month, what percentage teachers earned from the fees paid in that month, what was paid out for that month, and the **unpaid teacher shares**: what percentage teachers have earned and the college hasn't handed over yet.
+Admins only. Pick a month at the top. The four figures across the top are the fixed salaries due each month, what percentage teachers earned from the fees paid in that month, what was paid out for that month, and the **unpaid teacher shares**: what percentage teachers have earned and the college hasn't handed over yet. Each is in both currencies, with the combined figure at today's rate.
 
-The table lists every teacher with how they're paid, what they teach, what they earned in the month, what they've been paid for it and their **unpaid share**. A fixed-salary teacher paid less than their salary for the month gets a yellow **Salary not paid in full** badge. Fixed-salary teachers show a dash under "Earned" and "Unpaid share": student payments never add to their pay.
+The table lists every teacher with how they're paid, what they teach, what they earned in the month, what they've been paid for it and their **unpaid share**, one line per currency. A fixed-salary teacher paid less than their salary for the month gets a yellow **Salary not paid in full** badge. Fixed-salary teachers show a dash under "Earned" and "Unpaid share": student payments never add to their pay.
+
+A percentage teacher earns in whatever currency each student paid: a fee paid in shillings earns shillings. So their unpaid share can be dollars and shillings at once, and each is paid out of its own currency.
 
 "Unpaid share" is money the college still has to pay the teacher, never money the teacher owes the college. The screens keep the word "owed" for students, on Fees owed, so the two directions can't be mixed up. A student paying their fee earns the teacher a share, but the share only leaves the college when someone presses **Pay**.
 
-**Pay** on a row opens the expense dialog with the teacher, the month and the amount already filled in — a percentage teacher's unpaid share, or a fixed teacher's monthly salary. It saves as an ordinary Teacher salary expense, so it shows up in the month's spending like every other cost. The amount box is checked: a percentage teacher can't be paid more than their unpaid share, and a fixed teacher can't be paid more than their monthly salary for that month across every payment for it, so a second full salary is refused. A fixed teacher with no salary set can't be paid until one is entered on the Teachers page. Editing a saved salary expense is checked the same way.
+**Pay** on a row opens the expense dialog with the teacher, the month and the amount already filled in — a percentage teacher's unpaid share, or a fixed teacher's monthly salary. For a percentage teacher owed in both currencies, the box starts at the dollars, and switching the Currency dropdown to SLSH switches it to the shillings. A fixed teacher's currency is their salary's, and the dropdown can't be changed. It saves as an ordinary Teacher salary expense, so it shows up in the month's spending like every other cost. The amount box is checked: a percentage teacher can't be paid more than their unpaid share in the currency being paid, and a fixed teacher can't be paid more than their monthly salary for that month across every payment for it, so a second full salary is refused. A fixed teacher with no salary set can't be paid until one is entered on the Teachers page. Editing a saved salary expense is checked the same way.
 
 Clicking a teacher's name opens their own page: what they've earned in total, what they've been paid, their unpaid share, which branches the earnings came from, the last 100 payments that earned them a share — with the student, the skill, the month, what the student paid and the rate it was worked out at — and every payment the college has made to them.
 
@@ -1000,15 +1058,17 @@ Clicking a teacher's name opens their own page: what they've earned in total, wh
 
 Admins only. Pick a month, and the first screen compares every branch's plan against what really happened: income planned and actual, expenses planned and actual, and the net balance, with a row for the whole college at the bottom. A branch with no plan yet says so.
 
+A plan is written in dollars. The actual figures are dollars and shillings together in dollars at today's rate — the same combined figures as everywhere else — so a branch that takes shillings is compared with its plan in dollars, and a past month's result moves when the rate does.
+
 Click a branch to open its plan for that month. At the top: income, expenses, the net balance, and how the month came out against what was expected. Then a line-by-line comparison — income first, then every expense category, then the totals — with the difference beside each. A difference that's the wrong way round is red: taking less income than planned, or spending more than budgeted. A category with no plan reads **Not planned**, and any spending on it still shows.
 
 The form underneath writes or replaces the plan: the income you expect, an amount for each active category you plan to spend on, and a note. Boxes left empty mean nothing was planned for that category. A deactivated category keeps its box, and its line in the comparison, while the plan has an amount for it, so saving the plan again doesn't lose that amount. **Remove the plan** throws the plan away and leaves every payment and expense exactly as they are.
 
 ### The financial dashboard
 
-Admins only, and the first thing under Money. Pick a day, a month and optionally one branch.
+Admins only, and the first thing under Money. Pick a day, a month and optionally one branch. A line under the title gives the exchange rate in force and links to Settings.
 
-**The day** shows what came in as cash, ZAAD, eDahab and bank, the total, and then income, expenses and the net balance side by side.
+**The day** shows what came in as cash, ZAAD, eDahab and bank, the total, and then income, expenses and the net balance side by side. Every box has the dollars, the shillings and the combined figure.
 
 **The month** shows income, expenses, what percentage teachers earned from that month's fees, and the net balance, then income by category next to expenses by category. Every block links through to the screen behind it: every payment that day, every payment or expense that month, or the month against its plan.
 
@@ -1021,6 +1081,10 @@ Admins only, and the first thing under Money. Pick a day, a month and optionally
 **A student pays the registration fee later.** Open their page and press Record payment on that skill. Pick the day they paid and how.
 
 **A student pays for a month.** Open their page, find the skill under Monthly fees and click the yellow box for that month. The amount is already there; change it if they were given a discount, then pick the day and the method. If the teacher is paid by percentage, their share is worked out and added at the same moment.
+
+**A student pays in shillings.** The same as paying in dollars, but pick **SLSH** in the Currency dropdown. The amount switches to the fee at today's rate, with what that comes to in dollars underneath; change it if they paid something else. The payment keeps today's rate for good.
+
+**The exchange rate changes.** The admin opens Settings and saves the new rate. Every combined figure moves to it at once, past months included, because they say what the money is worth now. Every receipt and expense already recorded keeps its own rate and its own dollar value from the day.
 
 **A student pays for three months at once.** Record each month separately, all with the same date. The books show three payments on one day, and the student's page shows three months settled.
 
@@ -1116,7 +1180,7 @@ The [README](../README.md) has the full first-time setup and the steps to deploy
 
 `pnpm db:demo` adds two branches (Main Branch and Second Branch), four skills, four teachers, four students and a branch staff account `staff@college.local` at Main Branch. That address isn't a Google account, so it signs in with a password, which the script prints once. If you lose it, set a new one under Staff accounts.
 
-The sample students cover a student with two skills, a student past their end date, a student taking skills at both branches, an Inactive student, and both paid and unpaid registration fees. The money is there too: two of the four teachers are on a fixed salary and two on a percentage, fees are paid across all four methods with some months left owing, books were sold over the counter, rent and electricity went out for this month and last, last month's salaries were paid and this month's weren't, and both branches have a plan for this month to compare against. Never run it on the real database. It refuses anyway if branches already exist.
+The sample students cover a student with two skills, a student past their end date, a student taking skills at both branches, an Inactive student, and both paid and unpaid registration fees. The money is there too: two of the four teachers are on a fixed salary (one of them in shillings) and two on a percentage, fees are paid across all four methods with some months left owing, books were sold over the counter, rent and electricity went out for this month and last, last month's salaries were paid and this month's weren't, and both branches have a plan for this month to compare against. The exchange rate is set at 8,550, one student pays the Second Branch in shillings, which earns her teacher a shilling share, and the Second Branch pays its electricity in shillings. Never run it on the real database. It refuses anyway if branches already exist.
 
 ## Adding new features
 
@@ -1166,6 +1230,7 @@ Everything here was left out of Phase 1 on purpose, or is a known gap:
 - Fees owed reads every enrollment a person can see and works the months out in the app, because the months a fee is due for are arithmetic the database can't do. That's comfortable for a college of this size; tens of thousands of enrollments would need a stored count of months paid.
 - Nothing chases anybody by itself. Fees owed lists who is behind, but there are no reminders, no SMS and no yellow bar on the student list for unpaid months the way there is for registration fees.
 - A budget is per branch per month and has to be written by hand each month. Last month's plan isn't copied forward.
+- Only two currencies, US dollars and Somaliland shillings, and fees can only be priced in dollars. A shilling payment always uses the rate in force when it's recorded; there's no typing in a different rate for one payment. Changing a fixed teacher's salary currency partway through a month counts what they were already paid in the old currency in the new one, at today's rate.
 - No automated tests yet. Everything was checked by hand in the browser. Adding tests is a good next step: unit tests for `src/lib` and browser tests for registration and the branch rules.
 - No import from the old system. Old students are typed in by hand.
 - No printing: no ID cards, receipts or registration forms.

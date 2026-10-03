@@ -45,11 +45,11 @@ A person who teaches skills at one or more branches. Not a staff account.
 _Avoid_: Instructor, trainer, lecturer
 
 **Monthly fee**:
-What a branch skill costs per month, in US dollars.
+What a branch skill costs per month, set in US dollars. A student can pay it in shillings at the exchange rate.
 _Avoid_: Price, tuition
 
 **Registration fee**:
-What a student pays once for each skill they start, on top of the monthly fee, in US dollars. Each branch skill sets its own, and zero means none. Despite the name it goes with the enrollment, not the registration: two skills mean two registration fees, and taking a skill again means paying again.
+What a student pays once for each skill they start, on top of the monthly fee, set in US dollars. Each branch skill sets its own, and zero means none. Despite the name it goes with the enrollment, not the registration: two skills mean two registration fees, and taking a skill again means paying again.
 _Avoid_: Admission fee, enrollment fee, joining fee
 
 **Unpaid**:
@@ -113,8 +113,24 @@ _Avoid_: Archive, disable
 
 ### Money
 
+**Currency**:
+US dollars (USD) or Somaliland shillings (SLSH). Every payment and expense is in exactly one, and the two are counted apart, like two separate books: no total ever adds a dollar to a shilling. Shillings are whole numbers.
+_Avoid_: Money type, denomination
+
+**Exchange rate**:
+How many Somaliland shillings one US dollar is, like 8,550. Only the admin sets it, on the Settings page, and every change is kept with who made it and when. Today's rate values every combined figure, and a shilling payment or expense keeps the rate in force when it's recorded.
+_Avoid_: Conversion rate, dollar rate, price of the dollar
+
+**Dollar value**:
+What one payment or expense was worth in US dollars the day it was recorded, to the cent: its amount for dollars, or its shillings at the rate it was recorded at. Part of the receipt: worked out once and never changed by a new rate. Totals don't add these up.
+_Avoid_: USD equivalent, converted amount
+
+**Combined**:
+What the two currencies are worth together in US dollars now: the dollars plus the shillings at today's rate. Every total shows the dollars, the shillings and the combined figure, and the combined figure moves when the rate does. The monthly budget is compared against the combined figures.
+_Avoid_: Grand total, total in dollars, overall
+
 **Payment**:
-Money the college received, recorded once with the day it came in, the branch that took it, what it was for and how it was paid. Registration fees and monthly fees are payments, and so is a book sold over the counter.
+Money the college received, recorded once with the day it came in, the branch that took it, what it was for, how it was paid and its currency. Registration fees and monthly fees are payments, and so is a book sold over the counter.
 _Avoid_: Receipt, transaction, income record
 
 **Payment method**:
@@ -130,15 +146,15 @@ The month a monthly fee pays for, not the day the money arrived. September stays
 _Avoid_: Billing period, cycle
 
 **Monthly fee payment**:
-One fee month of one enrollment, paid. A month is paid in full or not at all, the same way a registration fee is; the amount can be lowered for a discount, and whatever is recorded settles that month.
+One fee month of one enrollment, paid. A month is paid in full or not at all, the same way a registration fee is; the amount can be lowered for a discount, and whatever is recorded settles that month, in either currency.
 _Avoid_: Instalment, invoice, bill
 
 **Owed**:
-A registration fee above zero, or a fee month the enrollment has reached, with no payment against it. Only ever money a student owes the college, never the other way round.
+A registration fee above zero, or a fee month the enrollment has reached, with no payment against it. Only ever money a student owes the college, never the other way round. Owed amounts are in US dollars, because that's what fees are set in.
 _Avoid_: Arrears, balance, debt, outstanding
 
 **Expense**:
-Money the college spent, recorded with the day it went out, the branch it was spent for, and a category. Every expense names a branch, so what each one costs to run can be checked against what it takes in.
+Money the college spent, recorded with the day it went out, the branch it was spent for, a category and its currency. Every expense names a branch, so what each one costs to run can be checked against what it takes in.
 _Avoid_: Cost, outgoing, bill
 
 **Expense category**:
@@ -146,7 +162,7 @@ What the money went on, like Rent or Electricity. The admin keeps the list. Teac
 _Avoid_: Expense type, account
 
 **Salary type**:
-How a teacher is paid: a Fixed salary every month, or a Percentage of the monthly fees their students pay. Never both.
+How a teacher is paid: a Fixed salary every month, set and paid in one currency, or a Percentage of the monthly fees their students pay. Never both.
 _Avoid_: Pay type, contract
 
 **Percentage rate**:
@@ -154,21 +170,21 @@ The share of every monthly fee a percentage-paid teacher earns, written as a per
 _Avoid_: Commission, cut
 
 **Teacher share**:
-What one monthly fee payment earned one teacher, worked out and kept on the payment when it's recorded. Raising a teacher's rate changes what they earn from then on and never rewrites what they earned before. Teachers are paid at the end of the month, and once one has been paid for a month, a payment taken in that month can't be removed: the college doesn't refund money whose share has already gone to the teacher.
+What one monthly fee payment earned one teacher, worked out and kept on the payment when it's recorded, in the currency the student paid. Raising a teacher's rate changes what they earn from then on and never rewrites what they earned before. Teachers are paid at the end of the month, and once one has been paid for a month, a payment taken in that month can't be removed: the college doesn't refund money whose share has already gone to the teacher.
 _Avoid_: Commission, accrual
 
 **Unpaid share**:
-Everything a percentage teacher has earned, minus everything the college has paid them: money the college has still to hand over. Nobody sets this by hand.
+Everything a percentage teacher has earned, minus everything the college has paid them: money the college has still to hand over. Nobody sets this by hand. It's kept per currency, and each currency's part is paid out in that currency.
 _Avoid_: Owed, balance, accrued earnings
 
 **Teacher pay**:
-An expense in the Teacher salary category naming the teacher and the month it covers: a fixed salary for that month, or a settlement of what a percentage teacher has earned. A teacher is never paid more than they're due: a percentage teacher up to their unpaid share, a fixed teacher up to their monthly salary for that month across every payment made for it. The app refuses more, whether it's recorded or edited later.
+An expense in the Teacher salary category naming the teacher and the month it covers: a fixed salary for that month, in the salary's currency, or a settlement of what a percentage teacher has earned. A teacher is never paid more than they're due: a percentage teacher up to their unpaid share in the currency being paid, a fixed teacher up to their monthly salary for that month across every payment made for it. The app refuses more, whether it's recorded or edited later.
 _Avoid_: Payroll, payout, wages
 
 **Monthly budget**:
-One branch's plan for one month: the income it expects and what it means to spend on each expense category. Written before the month is spent, and compared against what actually happened.
+One branch's plan for one month: the income it expects and what it means to spend on each expense category, in US dollars. Written before the month is spent, and compared against the combined figures for what actually happened.
 _Avoid_: Forecast, target, projection
 
 **Net balance**:
-Income minus expenses over a day, a month or a branch. Negative means the college spent more than it took.
+Income minus expenses over a day, a month or a branch, worked out for each currency and for the combined figures. Negative means the college spent more than it took.
 _Avoid_: Profit, surplus, bottom line
