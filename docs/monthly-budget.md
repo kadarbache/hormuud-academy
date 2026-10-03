@@ -120,6 +120,10 @@ The difference column is written to be read at a glance:
 
 A few things about the actual figures:
 
+- **They're in dollars, like the plan.** Money taken or spent in shillings is
+  counted at today's exchange rate, so the figures are the same "Combined at
+  today's rate" figures the dashboard shows. They say what the month's money
+  is worth now, so a past month's result moves when the rate changes.
 - **Income** is every payment taken at that branch that month — registration
   fees, monthly fees, books, examination fees and anything else — counted by
   the day the money came in.

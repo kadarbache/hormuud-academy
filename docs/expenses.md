@@ -36,7 +36,8 @@ Press **Record expense** at the top right and fill in the dialog.
 | Field | What to put in it |
 | --- | --- |
 | **Spent on** | The category the money went on: Rent, Electricity, Stationery and so on. Only active categories are offered |
-| **Amount (USD)** | What was spent, like `300` or `300.50`. It has to be above zero |
+| **Amount** | What was spent, like `300` or `300.50` in dollars, or `2,500,000` in shillings. It has to be above zero |
+| **Currency** | USD or SLSH, whichever the money went out in. In shillings, the dialog shows what the amount comes to in dollars at today's rate, and the expense keeps that rate |
 | **Paid by** | Cash, ZAAD, eDahab, or Bank / other |
 | **Paid on** | The day the money actually went out. It starts on today and can't be in the future |
 | **Branch** | The branch the money was spent for. Only active branches are offered, and the box fills itself in when the college has only one |
@@ -78,14 +79,22 @@ The amount that gets filled in depends on how the teacher is paid. A teacher on
 a **percentage** is offered what they've earned and not yet been paid; a teacher
 on a **fixed salary** is offered their monthly salary.
 
+The currency depends on it too. A **fixed salary** is set in one currency on the
+Teachers page and always paid in it, so picking that teacher fixes the Currency
+box. A **percentage teacher** earns in whatever currency each student paid, so
+they can be owed dollars and shillings at once: the amount starts at what
+they're owed in dollars, and switching the Currency box to SLSH switches it to
+what they're owed in shillings. Each is paid separately.
+
 ### Nobody is paid more than they're due
 
 The amount box is checked before anything is saved:
 
-- A **percentage teacher** can be paid up to their unpaid share: what they've
-  earned and haven't been handed yet. Ask for more and you get *"Amina's unpaid
-  share is $120.00. Pay that or less."* If there's nothing left to pay, it says
-  so.
+- A **percentage teacher** can be paid up to their unpaid share in the
+  currency you're paying: what they've earned in it and haven't been handed
+  yet. Ask for more and you get *"Amina's unpaid share in USD is $120.00. Pay
+  that or less."*, with what they're owed in the other currency after it. If
+  there's nothing left to pay in that currency, it says so.
 - A **fixed teacher** can be paid up to their monthly salary for the month the
   pay covers, counting everything already paid for that month. So two half
   payments are fine and a second full salary is refused: *"Amina has been paid
@@ -109,8 +118,8 @@ teacher's salary expense first, then the payment, then record the salary again.
 ### Choosing what you're looking at
 
 At the top: the period picker — **One day**, **One month** or **Everything** —
-and filters for branch, category and teacher. Set what you want and press
-**Apply**; **Clear** puts it all back.
+and filters for branch, category, currency and teacher. Set what you want and
+press **Apply**; **Clear** puts it all back.
 
 The filters travel in the address bar, so a filtered view can be bookmarked or
 sent to somebody else and they'll see exactly the same thing.
@@ -125,9 +134,13 @@ Two small points:
 ### The figures
 
 Under the filters, five cards: the **total spent** over the period you picked,
-then that same total split by Cash, ZAAD, eDahab and Bank / other.
+then that same total split by Cash, ZAAD, eDahab and Bank / other. Each card
+shows the dollars, the shillings, and under a line, **Combined at today's
+rate**: what the two are worth together in dollars now, so it moves when the
+exchange rate changes.
 
-Below them, the spending **by category**. Every active category gets a row even
+Below them, the spending **by category**, with a column for dollars, one for
+shillings and one for the combined figure. Every active category gets a row even
 when nothing was spent on it, so a zero is visibly a zero. A deactivated
 category appears only when money actually went on it in that period.
 
@@ -138,7 +151,11 @@ underneath and a count telling you where you are.
 
 Each row shows the date, the category with your note under it, the branch, how
 it was paid, the amount, and who recorded it. On a teacher salary the line under
-the category shows the teacher and the month instead of the note.
+the category shows the teacher and the month instead of the note. An amount in
+shillings has under it what it was worth the day it was recorded, and at which
+rate, like "≈ $40.94 at 8,550". Like a receipt, that never changes, so once
+the rate moves these no longer add up to the totals above, which are at
+today's rate.
 
 Filter by a teacher and a line appears above the list with a link through to
 what that teacher has earned.
@@ -147,7 +164,9 @@ what that teacher has earned.
 
 **Edit** on a row reopens the same dialog with everything filled in, and
 everything is checked again when you save. The row keeps the name of whoever
-recorded it first.
+recorded it first. An expense in shillings keeps the rate it was first recorded
+at, even if the rate has changed since, so correcting its amount works out its
+dollar value at that same rate.
 
 **Remove** takes the expense back out of the books for good, after a
 confirmation. It's meant for something recorded by mistake, not for an expense
