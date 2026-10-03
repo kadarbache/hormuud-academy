@@ -132,8 +132,8 @@ also passed: scoped lists, blocked admin pages, registering a student with the
 registration fee paid, a monthly fee and a books sale. Not covered as staff:
 adding a skill to an existing student, and finishing or dropping a skill.
 
-**Class times, before it goes live.** Built and committed on 3 Oct 2026, not
-pushed: class times on each skill's page with the clash checks, picking a
+**Class times, live except for their hours.** Built, committed and pushed on
+3 Oct 2026: class times on each skill's page with the clash checks, picking a
 class time when registering a student or adding a skill, and a percentage
 teacher's share coming from the class time's teacher. It began with a
 Shifts page too, dropped the same day (below). Tried in
@@ -175,12 +175,19 @@ to back, the Computer Lab's free 10 am–4 pm and a class with no hours listed
 underneath, on a wide screen and a phone; abdaal branch staff opening their
 own Room A and getting Not found for Main Branch's Room 1.
 
-Production needs the
-`20261003090000_class_times` and `20261003120000_class_time_hours`
-migrations applied, in that order and after a backup, *before* the push, or
-every student and skill screen breaks. Then the admin sets the hours and
-days on every class time the migration made, which show "Time not set"
-until then.
+Both migrations, `20261003090000_class_times` and
+`20261003120000_class_time_hours`, were applied the same day to both of the
+user's Neon databases, `ep-square-silence` and `ep-polished-paper` (the first
+run hit the wrong one by accident, because a `DIRECT_URL` left in the shell
+overrode `.env`), and main was pushed: the deploy was ready in under a
+minute.
+
+Still to do: the admin types the hours and days on every class time the
+migration made, which show "Time not set" until then. Students can join them
+meanwhile, but the app can't check them for clashes. The steps are in the
+system guide, under "Setting the hours on class times that say Time not
+set". Also still to do: reset the Neon database password, which was pasted
+into chat twice.
 
 ## Decided
 

@@ -968,6 +968,36 @@ Each class time row shows its time, days, class, teacher and how many students i
 - **Deactivate** stops it taking new students. The students already in it stay, and it keeps its class and teacher until they've all finished.
 - **Remove**, only while no student has ever been in it.
 
+#### Setting the hours on class times that say "Time not set"
+
+The `class_times` migration turned every skill already set up at a branch into one class time, in the class and with the teacher it already had, and put its students in it. It couldn't know the hours, so each of those class times says **Time not set** until the admin types them. It's a one-time job, done once after the update goes live, and again for any database moved over from before class times existed.
+
+A class time with no hours still works: students can join it and their fees are right. What it can't do is protect you from a clash. The app skips any class time with no hours when it checks whether a class, a teacher or a student is in two places at once, so until you set it, the same room could be given to another skill at the same time and nothing would warn you. It also stays off the week on the Classes page, where it's listed in a **Time not set** box at the bottom, and the Teachers page says "time not set" beside it.
+
+Before you start, write down for every skill at every branch: the hours, the days, and whether it really runs more than once, like a morning group and an evening group. The branch staff or the teachers know. Then, for each skill:
+
+1. Open **Skills** and click the skill's name.
+2. Find the branch's box. In its table, a row with a yellow **Time not set** badge needs its hours.
+3. Press **Set time** on that row. The dialog is called "Change class time at" and the branch's name. The class and the teacher already hold what the skill had before, so leave them unless they're wrong.
+4. Type **Starts** and **Ends**, in 5-minute steps. Any hours work, like 4:00 pm to 5:30 pm, as long as it ends after it starts.
+5. Tick the **Days** it meets.
+6. Press **Save**. The row now shows its hours and days.
+7. Do the same for the branch's other rows and for the skill's other branches, then move on to the next skill.
+
+If the app refuses, nothing is saved, and the message says why:
+
+- *Room 1 already has Graphic Design at 4:00–5:00 pm on Monday.* Another class time holds that class then. Pick other hours or another class.
+- *Demo Teacher 2 already teaches Tailoring at Main Branch at 5:00–6:00 pm on Monday.* The teacher is busy then, here or at another branch. Pick other hours or another teacher.
+- *A student in this class time would be in two places at once,* followed by a student's name and the skill. That student already takes another skill at those hours. Pick other hours, or fix the other skill's class time first.
+
+A skill that really runs twice needs a second class time. After setting the first, press **Add class time** under the same branch and give it the other hours, or another class at the same hours. Then open each student who belongs in the second group and press **Change class time**. Their fees and payments don't change.
+
+When you're done, check it three ways:
+
+- No yellow **Time not set** badge is left on any skill's page.
+- On the Classes page, click each class's name: the **Time not set** box is gone and the week looks like the real timetable.
+- The Teachers page doesn't say "time not set" anywhere.
+
 #### Staff accounts
 
 - **Add staff account.** Enter a name, the person's Gmail address, a role and, for branch staff, their branch. There's no password and no email sending: tell the person yourself that they can sign in with Google.
@@ -1205,6 +1235,8 @@ Admins only, and the first thing under Money. Pick a day, a month and optionally
 **A class moves to another time.** On the skill's page, press Change on that class time and type the new hours or tick other days. Its students move with it. If the new time clashes with another skill one of them takes, the app says who.
 
 **A student wants another time.** Open the student, press Change class time on that skill and pick the new one. Their fees and payments don't change.
+
+**Class times say "Time not set".** They came from before class times had hours. They work, but the app can't check them for clashes until the admin types their hours. See [Setting the hours on class times](#setting-the-hours-on-class-times-that-say-time-not-set).
 
 **A class time closes.** On the skill's page, press Deactivate on it: nobody new can join, and its students keep coming. Their pages show a yellow Class time deactivated badge; open each one and press Change class time. Once nobody is left in it, its class and teacher are free for other class times.
 
