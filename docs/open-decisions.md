@@ -4,7 +4,7 @@ Questions we haven't answered yet, and the code work waiting on them. Move a
 decision to "Decided" when it's settled, and write the rule into CONTEXT.md or
 an ADR if it changes how the system behaves.
 
-Last updated 25 September 2026.
+Last updated 3 October 2026.
 
 ## Open
 
@@ -56,6 +56,25 @@ Cloudinary for student photos only, drop student photos (initials instead), or
 move them to Vercel Blob. Parked on 24 Sep 2026.
 
 ## Still to do (no decision needed)
+
+**Two currencies, before it goes live.** Built on 29 Sep 2026 and tried in
+the browser the same day: no rate refuses shillings; setting the rate (8,550,
+then 9,000); walk-in income, a monthly fee (the box switches to the shilling
+price), a registration fee paid now and one paid later, and an expense, all in
+shillings; a percentage share in shillings rounded to the shilling; paying
+more than a teacher's unpaid share in either currency refused; a fixed salary
+in shillings with the currency locked, dollars refused by the server, and a
+second payment for the month refused; an old shilling expense edited after a
+rate change keeping its rate; the currency filter; staff at abdaal recording
+shillings and blocked from Settings; every screen showing the same combined
+total at today's rate (checked at 12,000), with each receipt still at its own
+day's rate. Production needs the `20260929090000_two_currencies` and
+`20260929130000_dollar_values` migrations applied, in that order and after a
+backup, *before* the push, or every money screen breaks. Then the admin sets
+the exchange rate in Settings, because nothing can be taken in shillings
+until they do. The system guide and the Expenses and Monthly budget guides
+describe both currencies now; the training slides and their screenshots
+still show dollars only.
 
 **Editable expense categories, before it goes live.** Built and tried in
 Chrome on 25 Sep 2026: adding, a duplicate name refused, renaming,
@@ -115,6 +134,32 @@ adding a skill to an existing student, and finishing or dropping a skill.
 
 ## Decided
 
+- **Two currencies, two ledgers: USD and SLSH.** The client wants Somaliland
+  shillings next to dollars. Built on 29 Sep 2026; see "Still to do" for
+  going live, and [ADR 0007](adr/0007-two-currencies-two-ledgers.md).
+  (29 Sep 2026)
+  - Every payment and expense has a USD / SLSH dropdown, USD by default. The
+    two are never added together when stored. Shillings are whole numbers.
+  - A new admin-only Settings page holds the exchange rate: how many
+    shillings one dollar is. Each change records who made it and when.
+  - Each SLSH payment and expense saves the rate it was taken at, and its
+    dollar value that day with it, like a receipt: that never changes.
+  - Every total's combined figure uses today's rate, on every screen,
+    budget included: the dashboard shows what the money is worth now, so it
+    moves when the rate does. Changed the same day from "the rate each
+    payment was taken at", which kept past months still but no longer said
+    what the college has.
+  - Fees stay priced in dollars. A student can pay one in shillings: the
+    amount starts at the fee at today's rate and, like a dollar amount, can be
+    lowered for a discount. Whatever is recorded settles the month, and the
+    shillings go in the SLSH ledger.
+  - A fixed-salary teacher is paid in one currency, set on the teacher. A
+    percentage teacher earns their share in whatever currency the student
+    paid, so their unpaid share has a USD amount and an SLSH amount.
+  - Each dashboard box shows the USD figure, the SLSH figure and a combined
+    total in dollars, all in the one box.
+  - The monthly budget is still planned in dollars and compared against that
+    combined total.
 - **"Unpaid share", not "owed", for teachers.** What a percentage teacher has
   earned and the college hasn't handed over yet is their unpaid share, on the
   Teacher pay screens, the pay dialog and its messages. "Owed" read as the
