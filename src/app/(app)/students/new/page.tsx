@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { PageHeader } from "@/components/page-header";
 import { photoUploadEnabled } from "@/lib/cloudinary";
 import { collegeToday } from "@/lib/dates";
+import { currentRate } from "@/lib/exchange-rate";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { enrollableBranchSkills } from "../queries";
@@ -13,12 +14,13 @@ export default async function NewStudentPage() {
   const user = await requireUser();
   const isAdmin = user.role === "admin";
 
-  const [branches, fixedBranch, branchSkills] = await Promise.all([
+  const [branches, fixedBranch, branchSkills, rate] = await Promise.all([
     isAdmin ? prisma.branch.findMany({ where: { active: true }, orderBy: { name: "asc" } }) : null,
     user.branchId
       ? prisma.branch.findUnique({ where: { id: user.branchId }, select: { id: true, name: true } })
       : null,
     enrollableBranchSkills(isAdmin ? undefined : (user.branchId ?? undefined)),
+    currentRate(),
   ]);
 
   return (
@@ -31,6 +33,7 @@ export default async function NewStudentPage() {
         branches={branches?.map((branch) => ({ value: branch.id, label: branch.name })) ?? null}
         fixedBranch={isAdmin ? null : fixedBranch}
         branchSkills={branchSkills}
+        rate={rate}
         today={collegeToday()}
         photoEnabled={photoUploadEnabled()}
       />

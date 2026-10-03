@@ -2,7 +2,7 @@
 
 import { refresh } from "next/cache";
 import { z } from "zod";
-import type { Prisma } from "@/generated/prisma/client";
+import type { Currency, PaymentMethod, Prisma } from "@/generated/prisma/client";
 import { canActAtBranch } from "@/lib/access";
 import {
   deleteStudentPhoto,
@@ -11,6 +11,7 @@ import {
   uploadStudentPhoto,
 } from "@/lib/cloudinary";
 import { addMonths, collegeToday, toDbDate } from "@/lib/dates";
+import { ledgerFields, NO_RATE_MESSAGE } from "@/lib/exchange-rate";
 import { formatMoney, formatStudentNumber } from "@/lib/format";
 import { isBlankEntry, toStoredPhone } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
@@ -24,6 +25,7 @@ import {
   type FieldErrors,
 } from "@/lib/action-result";
 import {
+  currency,
   formObject,
   isoDate,
   money,
@@ -95,8 +97,15 @@ type BranchSkillForEnrollment = {
   monthlyFee: Prisma.Decimal;
 };
 
-/** The registration fee handed over as the student joins, if it was. */
-type FeePaidNow = { on: string; method: "CASH" | "ZAAD" | "EDAHAB" | "BANK" } | null;
+/**
+ * The registration fee handed over as the student joins, if it was: when, how,
+ * and which ledger it goes in, with the rate for shillings.
+ */
+type FeePaidNow = {
+  on: string;
+  method: PaymentMethod;
+  ledger: { currency: Currency; exchangeRate: string | null };
+} | null;
 
 /**
  * One enrollment, with its registration fee payment attached when the student
@@ -128,7 +137,8 @@ function enrollmentData(
               registrationFeePayment({
                 studentId,
                 branchId: bs.branchId,
-                amount: bs.registrationFee,
+                fee: bs.registrationFee,
+                ledger: paid.ledger,
                 paidOn: paid.on,
                 method: paid.method,
                 recordedById: createdById,
@@ -142,20 +152,26 @@ function enrollmentData(
 
 /**
  * How the registration fees on this form were paid, when the box says they
- * were paid now. The method is only asked for once the box is ticked, so an
- * unticked form has nothing to check.
+ * were paid now. The method and currency are only asked for once the box is
+ * ticked, so an unticked form has nothing to check.
  */
-function readFeePaidNow(
+async function readFeePaidNow(
   values: Record<string, string>,
   paidOn: string,
-): { paid: FeePaidNow; errors: FieldErrors } {
+): Promise<{ paid: FeePaidNow; errors: FieldErrors }> {
   if (values.registrationFeePaid !== "on") return { paid: null, errors: {} };
 
+  const errors: FieldErrors = {};
   const method = paymentMethod().safeParse(values.registrationFeeMethod);
-  if (!method.success) {
-    return { paid: null, errors: { registrationFeeMethod: ["Pick how the fee was paid."] } };
-  }
-  return { paid: { on: paidOn, method: method.data }, errors: {} };
+  if (!method.success) errors.registrationFeeMethod = ["Pick how the fee was paid."];
+
+  const paidIn = currency().safeParse(values.registrationFeeCurrency);
+  const ledger = paidIn.success ? await ledgerFields(paidIn.data) : null;
+  if (!paidIn.success) errors.registrationFeeCurrency = ["Pick the currency it was paid in."];
+  else if (!ledger) errors.registrationFeeCurrency = [NO_RATE_MESSAGE];
+
+  if (!method.success || !ledger) return { paid: null, errors };
+  return { paid: { on: paidOn, method: method.data, ledger }, errors };
 }
 
 export async function registerStudent(formData: FormData): Promise<ActionResult<{ id: string }>> {
@@ -172,7 +188,7 @@ export async function registerStudent(formData: FormData): Promise<ActionResult<
 
   // Paid at registration means paid on the registration date. For a student
   // entered from the old system, that's their original date, not today.
-  const fee = readFeePaidNow(values, values.registrationDate ?? "");
+  const fee = await readFeePaidNow(values, values.registrationDate ?? "");
 
   // Collect every problem at once so the form shows them all together.
   const fieldErrors: FieldErrors = {
@@ -325,7 +341,7 @@ export async function enrollStudent(studentId: string, formData: FormData): Prom
   }
 
   // Paid now means paid today, whatever the start date.
-  const fee = readFeePaidNow(values, collegeToday());
+  const fee = await readFeePaidNow(values, collegeToday());
   if (Object.keys(fee.errors).length > 0) {
     return failure("Check the highlighted fields.", fee.errors);
   }

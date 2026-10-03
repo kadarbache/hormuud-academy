@@ -17,9 +17,11 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { PhoneField, SelectField, TextField } from "@/components/form-fields";
+import type { Currency } from "@/generated/prisma/client";
 import type { FieldErrors } from "@/lib/action-result";
-import { formatMoney, formatMonths } from "@/lib/format";
-import { paymentMethodOptions } from "../finance/labels";
+import { formatMoney, formatMonths, formatRate } from "@/lib/format";
+import { dollarsToShillings } from "@/lib/money";
+import { currencyOptions, paymentMethodOptions } from "../finance/labels";
 import { findStudentsByPhone } from "./actions";
 import type { BranchSkillOption, PhoneMatch, StudentFormValues } from "./types";
 
@@ -260,21 +262,25 @@ export function SkillPicker({
 
 /**
  * A box to tick when the student pays the registration fees for the skills
- * being added straight away, and how they paid. Shows nothing when those
- * skills have no fee. Ticking it writes a payment into the books, so the
- * method has to be asked for.
+ * being added straight away, how they paid, and in which currency. Shows
+ * nothing when those skills have no fee. Ticking it writes a payment into
+ * the books, so the method and currency have to be asked for.
  */
 export function RegistrationFeePaidField({
   skills,
+  rate,
   description,
   errors,
 }: {
   skills: Pick<BranchSkillOption, "id" | "skillName" | "registrationFee">[];
+  /** Shillings to the dollar right now, or null before the admin sets it. */
+  rate: string | null;
   description: string;
-  errors?: string[];
+  errors: { method?: string[]; currency?: string[] };
 }) {
   const id = useId();
   const [paid, setPaid] = useState(false);
+  const [paidIn, setPaidIn] = useState<Currency>("USD");
   const withFee = skills.filter((skill) => Number(skill.registrationFee) > 0);
   if (withFee.length === 0) return null;
 
@@ -283,6 +289,14 @@ export function RegistrationFeePaidField({
     (sum, skill) => sum + Math.round(Number(skill.registrationFee) * 100),
     0,
   );
+  // Each skill's fee becomes its own payment, rounded to the shilling on its
+  // own, so the total is those added up.
+  const totalShillings = rate
+    ? withFee.reduce(
+        (sum, skill) => sum + Number(dollarsToShillings(skill.registrationFee, rate)),
+        0,
+      )
+    : null;
   const breakdown =
     withFee.length > 1
       ? `${withFee.map((skill) => `${skill.skillName} ${formatMoney(skill.registrationFee)}`).join(", ")}. `
@@ -310,13 +324,30 @@ export function RegistrationFeePaidField({
         </FieldContent>
       </Field>
       {paid && (
-        <SelectField
-          label="Paid by"
-          name="registrationFeeMethod"
-          options={paymentMethodOptions}
-          placeholder="Pick one"
-          errors={errors}
-        />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <SelectField
+            label="Paid by"
+            name="registrationFeeMethod"
+            options={paymentMethodOptions}
+            placeholder="Pick one"
+            errors={errors.method}
+          />
+          <SelectField
+            label="Paid in"
+            name="registrationFeeCurrency"
+            options={currencyOptions}
+            value={paidIn}
+            onValueChange={(value) => setPaidIn(value as Currency)}
+            errors={errors.currency}
+          />
+        </div>
+      )}
+      {paid && paidIn === "SLSH" && (rate || !errors.currency?.length) && (
+        <p className={`text-sm ${rate ? "text-muted-foreground" : "text-destructive"}`}>
+          {rate && totalShillings !== null
+            ? `That's ${formatMoney(totalShillings, "SLSH")} at today's rate of ${formatRate(rate)} shillings to the dollar.`
+            : "There's no exchange rate yet, so shillings can't be recorded. The admin sets it under Settings."}
+        </p>
       )}
     </div>
   );

@@ -11,12 +11,15 @@ import type { BranchSkillOption } from "../types";
 export function EnrollDialog({
   action,
   options,
+  rate,
   today,
   showBranch,
   trigger,
 }: {
   action: (formData: FormData) => Promise<ActionResult>;
   options: BranchSkillOption[];
+  /** Shillings to the dollar right now, or null before the admin sets it. */
+  rate: string | null;
   today: string;
   /** Admins pick from every branch, so each option names its branch. */
   showBranch: boolean;
@@ -67,8 +70,12 @@ export function EnrollDialog({
           {selected && (
             <RegistrationFeePaidField
               skills={[selected]}
+              rate={rate}
               description="Tick it if the student paid now. If they'll pay later, record it on this page once they do."
-              errors={errors.registrationFeeMethod}
+              errors={{
+                method: errors.registrationFeeMethod,
+                currency: errors.registrationFeeCurrency,
+              }}
             />
           )}
         </>

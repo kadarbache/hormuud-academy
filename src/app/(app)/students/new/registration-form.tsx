@@ -23,6 +23,7 @@ export function RegistrationForm({
   branches,
   fixedBranch,
   branchSkills,
+  rate,
   today,
   photoEnabled,
 }: {
@@ -31,6 +32,8 @@ export function RegistrationForm({
   /** The staff member's own branch. Null for an admin. */
   fixedBranch: { id: string; name: string } | null;
   branchSkills: BranchSkillOption[];
+  /** Shillings to the dollar right now, or null before the admin sets it. */
+  rate: string | null;
   today: string;
   photoEnabled: boolean;
 }) {
@@ -124,8 +127,12 @@ export function RegistrationForm({
             />
             <RegistrationFeePaidField
               skills={pickedOptions}
+              rate={rate}
               description="Tick it if the student paid now. It's recorded as paid on the registration date. If they'll pay later, record it on their page once they do."
-              errors={fieldErrors.registrationFeeMethod}
+              errors={{
+                method: fieldErrors.registrationFeeMethod,
+                currency: fieldErrors.registrationFeeCurrency,
+              }}
             />
           </FieldGroup>
         </CardContent>

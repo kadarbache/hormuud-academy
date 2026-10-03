@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ActionButton } from "@/components/action-button";
 import { DataTable } from "@/components/data-table";
 import { EmptyRow } from "@/components/status-badge";
-import type { Prisma } from "@/generated/prisma/client";
+import type { Currency, Prisma } from "@/generated/prisma/client";
 import { canActAtBranch } from "@/lib/access";
 import {
   collegeToday,
@@ -19,7 +19,8 @@ import {
   fromDbMonth,
   toCollegeDate,
 } from "@/lib/dates";
-import { formatMoney, formatStudentNumber } from "@/lib/format";
+import { currentRate } from "@/lib/exchange-rate";
+import { formatBoth, formatMoney, formatStudentNumber } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { sumMoney } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
@@ -57,6 +58,7 @@ type FeePayment = {
   category: string;
   method: keyof typeof paymentMethodLabels;
   amount: Prisma.Decimal;
+  currency: Currency;
   paidOn: Date;
   forMonth: Date | null;
   recordedBy: { name: string };
@@ -92,12 +94,14 @@ function RegistrationFee({
   payment,
   canRecord,
   isAdmin,
+  rate,
   today,
 }: {
   enrollment: { id: string; registrationFee: Prisma.Decimal; skill: { name: string } };
   payment: FeePayment | undefined;
   canRecord: boolean;
   isAdmin: boolean;
+  rate: string | null;
   today: string;
 }) {
   const fee = enrollment.registrationFee.toString();
@@ -119,7 +123,11 @@ function RegistrationFee({
       )}
       {payment && (
         <div className="text-xs text-muted-foreground">
-          Paid {formatDate(payment.paidOn)} by {paymentMethodLabels[payment.method]}, recorded by{" "}
+          {/* Paid in shillings, the amount isn't the fee shown above, so it's spelled out. */}
+          Paid{" "}
+          {payment.currency === "SLSH" &&
+            `${formatMoney(payment.amount.toString(), "SLSH")} on `}
+          {formatDate(payment.paidOn)} by {paymentMethodLabels[payment.method]}, recorded by{" "}
           {payment.recordedBy.name}
         </div>
       )}
@@ -129,7 +137,8 @@ function RegistrationFee({
             <RecordRegistrationFeeDialog
               action={recordRegistrationFee.bind(null, enrollment.id)}
               skillName={enrollment.skill.name}
-              fee={formatMoney(fee)}
+              fee={fee}
+              rate={rate}
               today={today}
               trigger={
                 <Button variant="outline" size="xs">
@@ -166,6 +175,7 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
   const isAdmin = user.role === "admin";
   const canEdit = canEditStudent(user, student);
   const today = collegeToday();
+  const rate = await currentRate();
   // The admin sees every enrollment, so this is the student's whole record.
   const paidAMonthlyFee = student.enrollments.some((enrollment) =>
     enrollment.payments.some((payment) => payment.category === "MONTHLY_FEE"),
@@ -194,13 +204,18 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
     ).map((month) => ({ month, payment: paidByMonth.get(month) }));
 
     const unpaidMonths = months.filter((row) => !row.payment);
+    const paid = [...paidByMonth.values()];
     return {
       enrollment,
       months,
       paidCount: months.length - unpaidMonths.length,
       // What's still owed is the fee they joined at, once per unpaid month.
       owed: sumMoney(unpaidMonths.map(() => enrollment.monthlyFee.toString())),
-      collected: sumMoney([...paidByMonth.values()].map((payment) => payment.amount.toString())),
+      // Kept per currency: dollars and shillings are never added together.
+      collected: {
+        USD: sumMoney(paid.filter((p) => p.currency === "USD").map((p) => p.amount.toString())),
+        SLSH: sumMoney(paid.filter((p) => p.currency === "SLSH").map((p) => p.amount.toString())),
+      },
     };
   });
 
@@ -263,6 +278,7 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
           <EnrollDialog
             action={enrollStudent.bind(null, student.id)}
             options={enrollOptions}
+            rate={rate}
             today={today}
             showBranch={isAdmin}
             trigger={
@@ -383,6 +399,7 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
                       )}
                       canRecord={canAct}
                       isAdmin={isAdmin}
+                      rate={rate}
                       today={today}
                     />
                   ),
@@ -471,7 +488,7 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
                     </div>
                     <div className="text-sm text-muted-foreground">
                       {paidCount} of {months.length} months paid,{" "}
-                      <span className="tabular-nums">{formatMoney(collected)}</span> collected
+                      <span className="tabular-nums">{formatBoth(collected)}</span> collected
                       {Number(owed) > 0 && (
                         <>
                           {" · "}
@@ -497,7 +514,8 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
                             className="h-8 px-3"
                             title={`Paid ${formatDate(payment.paidOn)} by ${paymentMethodLabels[payment.method]}, recorded by ${payment.recordedBy.name}`}
                           >
-                            {formatMonth(month)} · {formatMoney(payment.amount.toString())}
+                            {formatMonth(month)} ·{" "}
+                            {formatMoney(payment.amount.toString(), payment.currency)}
                           </Badge>
                         ) : canAct ? (
                           <RecordMonthlyFeeDialog
@@ -507,6 +525,7 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
                             month={month}
                             monthLabel={formatMonth(month)}
                             monthlyFee={enrollment.monthlyFee.toString()}
+                            rate={rate}
                             today={today}
                             trigger={
                               <Button variant="outline" size="sm" className={warning}>
