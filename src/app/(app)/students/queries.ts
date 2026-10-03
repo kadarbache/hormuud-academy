@@ -7,9 +7,29 @@ import { prisma } from "@/lib/prisma";
 import { one, type SearchParams } from "@/lib/search-params";
 import type { CurrentUser } from "@/lib/session";
 import { browsableStudents, visibleEnrollments } from "./access";
-import type { BranchSkillOption } from "./types";
+import type { BranchSkillOption, ClassTimeOption } from "./types";
 
 export const PAGE_SIZE = 25;
+
+/** A branch skill's class times taking students, with what a picker shows. */
+const openClassTimes = {
+  where: { active: true },
+  include: { classroom: { select: { name: true } }, teacher: { select: { name: true } } },
+} satisfies Prisma.BranchSkill$classTimesArgs;
+
+/** Those class times as picker options, by the clock, with any not set yet first. */
+function classTimeOptions(
+  classTimes: Prisma.ClassTimeGetPayload<typeof openClassTimes>[],
+): ClassTimeOption[] {
+  return classTimes
+    .toSorted((a, b) => (a.startMinute ?? -1) - (b.startMinute ?? -1))
+    .map((classTime) => ({
+      id: classTime.id,
+      when: formatSlot(classTime),
+      classroomName: classTime.classroom.name,
+      teacherName: classTime.teacher.name,
+    }));
+}
 
 /**
  * An enrollment whose registration fee is still owed: above zero, with no
@@ -183,10 +203,15 @@ export async function getStudentProfile(user: CurrentUser, id: string) {
             include: { recordedBy: { select: { name: true } } },
           },
           branchSkill: {
-            select: { branchId: true, branch: { select: { name: true } } },
+            select: {
+              branchId: true,
+              branch: { select: { name: true } },
+              classTimes: openClassTimes,
+            },
           },
           classTime: {
             select: {
+              active: true,
               startMinute: true,
               endMinute: true,
               days: true,
@@ -207,8 +232,24 @@ export async function getStudentProfile(user: CurrentUser, id: string) {
     select: { skillId: true },
   });
 
+  // Where each active skill can move to: the skill's other class times that
+  // are taking students.
+  const otherClassTimes = new Map(
+    student.enrollments.map((enrollment) => [
+      enrollment.id,
+      enrollment.status === "ACTIVE"
+        ? classTimeOptions(
+            enrollment.branchSkill.classTimes.filter(
+              (classTime) => classTime.id !== enrollment.classTimeId,
+            ),
+          )
+        : [],
+    ]),
+  );
+
   return {
     student,
+    otherClassTimes,
     isActive: activeAnywhere.length > 0,
     activeSkillIds: activeAnywhere.map((e) => e.skillId),
   };
@@ -226,13 +267,7 @@ export async function enrollableBranchSkills(branchId?: string): Promise<BranchS
     orderBy: [{ branch: { name: "asc" } }, { skill: { name: "asc" } }],
     include: {
       branch: { select: { name: true } },
-      classTimes: {
-        where: { active: true },
-        include: {
-          classroom: { select: { name: true } },
-          teacher: { select: { name: true } },
-        },
-      },
+      classTimes: openClassTimes,
       skill: {
         select: {
           name: true,
@@ -249,14 +284,7 @@ export async function enrollableBranchSkills(branchId?: string): Promise<BranchS
     skillId: row.skillId,
     skillName: row.skill.name,
     categoryName: row.skill.category.name,
-    classTimes: row.classTimes
-      .toSorted((a, b) => (a.startMinute ?? -1) - (b.startMinute ?? -1))
-      .map((classTime) => ({
-        id: classTime.id,
-        when: formatSlot(classTime),
-        classroomName: classTime.classroom.name,
-        teacherName: classTime.teacher.name,
-      })),
+    classTimes: classTimeOptions(row.classTimes),
     durationMonths: row.durationMonths,
     registrationFee: row.registrationFee.toString(),
     monthlyFee: row.monthlyFee.toString(),

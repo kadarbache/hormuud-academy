@@ -31,12 +31,14 @@ import { recordMonthlyFee, recordRegistrationFee } from "../../finance/income/ac
 import { paymentMethodLabels } from "../../finance/labels";
 import { canEditStudent } from "../access";
 import {
+  changeClassTime,
   changeRegistrationFee,
   deleteStudent,
   enrollStudent,
   setEnrollmentStatus,
 } from "../actions";
 import { enrollableBranchSkills, getStudentProfile } from "../queries";
+import { ChangeClassTimeDialog } from "./change-class-time-dialog";
 import { EnrollDialog } from "./enroll-dialog";
 import {
   ChangeFeeDialog,
@@ -172,7 +174,7 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
   const profile = await getStudentProfile(user, id);
   if (!profile) notFound();
 
-  const { student, isActive, activeSkillIds } = profile;
+  const { student, otherClassTimes, isActive, activeSkillIds } = profile;
   const isAdmin = user.role === "admin";
   const canEdit = canEditStudent(user, student);
   const today = collegeToday();
@@ -359,6 +361,9 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
               const pastEnd =
                 enrollment.status === "ACTIVE" && fromDbDate(enrollment.endDate) < today;
               const canAct = canActAtBranch(user, enrollment.branchSkill.branchId);
+              const { classTime } = enrollment;
+              const where = `${classTime.classroom.name} with ${classTime.teacher.name}`;
+              const moveTo = otherClassTimes.get(enrollment.id) ?? [];
               return {
                 key: enrollment.id,
                 title: enrollment.skill.name,
@@ -374,10 +379,14 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
                   ),
                   "Class time": (
                     <>
-                      <div>{formatSlot(enrollment.classTime)}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {enrollment.classTime.classroom.name} with {enrollment.classTime.teacher.name}
-                      </div>
+                      <div>{formatSlot(classTime)}</div>
+                      <div className="text-xs text-muted-foreground">{where}</div>
+                      {/* Still coming to a class time that's closing: time to move them. */}
+                      {enrollment.status === "ACTIVE" && !classTime.active && (
+                        <Badge variant="outline" className={`mt-1 ${warning}`}>
+                          Class time deactivated
+                        </Badge>
+                      )}
                     </>
                   ),
                   Dates: (
@@ -410,6 +419,19 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
                     <div className="flex justify-end gap-1">
                       {enrollment.status === "ACTIVE" ? (
                         <>
+                          {moveTo.length > 0 && (
+                            <ChangeClassTimeDialog
+                              action={changeClassTime.bind(null, enrollment.id)}
+                              skillName={enrollment.skill.name}
+                              current={`${formatSlot(classTime)} in ${where}`}
+                              options={moveTo}
+                              trigger={
+                                <Button variant="ghost" size="sm">
+                                  Change class time
+                                </Button>
+                              }
+                            />
+                          )}
                           <ActionButton
                             variant="ghost"
                             size="sm"

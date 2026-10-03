@@ -13,12 +13,13 @@ import {
 import {
   formatDayList,
   formatHours,
+  formatSlot,
   sharedDays,
   slotOf,
   slotsClash,
   type ClassTimeHours,
 } from "@/lib/class-times";
-import { studentClash } from "@/lib/clashes";
+import { classTimeClash, studentClash } from "@/lib/clashes";
 import { addMonths, collegeToday, toDbDate } from "@/lib/dates";
 import { ledgerFields, NO_RATE_MESSAGE } from "@/lib/exchange-rate";
 import { formatMoney, formatStudentNumber } from "@/lib/format";
@@ -442,6 +443,58 @@ export async function enrollStudent(studentId: string, formData: FormData): Prom
   return success(`${student.fullName} now takes ${branchSkill.skill.name}.`);
 }
 
+/**
+ * Moves a student to another of the skill's class times, say from the evening
+ * to the morning. Fees, dates and payments stay as they are. A percentage
+ * teacher earns from the fees paid after the move, so the new class time's
+ * teacher earns from then on and the old one keeps what they already earned.
+ */
+export async function changeClassTime(
+  enrollmentId: string,
+  formData: FormData,
+): Promise<ActionResult> {
+  const user = await requireUser();
+  const parsed = z
+    .object({ classTimeId: z.string({ error: "Pick a class time." }).min(1, "Pick a class time.") })
+    .safeParse(formObject(formData));
+  if (!parsed.success) return invalid(parsed.error);
+
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { id: enrollmentId },
+    include: {
+      skill: { select: { name: true } },
+      branchSkill: { select: { branchId: true, classTimes: openClassTimes } },
+    },
+  });
+  if (!enrollment) return failure("That skill record no longer exists.");
+  if (!canActAtBranch(user, enrollment.branchSkill.branchId)) {
+    return failure("Only staff at the skill's branch can change it.");
+  }
+  if (enrollment.status !== "ACTIVE") {
+    return failure(`${enrollment.skill.name} isn't active, so there's no class time to change.`);
+  }
+  if (enrollment.classTimeId === parsed.data.classTimeId) {
+    return failure("The student is already in that class time.");
+  }
+  const classTime = enrollment.branchSkill.classTimes.find(
+    (open) => open.id === parsed.data.classTimeId,
+  );
+  if (!classTime) {
+    return failure("That class time isn't taking students now. Close this and try again.");
+  }
+  // Measured against the student's other skills, not the one being moved.
+  const slot = slotOf(classTime);
+  const clash = slot ? await studentClash([enrollment.studentId], slot, { id: enrollmentId }) : null;
+  if (clash) return failure(`${clash} Pick another class time.`);
+
+  await prisma.enrollment.update({
+    where: { id: enrollmentId },
+    data: { classTimeId: classTime.id },
+  });
+  refresh();
+  return success(`${enrollment.skill.name} moved to ${formatSlot(classTime)}.`);
+}
+
 export async function setEnrollmentStatus(
   enrollmentId: string,
   status: "ACTIVE" | "FINISHED" | "DROPPED",
@@ -449,13 +502,45 @@ export async function setEnrollmentStatus(
   const user = await requireUser();
   const enrollment = await prisma.enrollment.findUnique({
     where: { id: enrollmentId },
-    include: { skill: { select: { name: true } }, branchSkill: { select: { branchId: true } } },
+    include: {
+      skill: { select: { name: true } },
+      branchSkill: { select: { branchId: true } },
+      classTime: {
+        select: {
+          id: true,
+          active: true,
+          classroomId: true,
+          teacherId: true,
+          startMinute: true,
+          endMinute: true,
+          days: true,
+        },
+      },
+    },
   });
   if (!enrollment) return failure("That skill record no longer exists.");
   if (!canActAtBranch(user, enrollment.branchSkill.branchId)) {
     return failure("Only staff at the skill's branch can change it.");
   }
   if (enrollment.status === status) return success();
+
+  // Set active again, the student is back in their class time, which mustn't
+  // clash with the skills they took up since.
+  const slot = slotOf(enrollment.classTime);
+  if (status === "ACTIVE" && slot) {
+    const clash = await studentClash([enrollment.studentId], slot, { id: enrollmentId });
+    if (clash) return failure(`${clash} Finish, drop or move that skill first.`);
+    // A deactivated class time with nobody left in it let go of its class and
+    // teacher, and another class time may have taken them since.
+    if (!enrollment.classTime.active) {
+      const taken = await classTimeClash({ ...enrollment.classTime, slot });
+      if (taken) {
+        return failure(
+          `Its class time was deactivated, and since then: ${taken.message} Add ${enrollment.skill.name} again in another class time instead.`,
+        );
+      }
+    }
+  }
 
   try {
     await prisma.enrollment.update({
