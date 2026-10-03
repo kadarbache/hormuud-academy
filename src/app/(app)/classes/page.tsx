@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ActionButton } from "@/components/action-button";
@@ -52,8 +53,8 @@ export default async function ClassesPage() {
         title="Classes"
         description={
           isAdmin
-            ? "The rooms at each branch. A class holds different skills at different times, set as class times on the Skills page."
-            : "The rooms at your branch and the class times in each. Only the admin can change them."
+            ? "The rooms at each branch. A class holds different skills at different times, set as class times on the Skills page. Open a class to see its week."
+            : "The rooms at your branch and the class times in each. Open a class to see its week. Only the admin can change them."
         }
       >
         {isAdmin && (
@@ -97,7 +98,11 @@ export default async function ClassesPage() {
             title: classroom.name,
             description: isAdmin ? classroom.branch.name : undefined,
             cells: {
-              Class: classroom.name,
+              Class: (
+                <Link href={`/classes/${classroom.id}`} className="hover:underline">
+                  {classroom.name}
+                </Link>
+              ),
               Branch: classroom.branch.name,
               // What still meets here: class times that are active or still
               // have students.
