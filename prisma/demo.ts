@@ -7,9 +7,26 @@ import "dotenv/config";
 import { randomBytes } from "node:crypto";
 import { auth } from "../src/lib/auth";
 import { addMonths, collegeToday, monthOf, toDbDate, toDbMonth } from "../src/lib/dates";
+import { dollarsToShillings, dollarValue, inLedger, percentOf, type Ledger } from "../src/lib/money";
 import { prisma } from "../src/lib/prisma";
 
 type Method = "CASH" | "ZAAD" | "EDAHAB" | "BANK";
+
+/** The exchange rate the demo sets: shillings to one dollar. */
+const RATE = "8550";
+
+const ledgers: Record<"USD" | "SLSH", Ledger> = {
+  USD: { currency: "USD", exchangeRate: null },
+  SLSH: { currency: "SLSH", exchangeRate: RATE },
+};
+
+/** Where a demo amount set in dollars goes: as it is, or in shillings at the demo rate. */
+function paidIn(currency: "USD" | "SLSH", dollars: string) {
+  return inLedger(
+    currency === "SLSH" ? dollarsToShillings(dollars, RATE) : dollars,
+    ledgers[currency],
+  );
+}
 
 /** Spreads the demo payments across the methods so the day's split isn't flat. */
 const methods: Method[] = ["CASH", "ZAAD", "CASH", "EDAHAB", "CASH", "BANK"];
@@ -33,6 +50,9 @@ async function main() {
   const admin = await prisma.user.findFirst({ where: { role: "admin" } });
   if (!admin) throw new Error("Run pnpm db:seed first to create the admin.");
 
+  // Shillings can only be recorded once there's a rate to keep on them.
+  await prisma.exchangeRate.create({ data: { rate: RATE, setById: admin.id } });
+
   const tech = await prisma.category.findUniqueOrThrow({ where: { name: "Technology Skills" } });
   const hand = await prisma.category.findUniqueOrThrow({ where: { name: "Hand Skills" } });
 
@@ -50,11 +70,14 @@ async function main() {
     prisma.classroom.create({ data: { name: "Room B", branchId: second.id } }),
   ]);
 
-  // Two teachers on a fixed salary, two on a share of the fees they bring in.
+  // Two teachers on a fixed salary, one of them paid in shillings, and two
+  // on a share of the fees they bring in.
   const teacher = (
     name: string,
     branchIds: string[],
-    pay: { salaryType: "FIXED"; fixedSalary: string } | { salaryType: "PERCENTAGE"; percentageRate: string },
+    pay:
+      | { salaryType: "FIXED"; fixedSalary: string; salaryCurrency?: "USD" | "SLSH" }
+      | { salaryType: "PERCENTAGE"; percentageRate: string },
   ) =>
     prisma.teacher.create({
       data: { name, ...pay, branches: { create: branchIds.map((branchId) => ({ branchId })) } },
@@ -63,7 +86,11 @@ async function main() {
     teacher("Demo Teacher 1", [main.id], { salaryType: "FIXED", fixedSalary: "200" }),
     teacher("Demo Teacher 2", [main.id], { salaryType: "PERCENTAGE", percentageRate: "30" }),
     teacher("Demo Teacher 3", [main.id, second.id], { salaryType: "PERCENTAGE", percentageRate: "25" }),
-    teacher("Demo Teacher 4", [second.id], { salaryType: "FIXED", fixedSalary: "150" }),
+    teacher("Demo Teacher 4", [second.id], {
+      salaryType: "FIXED",
+      fixedSalary: "1300000",
+      salaryCurrency: "SLSH",
+    }),
   ]);
 
   const skill = (
@@ -149,6 +176,8 @@ async function main() {
       paid: boolean;
       /** How many months of fees have been paid, oldest first. */
       monthsPaid: number;
+      /** What the fees were paid in. Dollars unless it says otherwise. */
+      currency?: "USD" | "SLSH";
       status?: "FINISHED" | "DROPPED";
     }[];
   }[] = [
@@ -197,13 +226,15 @@ async function main() {
       homeBranchId: second.id,
       registered: monthsAgo(2),
       // Registered at the second branch, also taking a skill at the main one,
-      // whose registration fee is still unpaid.
+      // whose registration fee is still unpaid. Pays the second branch in
+      // shillings, so her teacher's share is in shillings too.
       skills: [
         {
           offer: withTeacher(secondElectrical, t3),
           start: monthsAgo(2),
           paid: true,
           monthsPaid: 3,
+          currency: "SLSH",
         },
         {
           offer: withTeacher(mainDesign, t2),
@@ -245,7 +276,7 @@ async function main() {
       },
     });
 
-    for (const { offer, start, paid, monthsPaid, status } of student.skills) {
+    for (const { offer, start, paid, monthsPaid, currency = "USD", status } of student.skills) {
       // Created one at a time, not with createMany, because each fee payment
       // needs the id of the enrollment it belongs to.
       const enrollment = await prisma.enrollment.create({
@@ -268,7 +299,7 @@ async function main() {
           data: {
             category: "REGISTRATION_FEE",
             method: methodFor(payments++),
-            amount: offer.registrationFee,
+            ...paidIn(currency, offer.registrationFee),
             paidOn: toDbDate(start),
             branchId: offer.branchId,
             studentId: created.id,
@@ -281,14 +312,13 @@ async function main() {
       // The oldest months are the ones that have been paid; whatever is left
       // shows on the student's page as owed.
       for (const month of monthsUpToNow(start, offer.durationMonths, today).slice(0, monthsPaid)) {
-        const share = offer.rate
-          ? ((Math.round(Number(offer.fee) * 100 * Number(offer.rate)) / 100) / 100).toFixed(2)
-          : null;
+        const fee = paidIn(currency, offer.fee);
+        const share = offer.rate ? percentOf(fee.amount, offer.rate, currency) : null;
         await prisma.payment.create({
           data: {
             category: "MONTHLY_FEE",
             method: methodFor(payments++),
-            amount: offer.fee,
+            ...fee,
             paidOn: toDbDate(`${month}-05` <= today ? `${month}-05` : today),
             forMonth: toDbMonth(month),
             branchId: offer.branchId,
@@ -296,7 +326,12 @@ async function main() {
             enrollmentId: enrollment.id,
             recordedById: admin.id,
             ...(share
-              ? { teacherId: offer.teacherId, teacherSharePercent: offer.rate, teacherShare: share }
+              ? {
+                  teacherId: offer.teacherId,
+                  teacherSharePercent: offer.rate,
+                  teacherShare: share,
+                  teacherShareUsdValue: dollarValue(share, ledgers[currency]),
+                }
               : {}),
           },
         });
@@ -309,7 +344,7 @@ async function main() {
     data: {
       category: "BOOKS",
       method: "CASH",
-      amount: "30",
+      ...paidIn("USD", "30"),
       paidOn: toDbDate(today),
       branchId: main.id,
       note: "Two design textbooks",
@@ -323,14 +358,15 @@ async function main() {
   const expense = (
     branchId: string,
     categoryId: "rent" | "electricity" | "internet" | "stationery",
-    amount: string,
+    dollars: string,
     month: string,
+    currency: "USD" | "SLSH" = "USD",
   ) =>
     prisma.expense.create({
       data: {
         categoryId,
         method: "CASH",
-        amount,
+        ...paidIn(currency, dollars),
         spentOn: toDbDate(`${month}-03` <= today ? `${month}-03` : today),
         branchId,
         recordedById: admin.id,
@@ -341,21 +377,23 @@ async function main() {
     await expense(main.id, "electricity", "60", month);
     await expense(main.id, "internet", "35", month);
     await expense(second.id, "rent", "200", month);
-    await expense(second.id, "electricity", "40", month);
+    // The second branch pays its electricity in shillings.
+    await expense(second.id, "electricity", "40", month, "SLSH");
   }
   await expense(main.id, "stationery", "25", monthOf(today));
 
-  // Last month's salaries went out; this month's haven't yet.
+  // Last month's salaries went out, each in its own currency; this month's
+  // haven't yet.
   const lastMonth = monthOf(monthsAgo(1));
-  for (const [teach, branchId, amount] of [
-    [t1, main.id, "200"],
-    [t4, second.id, "150"],
+  for (const [teach, branchId, pay] of [
+    [t1, main.id, inLedger("200", ledgers.USD)],
+    [t4, second.id, inLedger("1300000", ledgers.SLSH)],
   ] as const) {
     await prisma.expense.create({
       data: {
         categoryId: "teacher_salary",
         method: "CASH",
-        amount,
+        ...pay,
         spentOn: toDbDate(`${lastMonth}-28` <= today ? `${lastMonth}-28` : today),
         forMonth: toDbMonth(lastMonth),
         branchId,
@@ -392,6 +430,7 @@ async function main() {
   ]);
 
   console.log("Demo data added: 2 branches, 4 skills, 4 teachers, 4 students.");
+  console.log(`Exchange rate: ${RATE} shillings to the dollar. The second branch takes some shillings.`);
   console.log(`Money: ${payments + 1} payments, expenses for two months, and this month's budget.`);
   console.log(`Branch staff login for Main Branch: staff@college.local / ${staffPassword}`);
 }
