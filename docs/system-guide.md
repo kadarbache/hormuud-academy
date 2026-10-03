@@ -214,6 +214,8 @@ These are all the libraries in `package.json`.
 | `eslint`, `eslint-config-next` | 9, 16.3.5 | Lint rules, including the React Compiler rules |
 | `babel-plugin-react-compiler` | 1.0 | The React Compiler |
 | `tsx` | 4.23 | Runs TypeScript scripts directly, for the seed and demo scripts |
+| `@serwist/turbopack`, `serwist` | 9.5 | Build the service worker that makes the app installable and shows the offline page. See [Installing it as an app](#installing-it-as-an-app) |
+| `esbuild` | 0.28 | Bundles the service worker; Serwist runs it during the build |
 | `@types/node`, `@types/react`, `@types/react-dom`, `@types/pg` | | Type information for those libraries |
 
 The fonts are Inter for text and Geist Mono for the student ID on a student's page, loaded by `next/font` in `src/app/layout.tsx`.
@@ -260,10 +262,18 @@ hormuud-academy/
 │   ├── seed.ts                  Creates the first admin and the two starting categories
 │   └── demo.ts                  Sample data for trying the app locally
 ├── prisma.config.ts             Where the Prisma CLI finds the schema and the database
-├── next.config.ts               Next.js settings: React Compiler, 6 MB uploads, Cloudinary images
+├── next.config.ts               Next.js settings: React Compiler, 6 MB uploads, Cloudinary images,
+│                                retrying when the connection drops, Serwist
+├── public/icons/                The app icons a phone puts on its home screen
 ├── src/
 │   ├── app/                     Every page, by URL
-│   │   ├── layout.tsx           The outer page: fonts and pop-up messages
+│   │   ├── layout.tsx           The outer page: fonts, pop-up messages, the offline banner,
+│   │   │                        and the service worker
+│   │   ├── manifest.ts          The app's name, icons and colours when it's installed
+│   │   ├── icon.svg, apple-icon.png The graduation cap in browser tabs and on iPhones
+│   │   ├── sw.ts                The service worker
+│   │   ├── serwist/             Builds sw.ts and serves it at /serwist/sw.js
+│   │   ├── ~offline/            The "You're offline" page
 │   │   ├── login/               The login page and its server actions (password and Google)
 │   │   ├── api/auth/            Better Auth's web endpoints
 │   │   └── (app)/               Everything behind the login
@@ -405,6 +415,19 @@ sequenceDiagram
 | `TextField`, `SelectField` | `src/components/form-fields.tsx` | A labelled input or dropdown with its error message |
 | `SelectInput` | `src/components/select-input.tsx` | The one dropdown every screen uses: the form fields, the students filters and the theme picker. Built on the shadcn `select`. The page draws the list itself, so it gets the app's font and theme, which the browser's own `<select>` list can't. It can't take an empty option value, so a "no filter" choice like "Any skill" needs a real value |
 | `PageHeader`, `ActiveBadge`, `EmptyRow` | `src/components/` | The page title row, the Active/Inactive badge, the "nothing here yet" box |
+
+### Installing it as an app
+
+The app is a PWA (progressive web app): a website a phone or computer can install like an app. Installed, it gets the graduation cap on the home screen and opens full screen, without the browser's address bar. It's still the same website, so every deploy reaches installed copies straight away, with no app store.
+
+Four pieces make it work:
+
+- **The manifest** (`src/app/manifest.ts`, served at `/manifest.webmanifest`) tells the phone the app's name, icons and colours, and that it opens on `/students`.
+- **The service worker** (`src/app/sw.ts`) is a small script the browser keeps running for the site, even between visits. It sits between the app and the internet and decides what comes from the network and what from the phone. Serwist builds it during `pnpm build` and serves it at `/serwist/sw.js`. It's switched off under `pnpm dev`, where a cache would serve stale code; to try it locally, run `pnpm build` then `pnpm start`.
+- **The offline page** (`src/app/~offline/`). When a page can't load because there's no internet, the service worker shows this instead of the browser's error. The address stays the page you wanted, so **Try again** reloads it.
+- **The offline banner** (`src/components/offline-banner.tsx`). Next.js's `useOffline` setting notices when a page load or a save fails for lack of internet. Instead of failing, the request waits, and goes through by itself once the connection is back. Meanwhile a yellow strip across the top says "No internet".
+
+What the service worker keeps on the phone is only the app's own files (scripts, styles, fonts, icons) and the offline page, about 1.3 MB, downloaded once per deploy. **It never keeps pages.** Pages hold student records and payments, and a phone at a branch may be shared: if pages were cached, the next person could read them offline after the first one logged out. That's why `sw.ts` doesn't use Serwist's ready-made cache list, which would keep them. For the same reason the app doesn't reload itself when the connection comes back: a reload would throw away a form someone was halfway through.
 
 ### Security and permissions
 
@@ -836,6 +859,14 @@ Until the switch-over finishes, the email and password form is still under the G
 
 To log out, use **Log out** at the bottom of the sidebar.
 
+### Installing the app on a phone or computer
+
+- **Android (Chrome):** open the app's address, then the ⋮ menu → **Install app** (or **Add to Home screen**). Chrome sometimes offers it by itself at the bottom of the screen.
+- **iPhone (Safari):** open the address, tap the Share button, then **Add to Home Screen**.
+- **Computer (Chrome or Edge):** the install icon at the right of the address bar.
+
+The installed app logs in the same way and shows the same screens. Without internet it shows "You're offline" instead of a page. If the connection drops while a page is open, a yellow strip appears at the top, and anything you pressed Save on goes through when the connection is back. Don't press Save twice.
+
 ### The screen layout
 
 - **The sidebar** on the left. Students (**Students** and **Register student**) is there for everyone. Admins also get Money (**Dashboard**, **Income**, **Fees owed**, **Expenses**, **Expense categories**, **Teacher pay**, **Monthly budget**) and Admin (**Branches**, **Skills**, **Categories**, **Teachers**, **Classes**, **Staff accounts**, **Settings**). Branch staff get Your branch instead (**Income**, **Fees owed**, **Teachers** and **Classes**), which shows only their own branch; the teachers and classes there can't be changed. The bottom shows your name, your role and your branch.
@@ -1155,6 +1186,7 @@ Admins only, and the first thing under Money. Pick a day, a month and optionally
 | `pnpm lint` | Checks the code for mistakes |
 | `pnpm typecheck` | Checks the TypeScript types |
 | `pnpm build` | Builds the production version. Run it before every commit, because it catches problems the type check misses |
+| `pnpm start` | Runs the built version at http://localhost:3000. The only way to try the service worker and offline page locally |
 | `pnpm db:studio` | Opens Prisma Studio to look at the data |
 | `pnpm db:deploy` | Applies migrations to the production database |
 
@@ -1235,6 +1267,8 @@ Everything here was left out of Phase 1 on purpose, or is a known gap:
 - No import from the old system. Old students are typed in by hand.
 - No printing: no ID cards, receipts or registration forms.
 - No emails. Staff sign in with Google, so there's nothing to send.
+- The app doesn't work offline. Installed, it shows an offline page and holds saves until the connection is back, but registering a student or recording a payment with no internet would need every form to queue its work on the phone, and that isn't built.
+- No push notifications on phones.
 - Photos stay off until the Cloudinary keys are set.
 - No record of who changed what. Only who registered a student, who added each enrollment, who recorded each payment and expense, and who saved each budget. A fee the admin lowered or waived doesn't show what it was before, and an edited expense doesn't show its old amount.
 - Each branch runs a skill once, with one teacher in one class. There are no morning and evening groups of the same skill at the same branch.
