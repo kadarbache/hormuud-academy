@@ -300,7 +300,8 @@ hormuud-academy/
 │   │       │   ├── teacher-pay/ What each teacher earned and was paid, admins only
 │   │       │   └── budget/      The plan per branch per month, admins only
 │   │       ├── teachers/        Admins manage them; branch staff see their branch's
-│   │       ├── classes/         Admins manage them; branch staff see their branch's
+│   │       ├── classes/         Admins manage them; branch staff see their branch's.
+│   │       │                    [id]/ is one class's week
 │   │       └── admin/           Setup screens, admins only
 │   │           ├── layout.tsx   Sends anyone who isn't an admin back to /students
 │   │           ├── branches/
@@ -845,6 +846,7 @@ The app adds its own checks on top. Names are compared ignoring upper and lower 
 | Register a student | At any branch | At their own branch only |
 | Add a skill to a student | At any branch | At their own branch only |
 | Mark finished, drop, set active again | At any branch | Only for skills at their branch |
+| Move a student to another class time | At any branch | Only for skills at their branch |
 | Record a registration fee payment | At any branch | Only for skills at their branch |
 | Record a monthly fee payment | At any branch | Only for skills at their branch |
 | Record books, examination fees and other income | At any branch | At their own branch only |
@@ -931,7 +933,9 @@ Add, rename, deactivate and delete categories. A deactivated category can't be p
 
 Add a class by picking its branch and typing a name. You can rename a class, but not move it to another branch, because class times at that branch may already use it. A deactivated class can't be picked for class times anymore. The class times already there keep it until you change them. The table shows each class's class times: the skill, when, and who teaches it.
 
-Branch staff see this page too, with only their branch's classes and no buttons.
+Click a class's name to see its week: one box per day, Saturday to Friday, with what meets there in clock order. Each class time shows its hours, skill, teacher and how many students it has, and the free hours between two classes show as a dashed line, so it's easy to see when a room is empty. A deactivated class time still shows, with a badge, while students still come to it. Class times that use the class but have no hours yet are listed underneath. On a phone the days sit one under another.
+
+Branch staff see this page too, with only their branch's classes and no buttons. They can open the week of their own branch's classes only.
 
 
 #### Teachers
@@ -1028,7 +1032,7 @@ The top shows the photo, name, student ID and Active or Inactive. The buttons ar
 
 **Details** shows sex, phones, home branch, registration date, and who registered the student and when.
 
-**Skills** lists each enrollment with its branch, its class time (the hours and days, then the class and teacher), start and end dates, registration fee, monthly fee and status. Branch staff see only the skills at their branch, with a note saying so.
+**Skills** lists each enrollment with its branch, its class time (the hours and days, then the class and teacher), start and end dates, registration fee, monthly fee and status. A yellow **Class time deactivated** badge means the student still comes to a class time that takes nobody new: move them to another one. Branch staff see only the skills at their branch, with a note saying so.
 
 The **Registration fee** column shows one of three things:
 
@@ -1045,9 +1049,10 @@ To take a recorded payment back, an admin removes it on the [Income screen](#inc
 
 The other buttons on each row are:
 
+- **Change class time** moves the student to another of the skill's class times, say from the evening to the morning. It shows only on an Active skill that has another class time taking students. Fees, dates and payments stay exactly as they are. A teacher paid by percentage earns from the fees paid after the move, so the new class time's teacher earns from then on and the old one keeps what they already earned. The app refuses a class time that clashes with another skill the student takes.
 - **Mark finished** when the student completed the skill.
 - **Drop**, after confirming, when the student stopped coming before finishing.
-- **Set active**, after confirming, to undo a Finished or Dropped by mistake. It's refused if the student is already taking that skill again.
+- **Set active**, after confirming, to undo a Finished or Dropped by mistake. It's refused if the student is already taking that skill again, or if its class time now clashes with a skill they took up since. If the class time was deactivated and its class or teacher has gone to another class time since, it's refused too: add the skill again in another class time instead.
 
 When the last Active skill is finished or dropped, the student becomes Inactive by themselves. Adding a new skill makes them Active again.
 
@@ -1199,6 +1204,12 @@ Admins only, and the first thing under Money. Pick a day, a month and optionally
 
 **A class moves to another time.** On the skill's page, press Change on that class time and type the new hours or tick other days. Its students move with it. If the new time clashes with another skill one of them takes, the app says who.
 
+**A student wants another time.** Open the student, press Change class time on that skill and pick the new one. Their fees and payments don't change.
+
+**A class time closes.** On the skill's page, press Deactivate on it: nobody new can join, and its students keep coming. Their pages show a yellow Class time deactivated badge; open each one and press Change class time. Once nobody is left in it, its class and teacher are free for other class times.
+
+**Finding a free room.** Open Classes and click a class's name. The dashed lines show when it stands empty on each day.
+
 **A branch stops teaching a skill.** On the skill's page, deactivate that branch's row. Current students continue, and nobody new can join there.
 
 **A branch closes.** Finish or drop its students' skills, deactivate its skills on each skill page, deactivate its staff accounts, then deactivate the branch. The history stays.
@@ -1311,8 +1322,8 @@ Everything here was left out of Phase 1 on purpose, or is a known gap:
 - No push notifications on phones.
 - Photos stay off until the Cloudinary keys are set.
 - No record of who changed what. Only who registered a student, who added each enrollment, who recorded each payment and expense, and who saved each budget. A fee the admin lowered or waived doesn't show what it was before, and an edited expense doesn't show its old amount.
-- A student can't be moved to another class time of the same skill yet. That's the next step, and it won't touch their fees.
-- There's no timetable yet showing a whole room's week at once. The Classes page lists what runs in each room, as text.
+- Students move to another class time one at a time. There's no moving every student in a class time together.
+- No seat counts. Nothing stops a class time taking more students than the room has chairs.
 - A staff account works at exactly one branch.
 - Phone search needs the number written the same way. `0611111111` and `+252611111111` are different.
 - The admin tables don't page through results. That's fine for a few dozen branches, teachers or skills.
