@@ -163,8 +163,19 @@ Tailoring 5–6 pm and Tailoring 6–8 pm, with Demo Teacher 2 teaching the
 first two back to back; a 4:30–5:30 pm class in Room 1 refused as a clash;
 the Classes page listing them in clock order; /shifts gone.
 
-Still to build: moving a student to another class time, and the room
-timetable on the Classes page. Production needs the
+Then the rest of it, the same day: moving a student to another class time
+from their page, and each class's week, opened from its name on the Classes
+page. Tried in the browser: Demo Student Two moved from Computer Basics 8–10
+am to 4–6 pm with fees and dates unchanged; moving Graphic Design into
+Monday 4–5 pm refused as a clash with that; another skill's class time
+forced into the form refused; Set active on a dropped skill refused when
+its class time clashed with one taken up since, and allowed once it didn't;
+the Class time deactivated badge; Room 1's Monday 4–5, 5–6 and 6–8 pm back
+to back, the Computer Lab's free 10 am–4 pm and a class with no hours listed
+underneath, on a wide screen and a phone; abdaal branch staff opening their
+own Room A and getting Not found for Main Branch's Room 1.
+
+Production needs the
 `20261003090000_class_times` and `20261003120000_class_time_hours`
 migrations applied, in that order and after a backup, *before* the push, or
 every student and skill screen breaks. Then the admin sets the hours and
@@ -176,7 +187,7 @@ until then.
 - **Class times: a class hosts different skills at different times, and a
   skill can run more than once at a branch.** Room 3 can have Graphic Design
   4–6 pm and Tailoring 6–8 pm, and Graphic Design can also run 8–10 am in
-  Room 1. Partly built; see "Still to do". (3 Oct 2026)
+  Room 1. Built; see "Still to do" for going live. (3 Oct 2026)
   - A **class time** is one branch skill in one class, from a start time to
     an end time on chosen days, with one teacher: "Graphic Design, Room 3,
     4–6 pm, Sat Mon Wed, Ali". A branch skill can have several. Its fees and
