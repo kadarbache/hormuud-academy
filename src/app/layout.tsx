@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Inter } from "next/font/google";
+import { SerwistProvider } from "@serwist/turbopack/react";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/sonner";
@@ -39,10 +40,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={cn("h-full antialiased font-sans", inter.variable, geistMono.variable)}
     >
       <body className="min-h-full flex flex-col">
-        <ThemeProvider>
-          <TooltipProvider>{children}</TooltipProvider>
-          <Toaster position="top-center" />
-        </ThemeProvider>
+        {/* No service worker in development, where its cache would serve stale code.
+            Never cache visited pages or reload on reconnect: pages hold student
+            records, and a reload would throw away a half-filled form. */}
+        <SerwistProvider
+          swUrl="/serwist/sw.js"
+          disable={process.env.NODE_ENV === "development"}
+          cacheOnNavigation={false}
+          reloadOnOnline={false}
+        >
+          <ThemeProvider>
+            <TooltipProvider>{children}</TooltipProvider>
+            <Toaster position="top-center" />
+          </ThemeProvider>
+        </SerwistProvider>
       </body>
     </html>
   );
