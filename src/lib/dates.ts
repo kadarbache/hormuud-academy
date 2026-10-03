@@ -57,6 +57,20 @@ export function addMonths(isoDate: string, months: number): string {
   return fromDbDate(target);
 }
 
+const collegeMoment = new Intl.DateTimeFormat("en-GB", {
+  timeZone: COLLEGE_TIME_ZONE,
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+/** A moment as the college's clock showed it: "19 Sept 2026, 14:05". */
+export function formatDateTime(moment: Date): string {
+  return collegeMoment.format(moment);
+}
+
 /** 19 Sept 2026 */
 export function formatDate(date: Date | string): string {
   const value = typeof date === "string" ? toDbDate(date) : date;

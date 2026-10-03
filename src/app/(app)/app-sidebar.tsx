@@ -15,6 +15,7 @@ import {
   LogOut,
   Presentation,
   Receipt,
+  Settings,
   Tag,
   Tags,
   UserPlus,
@@ -133,6 +134,7 @@ const adminItems: NavItem[] = [
   teachersItem,
   classesItem,
   { href: "/admin/staff", label: "Staff accounts", icon: KeyRound, match: under("/admin/staff") },
+  { href: "/admin/settings", label: "Settings", icon: Settings, match: under("/admin/settings") },
 ];
 
 function NavMenu({ items, pathname }: { items: NavItem[]; pathname: string }) {
