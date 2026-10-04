@@ -3,14 +3,16 @@
 import { FormDialog } from "@/components/form-dialog";
 import { SelectField, TextField } from "@/components/form-fields";
 import type { ActionResult } from "@/lib/action-result";
-import { formatMoney, formatRate } from "@/lib/format";
+import { formatMoney } from "@/lib/format";
 import { amountForInput, dollarsToShillings } from "@/lib/money";
-import { AmountFields, CurrencyField } from "../../finance/amount-fields";
+import { AmountFields } from "../../finance/amount-fields";
 import { paymentMethodOptions } from "../../finance/labels";
 
 /**
  * Records the registration fee one student paid for one skill. The fee is set
- * in dollars; paid in shillings, it's the fee at today's rate.
+ * in dollars and the amount starts at the whole of it, in dollars or at
+ * today's rate in shillings. A student who can't pay all of it can pay less:
+ * whatever is entered settles the fee, as with a discounted month.
  */
 export function RecordRegistrationFeeDialog({
   action,
@@ -57,17 +59,16 @@ export function RecordRegistrationFeeDialog({
               errors={errors.method}
             />
           </div>
-          <CurrencyField rate={rate} errors={errors.currency}>
-            {(currency) =>
-              currency === "SLSH" &&
-              rate && (
-                <p className="text-sm text-muted-foreground">
-                  That&apos;s {formatMoney(dollarsToShillings(fee, rate), "SLSH")} at today&apos;s
-                  rate of {formatRate(rate)} shillings to the dollar.
-                </p>
-              )
-            }
-          </CurrencyField>
+          <AmountFields
+            label="Amount paid"
+            rate={rate}
+            defaultAmounts={{
+              USD: amountForInput(fee, "USD"),
+              SLSH: rate ? dollarsToShillings(fee, rate) : "",
+            }}
+            description="The full fee. Lower it if the student can only pay part of it."
+            errors={errors}
+          />
         </>
       )}
     </FormDialog>

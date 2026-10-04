@@ -23,7 +23,7 @@ import {
 import { currentRate } from "@/lib/exchange-rate";
 import { formatBoth, formatMoney, formatStudentNumber } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
-import { isPositiveMoney, sumMoney } from "@/lib/money";
+import { isPositiveMoney, sumMoney, toCents } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { feeMonths } from "../../finance/fee-months";
@@ -126,10 +126,10 @@ function RegistrationFee({
       )}
       {payment && (
         <div className="text-xs text-muted-foreground">
-          {/* Paid in shillings, the amount isn't the fee shown above, so it's spelled out. */}
+          {/* Paid in shillings, or less than the fee, the amount isn't the fee shown above, so it's spelled out. */}
           Paid{" "}
-          {payment.currency === "SLSH" &&
-            `${formatMoney(payment.amount.toString(), "SLSH")} on `}
+          {(payment.currency === "SLSH" || toCents(payment.amount.toString()) !== toCents(fee)) &&
+            `${formatMoney(payment.amount.toString(), payment.currency)} on `}
           {formatDate(payment.paidOn)} by {paymentMethodLabels[payment.method]}, recorded by{" "}
           {payment.recordedBy.name}
         </div>

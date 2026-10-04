@@ -21,7 +21,7 @@ import {
 } from "@/lib/dates";
 import { ledgerFields, NO_RATE_MESSAGE } from "@/lib/exchange-rate";
 import { formatMoney, parseStudentLookup } from "@/lib/format";
-import { dollarsToShillings, inLedger, isPositiveMoney } from "@/lib/money";
+import { dollarsToShillings, inLedger, isPositiveMoney, toCents } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, requireUser } from "@/lib/session";
 import { teacherShareOf } from "@/lib/teacher-share";
@@ -73,9 +73,15 @@ export async function recordRegistrationFee(
   formData: FormData,
 ): Promise<ActionResult> {
   const user = await requireUser();
+  const values = formObject(formData);
   const parsed = z
-    .object({ paidOn: paidOnField, method: paymentMethod(), currency: currency() })
-    .safeParse(formObject(formData));
+    .object({
+      currency: currency(),
+      amount: moneyIn(values.currency, "Enter the amount paid."),
+      paidOn: paidOnField,
+      method: paymentMethod(),
+    })
+    .safeParse(values);
   if (!parsed.success) return invalid(parsed.error);
 
   const enrollment = await findEnrollment(enrollmentId);
@@ -87,12 +93,22 @@ export async function recordRegistrationFee(
   if (!isPositiveMoney(fee)) {
     return failure("This skill has no registration fee to pay.");
   }
+  if (!isPositiveMoney(parsed.data.amount)) {
+    return failure("Check the highlighted fields.", { amount: ["Enter an amount above zero."] });
+  }
 
   const ledger = await ledgerFields(parsed.data.currency);
   if (!ledger) return noRate();
-  // The fee is set in dollars. Paid in shillings, it's the fee at the rate in
-  // force, to the nearest shilling.
-  const amount = ledger.exchangeRate ? dollarsToShillings(fee, ledger.exchangeRate) : fee;
+  // The fee is set in dollars. In shillings, the whole of it is the fee at the
+  // rate in force, to the nearest shilling. A student can pay less than that,
+  // never more, and whatever is recorded settles the fee.
+  const { amount } = parsed.data;
+  const fullFee = ledger.exchangeRate ? dollarsToShillings(fee, ledger.exchangeRate) : fee;
+  if (toCents(amount) > toCents(fullFee)) {
+    return failure("Check the highlighted fields.", {
+      amount: [`That's more than the fee, ${formatMoney(fullFee, ledger.currency)}.`],
+    });
+  }
 
   try {
     await prisma.payment.create({
@@ -117,6 +133,11 @@ export async function recordRegistrationFee(
   }
 
   refresh();
+  if (toCents(amount) < toCents(fullFee)) {
+    return success(
+      `${enrollment.skill.name} registration fee recorded as paid: ${formatMoney(amount, ledger.currency)} of ${formatMoney(fullFee, ledger.currency)}.`,
+    );
+  }
   const inShillings = ledger.exchangeRate ? ` (${formatMoney(amount, "SLSH")})` : "";
   return success(`${enrollment.skill.name} registration fee recorded as paid${inShillings}.`);
 }
