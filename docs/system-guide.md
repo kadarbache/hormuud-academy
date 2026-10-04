@@ -465,7 +465,7 @@ Each enrollment copies the skill's monthly fee and registration fee on the day t
 
 **Every amount in is a payment.** One row in `payments` holds the amount, its currency, the day the money came in, the branch that took it, what it was for and how it was paid. Registration fees used to live on the enrollment; [ADR 0004](adr/0004-one-ledger-for-every-payment.md) explains why they moved here and why nothing stores a running total. The enrollment still keeps the fee it *owes*, because that's a price the admin can waive; whether it was paid is the ledger's answer.
 
-A fee is paid in full or not at all, whether it's a registration fee or one month of a skill. There are no part payments. A monthly fee payment carries a **fee month**, so September stays September's however late the money arrived, and the database refuses a second payment for a month already settled. A skill whose monthly fee is zero is free: it has no fee months, so it never shows an unpaid month, Fees owed leaves it out, and recording a monthly payment for it is refused.
+A fee is settled or it isn't, whether it's a registration fee or one month of a skill. There is no running balance: staff can record less than the fee when a student can't pay it all, and that one payment settles it. A monthly fee payment carries a **fee month**, so September stays September's however late the money arrived, and the database refuses a second payment for a month already settled. A skill whose monthly fee is zero is free: it has no fee months, so it never shows an unpaid month, Fees owed leaves it out, and recording a monthly payment for it is refused.
 
 **Every amount out is an expense**, and every expense names the branch it was spent for. A teacher's pay is an expense in the Teacher salary category that also names the teacher and the month it covers.
 
@@ -478,7 +478,7 @@ The college takes and spends two currencies, US dollars (`USD`) and Somaliland s
 - **The exchange rate** is how many shillings one dollar is, like 8,550. The admin sets it on the Settings page (`src/app/(app)/admin/settings`). Every change is a new row in `exchange_rates`, so the page can show who changed it and when; the latest row is the rate in force. `src/lib/exchange-rate.ts` reads it. Until a rate is set, nothing can be recorded in shillings.
 - **A shilling row keeps its rate, like a receipt.** When a shilling payment or expense is recorded, the rate in force is copied onto it (`exchangeRate`), and what it was worth in dollars that day is worked out once, to the cent, and stored with it (`usdValue`). A dollar row's `usdValue` is simply its amount. Neither ever changes: a new rate doesn't rewrite a receipt. The row shows it under the shillings, like "≈ $5.00 at 8,550". Correcting a shilling expense's amount works its dollar value out again at the rate it was first recorded at.
 - **Totals use today's rate.** A combined figure says what the college's money is worth now, so it's the dollars plus the shillings at today's rate, worked out each time a screen opens, and it moves when the rate does: if a dollar was 10,000 shillings last month and is 12,000 now, last month's shillings count for less. That's why the ≈ figures on the rows, which are each at their own day's rate, don't add up to the totals. Every screen uses the same rate, so they all agree on the same total.
-- **Fees stay priced in dollars.** Paying a monthly fee in shillings, the amount box starts at the fee at today's rate (a $20 fee at 8,550 is 171,000 shillings) and can be lowered for a discount like a dollar amount. A registration fee paid in shillings is the fee at today's rate, to the nearest shilling. **Fees owed** stay in dollars, because that's what the fees are set in.
+- **Fees stay priced in dollars.** Paying a monthly fee in shillings, the amount box starts at the fee at today's rate (a $20 fee at 8,550 is 171,000 shillings) and can be lowered for a discount like a dollar amount. A registration fee works the same way, except the amount can only go down: the box starts at the fee at today's rate, to the nearest shilling, and the app refuses more than that. **Fees owed** stay in dollars, because that's what the fees are set in.
 - **Teacher pay follows the ledgers.** A fixed salary is set in one currency, on the teacher, and paid in that currency: the pay dialog fixes the dropdown, and the server refuses the other one. A percentage teacher earns their share in whatever currency the student paid, so their unpaid share has a dollar part and a shilling part, and each is paid out of its own ledger.
 - **The monthly budget is planned in dollars**, and compared against the combined figures, at today's rate like everywhere else.
 
@@ -850,7 +850,7 @@ The app adds its own checks on top. Names are compared ignoring upper and lower 
 | Mark finished, drop, set active again | At any branch | Only for skills at their branch |
 | Move a student to another class time | At any branch | Only for skills at their branch |
 | See who is in a class time | Every class time | Their own branch's class times |
-| Record a registration fee payment | At any branch | Only for skills at their branch |
+| Record a registration fee payment, for less than the fee if the student can't pay it all | At any branch | Only for skills at their branch |
 | Record a monthly fee payment | At any branch | Only for skills at their branch |
 | Record books, examination fees and other income | At any branch | At their own branch only |
 | Lower or waive a registration fee | Yes, while it's unpaid | No |
@@ -1077,12 +1077,12 @@ The top shows the photo, name, student ID and Active or Inactive. The buttons ar
 The **Registration fee** column shows one of three things:
 
 - The amount with a yellow **Unpaid** badge.
-- The amount with the day it was paid, how it was paid, and who recorded it. A fee paid in shillings also says how many shillings.
+- The amount with the day it was paid, how it was paid, and who recorded it. A fee paid in shillings, or paid for less than the fee, also says how much was paid.
 - **Nothing to pay**, when the skill has no registration fee or the admin waived it.
 
 Its buttons appear only while the fee is unpaid:
 
-- **Record payment**, for staff at the skill's branch and admins. Pick the day the student paid — today by default, never in the future — how they paid (Cash, ZAAD, eDahab or Bank / other) and the currency. Paid in shillings, the dialog shows the fee at today's rate, and that's the amount recorded. This writes a payment into the books, which is why the method has to be asked for.
+- **Record payment**, for staff at the skill's branch and admins. Pick the day the student paid — today by default, never in the future — how they paid (Cash, ZAAD, eDahab or Bank / other), the amount and the currency. The amount starts at the full fee, or at the fee at today's rate in shillings, with what it comes to in dollars underneath. A student who can't pay all of it can pay less: lower the amount, and that settles the fee. It can't be zero or more than the fee. This writes a payment into the books, which is why the method has to be asked for.
 - **Change fee**, for admins only. Enter a lower amount, or 0 to waive it. Only this student's fee for this skill changes.
 
 To take a recorded payment back, an admin removes it on the [Income screen](#income), where the receipt lives.
@@ -1099,7 +1099,7 @@ When the last Active skill is finished or dropped, the student becomes Inactive 
 **Monthly fees** is below the Skills table, one panel per skill. Each panel has a box per month, from the month the student joined up to this one, stopping at the skill's last month or the month the student dropped it. A skill that lasts four months has four boxes, so a student who joins on 19 April owes April to July, not August: the end date, 19 August, falls in the month after the last one taught. Nobody owes for a month that hasn't happened.
 
 - A **grey box** is a month that's been paid. It shows the amount in the currency it was paid in, and hovering over it says when it was paid, how, and who recorded it.
-- A **yellow box** is a month still owed. Staff at the skill's branch click it to record that month: the amount starts at the fee the student joined at and can be lowered for a discount, then pick the day and the method. Pick **SLSH** in the Currency dropdown and the amount switches to the fee at today's rate, with what it comes to in dollars underneath. Whatever is recorded settles that month — there are no part payments.
+- A **yellow box** is a month still owed. Staff at the skill's branch click it to record that month: the amount starts at the fee the student joined at and can be lowered for a discount, then pick the day and the method. Pick **SLSH** in the Currency dropdown and the amount switches to the fee at today's rate, with what it comes to in dollars underneath. Whatever is recorded settles that month, and no balance is kept.
 
 The panel's heading counts the months paid, what's been collected in each currency and what's still owed, and the badge beside the student's name at the top adds up everything they owe, registration fees included. **Every payment they made** opens the Income screen filtered to that student.
 
@@ -1190,7 +1190,7 @@ Admins only, and the first thing under Money. Pick a day, a month and optionally
 
 **A student starts another skill later.** Open their page and press Add skill. The new skill has its own registration fee.
 
-**A student pays the registration fee later.** Open their page and press Record payment on that skill. Pick the day they paid and how.
+**A student pays the registration fee later.** Open their page and press Record payment on that skill. Pick the day they paid and how. The amount starts at the full fee; lower it if they could only pay part.
 
 **A student pays for a month.** Open their page, find the skill under Monthly fees and click the yellow box for that month. The amount is already there; change it if they were given a discount, then pick the day and the method. If the teacher is paid by percentage, their share is worked out and added at the same moment.
 
@@ -1348,7 +1348,7 @@ Most new features follow the same steps:
 Everything here was left out of Phase 1 on purpose, or is a known gap:
 
 - No attendance, exams, results or certificates.
-- Fees are paid in full or not at all. There are no part payments, for a registration fee or for a month. A discount is recorded by lowering the amount, and that month still counts as settled.
+- A fee is settled or it isn't. There are no part payments to add up later, for a registration fee or for a month. Paying less, for a discount or because the student couldn't pay it all, is recorded by lowering the amount, and the fee still counts as settled. The difference isn't kept as a balance, so nothing chases it.
 - No printed receipts or statements. Payments have receipt numbers, but nothing prints them.
 - Removing a payment deletes it rather than writing a reversing entry, so the books show what is true now, not what was once typed. That's the right trade for a college this size, but it means a removed payment leaves no trace.
 - Office staff salaries are an expense category with no person attached. Only teachers are named on their pay.

@@ -53,7 +53,7 @@ What a branch skill costs per month, set in US dollars. A student can pay it in 
 _Avoid_: Price, tuition
 
 **Registration fee**:
-What a student pays once for each skill they start, on top of the monthly fee, set in US dollars. Each branch skill sets its own, and zero means none. Despite the name it goes with the enrollment, not the registration: two skills mean two registration fees, and taking a skill again means paying again.
+What a student pays once for each skill they start, on top of the monthly fee, set in US dollars. Each branch skill sets its own, and zero means none. Despite the name it goes with the enrollment, not the registration: two skills mean two registration fees, and taking a skill again means paying again. A student who can't pay all of it can pay less: staff record the smaller amount, never more than the fee, and it settles the fee, with no balance kept.
 _Avoid_: Admission fee, enrollment fee, joining fee
 
 **Unpaid**:
@@ -61,7 +61,7 @@ A registration fee above zero with no payment recorded. It stays unpaid until st
 _Avoid_: Outstanding, owing, due
 
 **Waive**:
-Set one student's registration fee for one skill to zero. Only the admin can waive or lower a fee, and only while it's unpaid.
+Set one student's registration fee for one skill to zero. Only the admin can waive or lower a fee, and only while it's unpaid. That changes what the student owes; staff recording a smaller payment doesn't change the fee, it only settles it for less.
 _Avoid_: Cancel, exempt
 
 ### Students
@@ -150,7 +150,7 @@ The month a monthly fee pays for, not the day the money arrived. September stays
 _Avoid_: Billing period, cycle
 
 **Monthly fee payment**:
-One fee month of one enrollment, paid. A month is paid in full or not at all, the same way a registration fee is; the amount can be lowered for a discount, and whatever is recorded settles that month, in either currency.
+One fee month of one enrollment, paid. A month is settled or not at all, the same way a registration fee is; the amount can be lowered for a discount, and whatever is recorded settles that month, in either currency.
 _Avoid_: Instalment, invoice, bill
 
 **Owed**:

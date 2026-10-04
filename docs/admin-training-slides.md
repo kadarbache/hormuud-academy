@@ -825,9 +825,12 @@ somewhere else would invite a wrong figure.
 - Open the student, Record payment on that skill's row
 - Pick the day they paid, today by default, never in the future
 - Pick Cash, ZAAD, eDahab or Bank / other
+- The amount is already the full fee. Lower it if the student can only pay part
 
 Notes: The method is asked for because this writes a real payment into the
-books, and the end-of-day count is split by method.
+books, and the end-of-day count is split by method. Whatever amount you record
+settles the fee, and no balance is kept. It can't be zero or more than the
+fee.
 
 ---
 

@@ -4,7 +4,7 @@ Questions we haven't answered yet, and the code work waiting on them. Move a
 decision to "Decided" when it's settled, and write the rule into CONTEXT.md or
 an ADR if it changes how the system behaves.
 
-Last updated 3 October 2026.
+Last updated 4 October 2026.
 
 ## Open
 
@@ -54,6 +54,22 @@ picture, which Google hosts, so we'd store nothing. But Cloudinary only holds
 student photos, and students have no Google account. Options for them: keep
 Cloudinary for student photos only, drop student photos (initials instead), or
 move them to Vercel Blob. Parked on 24 Sep 2026.
+
+### 5. Who may settle a registration fee for less?
+
+On 4 Oct 2026 the Record payment dialog gained an amount box, so a student who
+can't pay the whole registration fee can pay less, and the smaller amount
+settles it. Branch staff can do this, the same as they already can for a
+discounted month. But only the admin can *lower* a fee (Change fee), so staff
+can now reach the same result without the admin.
+
+- **Leave it (as now).** Matches monthly fees. Staff at the branch know who
+  couldn't pay, and the Income screen shows every amount.
+- **Admin lowers the fee first.** Staff could then only record the new fee in
+  full, and the admin sees every discount. Slower when a branch is busy.
+
+Not decided. The change is in `recordRegistrationFee`; the second option would
+mean allowing a smaller amount only for admins.
 
 ## Still to do (no decision needed)
 
