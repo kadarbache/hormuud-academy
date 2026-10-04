@@ -365,7 +365,7 @@ The finance folder works the same way, with a few pieces shared by all four mone
 | `queries.ts` | Income by method, income by category, expenses by category, the totals and the net balance |
 | `expense-categories/queries.ts` | The expense categories from A to Z, and the ones an expense can be put in |
 | `figures.tsx` | `StatCard` and `Breakdown`, the two shapes every money screen is drawn from |
-| `fee-months.ts` | The months one enrollment owes a fee for. Pure arithmetic, no database |
+| `fee-months.ts` | The months one enrollment owes a fee for, none when the monthly fee is zero. Pure arithmetic, no database |
 | `income/actions.ts` | Every action that records or removes a payment, including the ones the student's page calls |
 
 The student's page imports `recordRegistrationFee` and `recordMonthlyFee` from `finance/income/actions.ts` rather than having its own copies, so the branch check and the teacher's share are worked out in one place whatever screen took the money.
@@ -463,7 +463,7 @@ Each enrollment copies the skill's monthly fee and registration fee on the day t
 
 **Every amount in is a payment.** One row in `payments` holds the amount, its currency, the day the money came in, the branch that took it, what it was for and how it was paid. Registration fees used to live on the enrollment; [ADR 0004](adr/0004-one-ledger-for-every-payment.md) explains why they moved here and why nothing stores a running total. The enrollment still keeps the fee it *owes*, because that's a price the admin can waive; whether it was paid is the ledger's answer.
 
-A fee is paid in full or not at all, whether it's a registration fee or one month of a skill. There are no part payments. A monthly fee payment carries a **fee month**, so September stays September's however late the money arrived, and the database refuses a second payment for a month already settled.
+A fee is paid in full or not at all, whether it's a registration fee or one month of a skill. There are no part payments. A monthly fee payment carries a **fee month**, so September stays September's however late the money arrived, and the database refuses a second payment for a month already settled. A skill whose monthly fee is zero is free: it has no fee months, so it never shows an unpaid month, Fees owed leaves it out, and recording a monthly payment for it is refused.
 
 **Every amount out is an expense**, and every expense names the branch it was spent for. A teacher's pay is an expense in the Teacher salary category that also names the teacher and the month it covers.
 

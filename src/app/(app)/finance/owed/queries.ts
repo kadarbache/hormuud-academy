@@ -122,6 +122,7 @@ export async function listOwed(user: CurrentUser, filters: OwedFilters) {
     );
     const unpaidMonths = feeMonths(
       {
+        monthlyFee: enrollment.monthlyFee.toString(),
         startDate: fromDbDate(enrollment.startDate),
         endDate: fromDbDate(enrollment.endDate),
         status: enrollment.status,

@@ -147,9 +147,14 @@ export async function recordMonthlyFee(
     return failure("Check the highlighted fields.", { amount: ["Enter an amount above zero."] });
   }
 
+  if (!isPositiveMoney(enrollment.monthlyFee.toString())) {
+    return failure(`${enrollment.skill.name} is free, so there's no monthly fee to pay.`);
+  }
+
   // A month the student was never taking the skill in isn't theirs to pay.
   const owed = feeMonths(
     {
+      monthlyFee: enrollment.monthlyFee.toString(),
       startDate: fromDbDate(enrollment.startDate),
       endDate: fromDbDate(enrollment.endDate),
       status: enrollment.status,

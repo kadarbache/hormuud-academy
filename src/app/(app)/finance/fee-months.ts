@@ -1,7 +1,10 @@
 import { addMonthsToMonth, monthOf, monthsBetween } from "@/lib/dates";
+import { isPositiveMoney } from "@/lib/money";
 
 /** The parts of an enrollment that decide which months it owes a fee for. */
 export type FeeMonthsInput = {
+  /** The monthly fee the student joined at. A free skill has no fee months. */
+  monthlyFee: string;
   startDate: string;
   endDate: string;
   status: "ACTIVE" | "FINISHED" | "DROPPED";
@@ -22,8 +25,12 @@ export type FeeMonthsInput = {
  * duration, which lands in the month after the last one taught, so that month
  * isn't charged: joining on 19 April a 4-month skill ends 19 August and
  * owes April to July.
+ *
+ * A monthly fee of zero means the skill is free, the same way a registration
+ * fee of zero means none: it has no fee months, so nothing is ever owed for it.
  */
 export function feeMonths(enrollment: FeeMonthsInput, today: string): string[] {
+  if (!isPositiveMoney(enrollment.monthlyFee)) return [];
   const lastTaught = addMonthsToMonth(monthOf(enrollment.endDate), -1);
   const ends = [lastTaught, monthOf(today)];
   if (enrollment.status !== "ACTIVE" && enrollment.statusChangedOn) {

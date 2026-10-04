@@ -23,7 +23,7 @@ import {
 import { currentRate } from "@/lib/exchange-rate";
 import { formatBoth, formatMoney, formatStudentNumber } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
-import { sumMoney } from "@/lib/money";
+import { isPositiveMoney, sumMoney } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { feeMonths } from "../../finance/fee-months";
@@ -196,6 +196,7 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
     );
     const months = feeMonths(
       {
+        monthlyFee: enrollment.monthlyFee.toString(),
         startDate: fromDbDate(enrollment.startDate),
         endDate: fromDbDate(enrollment.endDate),
         status: enrollment.status,
@@ -210,6 +211,8 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
     const paid = [...paidByMonth.values()];
     return {
       enrollment,
+      // A free skill has no fee months, so it has no place in Monthly fees.
+      free: !isPositiveMoney(enrollment.monthlyFee.toString()),
       months,
       paidCount: months.length - unpaidMonths.length,
       // What's still owed is the fee they joined at, once per unpaid month.
@@ -232,6 +235,7 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
       .map((enrollment) => enrollment.registrationFee.toString()),
   );
   const owedAltogether = sumMoney([registrationOwed, ...feeSchedule.map((row) => row.owed)]);
+  const billedSchedule = feeSchedule.filter((row) => !row.free);
 
   return (
     <>
@@ -413,7 +417,9 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
                       today={today}
                     />
                   ),
-                  "Monthly fee": formatMoney(enrollment.monthlyFee.toString()),
+                  "Monthly fee": isPositiveMoney(enrollment.monthlyFee.toString())
+                    ? formatMoney(enrollment.monthlyFee.toString())
+                    : "Free",
                   Status: <EnrollmentStatus status={enrollment.status} />,
                   Actions: canAct && (
                     <div className="flex justify-end gap-1">
@@ -478,7 +484,7 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
         )}
       </section>
 
-      {feeSchedule.length > 0 && (
+      {billedSchedule.length > 0 && (
         <section className="space-y-3">
           <div className="flex flex-wrap items-end justify-between gap-2">
             <div>
@@ -497,7 +503,7 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
           </div>
 
           <div className="space-y-3">
-            {feeSchedule.map(({ enrollment, months, paidCount, owed, collected }) => {
+            {billedSchedule.map(({ enrollment, months, paidCount, owed, collected }) => {
               const canAct = canActAtBranch(user, enrollment.branchSkill.branchId);
               return (
                 <div key={enrollment.id} className="rounded-lg border p-4">

@@ -49,7 +49,7 @@ A person who teaches skills at one or more branches. Not a staff account.
 _Avoid_: Instructor, trainer, lecturer
 
 **Monthly fee**:
-What a branch skill costs per month, set in US dollars. A student can pay it in shillings at the exchange rate.
+What a branch skill costs per month, set in US dollars. A student can pay it in shillings at the exchange rate. Zero means the skill is free: it has no fee months, so nothing is ever owed for it.
 _Avoid_: Price, tuition
 
 **Registration fee**:
@@ -146,7 +146,7 @@ What a payment was for: Registration fee, Monthly fee, Books, Examination fee or
 _Avoid_: Income type, source
 
 **Fee month**:
-The month a monthly fee pays for, not the day the money arrived. September stays paid whether it was settled in August or in November. A skill has as many fee months as it lasts months, starting with the month the student joined: four months joining in April is April to July.
+The month a monthly fee pays for, not the day the money arrived. September stays paid whether it was settled in August or in November. A skill with a monthly fee has as many fee months as it lasts months, starting with the month the student joined: four months joining in April is April to July. A free skill has none.
 _Avoid_: Billing period, cycle
 
 **Monthly fee payment**:
