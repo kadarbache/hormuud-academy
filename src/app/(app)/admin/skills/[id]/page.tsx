@@ -294,7 +294,11 @@ export default async function SkillPage({ params }: PageProps<"/admin/skills/[id
                       title: hours ?? "Time not set",
                       description: `${classTime.classroom.name} with ${classTime.teacher.name}`,
                       cells: {
-                        Time: hours ?? (
+                        Time: hours ? (
+                          <Link href={`/class-times/${classTime.id}`} className="hover:underline">
+                            {hours}
+                          </Link>
+                        ) : (
                           <Badge
                             variant="outline"
                             className="border-warning-border bg-warning text-warning-foreground"
@@ -309,6 +313,9 @@ export default async function SkillPage({ params }: PageProps<"/admin/skills/[id
                         Status: <ActiveBadge active={classTime.active} />,
                         Actions: (
                           <div className="flex justify-end gap-1">
+                            <Button variant="outline" size="sm" asChild>
+                              <Link href={`/class-times/${classTime.id}`}>Students</Link>
+                            </Button>
                             <ClassTimeDialog
                               action={updateClassTime.bind(null, classTime.id)}
                               branchName={bs.branch.name}

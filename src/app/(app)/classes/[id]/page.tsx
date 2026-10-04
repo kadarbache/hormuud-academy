@@ -168,7 +168,13 @@ function Meeting({ slot, entry, linkSkill }: { slot?: Slot; entry: Entry; linkSk
         )}
       </div>
       <div className="text-xs text-muted-foreground">
-        {entry.teacherName} · {studentCount(entry.students)}
+        {entry.teacherName} ·{" "}
+        <Link
+          href={`/class-times/${entry.id}`}
+          className="font-medium text-foreground underline underline-offset-2"
+        >
+          {studentCount(entry.students)}
+        </Link>
       </div>
       {/* Deactivated, it takes nobody new, but its students still come. */}
       {!entry.active && (
