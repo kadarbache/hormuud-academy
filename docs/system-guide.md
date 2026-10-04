@@ -302,6 +302,8 @@ hormuud-academy/
 │   │       ├── teachers/        Admins manage them; branch staff see their branch's
 │   │       ├── classes/         Admins manage them; branch staff see their branch's.
 │   │       │                    [id]/ is one class's week
+│   │       ├── class-times/     [id]/ is one class time: its details and every student in it.
+│   │       │                    Admins and the branch's own staff
 │   │       └── admin/           Setup screens, admins only
 │   │           ├── layout.tsx   Sends anyone who isn't an admin back to /students
 │   │           ├── branches/
@@ -847,6 +849,7 @@ The app adds its own checks on top. Names are compared ignoring upper and lower 
 | Add a skill to a student | At any branch | At their own branch only |
 | Mark finished, drop, set active again | At any branch | Only for skills at their branch |
 | Move a student to another class time | At any branch | Only for skills at their branch |
+| See who is in a class time | Every class time | Their own branch's class times |
 | Record a registration fee payment | At any branch | Only for skills at their branch |
 | Record a monthly fee payment | At any branch | Only for skills at their branch |
 | Record books, examination fees and other income | At any branch | At their own branch only |
@@ -933,7 +936,7 @@ Add, rename, deactivate and delete categories. A deactivated category can't be p
 
 Add a class by picking its branch and typing a name. You can rename a class, but not move it to another branch, because class times at that branch may already use it. A deactivated class can't be picked for class times anymore. The class times already there keep it until you change them. The table shows each class's class times: the skill, when, and who teaches it.
 
-Click a class's name to see its week: one box per day, Saturday to Friday, with what meets there in clock order. Each class time shows its hours, skill, teacher and how many students it has, and the free hours between two classes show as a dashed line, so it's easy to see when a room is empty. A deactivated class time still shows, with a badge, while students still come to it. Class times that use the class but have no hours yet are listed underneath. On a phone the days sit one under another.
+Click a class's name to see its week: one box per day, Saturday to Friday, with what meets there in clock order. Each class time shows its hours, skill, teacher and how many students it has, and the free hours between two classes show as a dashed line, so it's easy to see when a room is empty. A deactivated class time still shows, with a badge, while students still come to it. Class times that use the class but have no hours yet are listed underneath. The student count on each box opens that class time's students. On a phone the days sit one under another.
 
 Branch staff see this page too, with only their branch's classes and no buttons. They can open the week of their own branch's classes only.
 
@@ -963,10 +966,17 @@ Each branch that teaches the skill has a box of its own, with its duration, fees
 
 Each class time row shows its time, days, class, teacher and how many students it has, with these buttons:
 
+- **Students** opens the class time's own page, described below. The time itself is a link to the same page.
 - **Change** its hours, days, class or teacher. Its students move with it, so the app also refuses a change that would put one of them in another skill at the same time. A new teacher earns from fees paid from then on; fees already paid stay with the teacher they were paid under.
 - **Set time** instead of Change on a class time with a yellow **Time not set** badge. Those came from before class times had hours: type its hours and tick its days.
 - **Deactivate** stops it taking new students. The students already in it stay, and it keeps its class and teacher until they've all finished.
 - **Remove**, only while no student has ever been in it.
+
+#### A class time's students
+
+Everyone studying one skill at one time is on one page. Open it from the **Students** button on a class time's row on the skill's page, or from the student count on a box in a class's week. Branch staff reach it from the week, and only for their own branch's class times: another branch's gives Not found, the same as a class there does.
+
+The top card says what the class time is: the skill, the branch, the class, the teacher, the hours and days, how many students are in it now (and how many have ever joined, when that's more), the length of the course and the two fees, with "Free" for a monthly fee of zero. Under it is the list of students, A to Z, each with their phone and the responsible person's phone, the day they joined, their end date, whether the registration fee is paid, and Active, Finished or Dropped. An Active student past their end date gets a yellow **Past end date** badge, and an unpaid fee shows its amount. A student's name opens their page. The list opens on the **Active** students; **Finished**, **Dropped** and **All** beside the heading switch it, each with its count.
 
 #### Setting the hours on class times that say "Time not set"
 
