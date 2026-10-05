@@ -30,7 +30,9 @@ export function toCollegeDate(moment: Date): string {
 
 export function isIsoDate(value: string) {
   if (!ISO_DATE.test(value)) return false;
-  return fromDbDate(toDbDate(value)) === value;
+  // Month 13 makes no Date at all; 31 September rolls over to 1 October.
+  const date = toDbDate(value);
+  return !Number.isNaN(date.getTime()) && fromDbDate(date) === value;
 }
 
 /** A YYYY-MM-DD string as the Date Prisma writes to a DATE column. */
