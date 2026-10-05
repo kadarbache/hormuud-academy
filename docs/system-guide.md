@@ -1048,7 +1048,7 @@ On a **skill's page** you can:
 - **Delete** it, only while no branch teaches it.
 - **Add to a branch.** Pick the branch. The duration and fees start at the skill's defaults; change them if this branch charges differently. The registration fee is paid once by each student who starts the skill. Enter 0 if there's none.
 
-Each branch that teaches the skill has a box of its own, with its duration, fees, how many students take it there, and its class times. In the box:
+Each branch that teaches the skill is a row you click to open, like the questions on an FAQ page. The closed row shows the branch, Active or Inactive, its duration, fees and how many students take it there, with an arrow on the right. Every row starts closed, and several can be open at once; a row you opened stays open after you use one of its buttons. Open a row to see its buttons and, under them, its class times. The buttons:
 
 - **Add class time.** Type when it starts and ends, tick the days, and pick a class and a teacher. The lists only hold that branch's active classes and teachers. Any hours work: a class can run 4–6 pm while another runs 4–5 pm in a different room, and a third takes that room 5–6 pm. The app refuses a class that already has another skill at that time on one of those days, and a teacher who's teaching somewhere else then, at any branch. A skill can have as many class times as it needs, such as a morning one and an evening one.
 - **Change fees** sets that branch's duration and fees. A new fee or duration only applies to students who join afterwards; current students keep what they joined with.
@@ -1079,7 +1079,7 @@ A class time with no hours still works: students can join it and their fees are 
 Before you start, write down for every skill at every branch: the hours, the days, and whether it really runs more than once, like a morning group and an evening group. The branch staff or the teachers know. Then, for each skill:
 
 1. Open **Skills** and click the skill's name.
-2. Find the branch's box. In its table, a row with a yellow **Time not set** badge needs its hours.
+2. Open the branch's row. In its table, a row with a yellow **Time not set** badge needs its hours.
 3. Press **Set time** on that row. The dialog is called "Change class time at" and the branch's name. The class and the teacher already hold what the skill had before, so leave them unless they're wrong.
 4. Type **Starts** and **Ends**, in 5-minute steps. Any hours work, like 4:00 pm to 5:30 pm, as long as it ends after it starts.
 5. Tick the **Days** it meets.
