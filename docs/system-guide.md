@@ -1513,7 +1513,7 @@ Most new features follow the same steps:
 | Office staff salaries | Expense, with User | Staff salaries are already a category; a `userId` beside `teacherId` would name the person |
 | Reports over longer stretches | Payment and Expense | Both carry a branch and a date, so any grouping is a `groupBy` away |
 | Custom roles and permissions | `src/lib/auth.ts` | Better Auth's access control can define more roles than admin and staff |
-| Importing from the old system | `students/actions.ts` | Registration already knows how to create a student with enrollments in one transaction |
+| Importing from the old system | `prisma/import-students.ts`, `students/actions.ts` | Registration already knows how to create a student with enrollments in one transaction, and the one-off import script does the same from a reviewed CSV |
 
 ## What isn't built yet
 
@@ -1531,7 +1531,7 @@ Everything here was left out of Phase 1 on purpose, or is a known gap:
 - A budget is per branch per month and has to be written by hand each month. Last month's plan isn't copied forward.
 - Only two currencies, US dollars and Somaliland shillings, and fees can only be priced in dollars. A shilling payment always uses the rate in force when it's recorded; there's no typing in a different rate for one payment. Changing a fixed teacher's salary currency partway through a month counts what they were already paid in the old currency in the new one, at today's rate.
 - No automated tests yet. Everything was checked by hand in the browser. Adding tests is a good next step: unit tests for `src/lib` and browser tests for registration and the branch rules.
-- No import from the old system. Old students are typed in by hand.
+- No import screen. The only import is a one-off script, `prisma/import-students.ts`, for the Computer students on the paper registration list; any other old student is typed in by hand.
 - No printing: no ID cards, receipts or registration forms.
 - No emails. Staff sign in with Google, so there's nothing to send.
 - The app doesn't work offline. Installed, it shows an offline page and holds saves until the connection is back, but registering a student or recording a payment with no internet would need every form to queue its work on the phone, and that isn't built.
