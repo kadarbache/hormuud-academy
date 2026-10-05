@@ -86,7 +86,57 @@ or change:
   Recording a cost with each delivery would mean branch staff writing
   expenses, which number 3 hasn't decided.
 
+### 7. Attendance: what's left to decide
+
+The order and the marks were decided on 5 Oct 2026 (see "Decided"). Still
+open:
+
+- **How teachers sign in.** Staff sign in with Google only, so "the same as
+  staff" means Google, and a teacher without a Google account couldn't. The
+  other way is a phone number and a password, which needs Better Auth's
+  username plugin and a placeholder email. Only needed for step three.
+- **Who can mark Excused.** The teacher on the day, or only staff, who hear
+  the reason from the student or their responsible person.
+- **A stand-in teacher.** Whether whoever covers a class marks its sheet, or
+  staff mark it that day.
+- **Marking offline.** Leaning: online only at first. Keeping marks on the
+  phone and sending them later is a project of its own.
+
 ## Still to do (no decision needed)
+
+**Attendance step one, before it goes live.** Built on 5 Oct 2026: the
+Attendance page (the day's class times, taken or not), the sheet for one class
+time on one day, the month's grid, an Attendance card on the class time page
+and an Attendance column on a student's skills. Tried in the browser on a
+production build the same day: Computer Basics 4–6 pm at Main Branch taken
+for Mon 5 Oct (one Absent, one Late, one Excused), saved again with no change
+("Nothing changed"), then one mark changed, which added "Changed by"; Sun 4 Oct
+taken late from the arrows; a Friday refused (the class meets Sat to Thu),
+tomorrow refused, a class time with "Time not set" refused, a made-up date
+Not found; a forged student and a forged mark refused by the server; as abdaal
+staff, only abdaal's class times listed, Main Branch's sheet Not found and a
+save to it refused; Demo Student One moved to the 8–10 am class time and back,
+with their marks staying on the 4–6 pm grid and their rate (50%) unchanged on
+their page; the sheet and the month's grid on a phone. The month page's back
+link was too wide for a phone and was shortened. Found on the way: `isIsoDate`
+threw on a date like month 13 instead of saying no, which turned a made-up URL
+into a server error; fixed in `src/lib/dates.ts`. A review the same day found
+that a student moved to another class time was listed, Present, on the new
+class time's sheets taken late for days their old class time had already
+marked them, which counted those days twice in their rate. They are now left
+off those days; checked against the Neon test database in a transaction
+that was rolled back. Committed on local `main` (`56598dd` to `798ec27`, then
+this note), not pushed.
+The Neon test database (`ep-polished-paper`) got the `books` and `attendance`
+migrations on 5 Oct 2026. Production (`ep-square-silence`) still needs the
+`20261005120000_attendance` migration applied, after a backup, *before* the push, or every class time page and student page
+breaks. Four attendance sheets are in the local database. Two are from
+this testing (Main Branch Computer Basics 4–6 pm, 4 and 5 Oct). The other two
+(Computer Basics at Import Test Branch, 28 Sep and 3 Oct, 21 students each)
+were taken by the admin account soon after, by someone else.
+
+Step two, strict roles, comes next whenever teacher logins are wanted: see
+number 7 and "Decided".
 
 **Books, before it goes live.** Built and tried in the browser on 5 Oct
 2026: the book list, each branch's price and copies, deliveries and fixed
@@ -247,6 +297,27 @@ into chat twice.
 
 ## Decided
 
+- **Attendance: staff first, then teachers.** Asked on 5 Oct 2026 ("what will
+  it take to add attendance where a teacher can do attendance to his class?").
+  Step one was built the same day; see "Still to do" for going live. What's
+  still open is number 7. (5 Oct 2026)
+  - Step one: staff and the admin take attendance on the class time page,
+    with no new role. One sheet per class time per day records who took it
+    and when, so "not taken yet" and "everyone absent" look different.
+  - Step two: strict roles. `getCurrentUser` in `src/lib/session.ts` treats
+    every role that isn't `admin` as staff, so no teacher role goes in before
+    that changes. The student portal needs the same fix.
+  - Step three: teacher logins, each tied to one teacher, with a phone-first
+    page of their own class times that reuses the same marking screen.
+  - A student is marked Present, Absent, Late or Excused. Late counts as
+    present in their attendance rate: they came.
+  - A class time showing "Time not set" takes no attendance until the admin
+    sets its hours and days.
+  - Sheets only on the class time's own days for now. A make-up lesson on
+    another day isn't recorded. Each sheet keeps its real date, so allowing
+    extra days later changes no saved sheet.
+  - A teacher can change only that day's sheet. Staff at the branch and the
+    admin can correct any day's.
 - **Books: one list, a price and a shelf per branch.** Asked on 5 Oct 2026
   ("how am I going to sell a book to a student?") and built the same day; see
   "Still to do" for going live, and
