@@ -50,3 +50,9 @@ export type PhoneMatch = {
   fullName: string;
   branchName: string;
 };
+
+/** A student found by the student picker, with enough to tell two apart. */
+export type StudentMatch = PhoneMatch & {
+  /** Theirs, or else the responsible person's, as +252 61 1111111. */
+  phone: string | null;
+};

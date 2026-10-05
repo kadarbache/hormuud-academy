@@ -22,8 +22,8 @@ import {
 import { classTimeClash, studentClash } from "@/lib/clashes";
 import { addMonths, collegeToday, toDbDate } from "@/lib/dates";
 import { ledgerFields, NO_RATE_MESSAGE } from "@/lib/exchange-rate";
-import { formatMoney, formatStudentNumber } from "@/lib/format";
-import { isBlankEntry, toStoredPhone } from "@/lib/phone";
+import { formatMoney, formatStudentNumber, parseStudentLookup } from "@/lib/format";
+import { formatPhone, isBlankEntry, toStoredPhone } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, requireUser } from "@/lib/session";
 import {
@@ -44,8 +44,8 @@ import {
   requiredText,
 } from "@/lib/validation";
 import { registrationFeePayment } from "../finance/payments";
-import { canEditStudent } from "./access";
-import { classTimeFieldName, type PhoneMatch } from "./types";
+import { browsableStudents, canEditStudent } from "./access";
+import { classTimeFieldName, type PhoneMatch, type StudentMatch } from "./types";
 
 const profileSchema = z.object({
   fullName: requiredText("Enter the student's full name.", 120),
@@ -654,5 +654,53 @@ export async function findStudentsByPhone(phone: string, excludeId?: string): Pr
     number: formatStudentNumber(student.number),
     fullName: student.fullName,
     branchName: student.homeBranch.name,
+  }));
+}
+
+/** The most students the picker lists at once. Typing more narrows it. */
+const PICKER_SIZE = 8;
+
+/**
+ * Students for the student picker, by the same rules as the student list:
+ * an ID or a phone number finds the student at any branch, and a name only
+ * searches the students this user can already browse.
+ */
+export async function searchStudents(query: string): Promise<StudentMatch[]> {
+  const user = await requireUser();
+  const text = query.trim();
+  if (!text) return [];
+
+  const lookup = parseStudentLookup(text);
+  // One letter matches half the college, so a name waits for two.
+  if (lookup.kind === "name" && lookup.text.length < 2) return [];
+  const where: Prisma.StudentWhereInput =
+    lookup.kind === "number"
+      ? { number: lookup.number }
+      : lookup.kind === "phone"
+        ? {
+            OR: [
+              { phone: { endsWith: lookup.phone } },
+              { responsiblePhone: { endsWith: lookup.phone } },
+            ],
+          }
+        : {
+            AND: [
+              browsableStudents(user),
+              { fullName: { contains: lookup.text, mode: "insensitive" } },
+            ],
+          };
+
+  const students = await prisma.student.findMany({
+    where,
+    orderBy: [{ fullName: "asc" }, { number: "asc" }],
+    take: PICKER_SIZE,
+    include: { homeBranch: { select: { name: true } } },
+  });
+  return students.map((student) => ({
+    id: student.id,
+    number: formatStudentNumber(student.number),
+    fullName: student.fullName,
+    branchName: student.homeBranch.name,
+    phone: formatPhone(student.phone ?? student.responsiblePhone) || null,
   }));
 }
