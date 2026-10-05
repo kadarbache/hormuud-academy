@@ -1077,7 +1077,7 @@ On a **book's page** you can:
 - **Delete** it, only while no branch sells it.
 - **Add to a branch.** Pick the branch. The price starts at the book's default; change it if this branch charges differently.
 
-Each branch that sells the book has a box of its own, with its price and the copies on its shelf (a yellow **Out of stock** badge at zero):
+Each branch that sells the book is a row you click to open, like the questions on an FAQ page. The closed row shows the branch, Active or Inactive, its price and the copies on its shelf (a yellow **Out of stock** badge at zero), with an arrow on the right. Every row starts closed for the admin, and several can be open at once; a row you opened stays open after you use one of its buttons. Branch staff only have their own branch's row, so theirs starts open. Open a row to see its buttons and, under them, what happened to its copies:
 
 - **Add copies** when a delivery arrives: how many, and an optional note like "From the head office". The count goes up straight away.
 - **Fix count** when the shelf doesn't match the app: count the copies, type what's really there, and say why, like "Two copies damaged". The reason is required, so copies never vanish without a word. If a sale changes the count while you're typing, nothing is saved and the app asks you to look again.
@@ -1086,7 +1086,7 @@ Each branch that sells the book has a box of its own, with its price and the cop
 
 Under the buttons is what happened to the copies, newest first: each **Delivery** (+20) and **Count fixed** (−2, with what was counted and why), and each **Sale** (−1) with its receipt number and the student, if one was named, and who recorded it. It shows the latest 20; older sales are on the Income screen under Books.
 
-Branch staff see the Books page too, with only their branch's books: the price, the copies on the shelf, and **Add copies** and **Fix count** on each row. A book's page shows them only their branch's box, without the price and setup buttons, and a book their branch doesn't sell gives Not found.
+Branch staff see the Books page too, with only their branch's books: the price, the copies on the shelf, and **Add copies** and **Fix count** on each row. A book's page shows them only their branch's row, already open, without the price and setup buttons, and a book their branch doesn't sell gives Not found.
 
 #### Staff accounts
 
