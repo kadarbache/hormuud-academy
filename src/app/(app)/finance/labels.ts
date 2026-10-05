@@ -56,8 +56,10 @@ export const incomeCategories = Object.keys(incomeCategoryLabels) as IncomeCateg
  * The income a member of staff types in themselves. A registration fee and a
  * monthly fee are always for one skill, so they're recorded on the student's
  * page instead, where the amount and the teacher's share are already known.
+ * Books have Sell books, which picks them from the branch's shelf and takes
+ * the copies off it.
  */
-export const walkInIncomeCategories = ["BOOKS", "EXAMINATION_FEE", "OTHER"] as const;
+export const walkInIncomeCategories = ["EXAMINATION_FEE", "OTHER"] as const;
 
 export const walkInIncomeOptions = walkInIncomeCategories.map((value) => ({
   value,

@@ -92,7 +92,8 @@ export function CurrencyField({
  * `defaultAmounts` is what the box starts at in each currency: a monthly fee
  * starts at the fee in dollars, and at the fee in shillings once shillings
  * are picked. Switching currency swaps the box to that currency's amount
- * until something is typed in it; after that, what was typed stays.
+ * until something is typed in it; after that, what was typed stays. The
+ * same goes for new defaults, like a book sale's total as books are added.
  */
 export function AmountFields({
   label,
@@ -128,6 +129,15 @@ export function AmountFields({
   const [amount, setAmount] = useState(defaultAmounts[defaultCurrency] ?? "");
   const [typed, setTyped] = useState(false);
   const currency = lockedCurrency ?? picked;
+
+  // Follow new defaults until something is typed, adjusting while rendering
+  // rather than in an effect, so the box never shows the old amount.
+  const defaultsKey = `${defaultAmounts.USD ?? ""}|${defaultAmounts.SLSH ?? ""}`;
+  const [shownDefaults, setShownDefaults] = useState(defaultsKey);
+  if (shownDefaults !== defaultsKey) {
+    setShownDefaults(defaultsKey);
+    if (!typed) setAmount(defaultAmounts[currency] ?? "");
+  }
 
   return (
     <>

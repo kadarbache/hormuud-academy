@@ -623,7 +623,12 @@ export async function deleteStudent(id: string): Promise<ActionResult> {
     );
   }
 
-  await prisma.student.delete({ where: { id } });
+  // Books they bought have left the shelf whoever bought them, so the sale
+  // stays, with nobody named, and the shelf's count stays true.
+  await prisma.$transaction([
+    prisma.payment.updateMany({ where: { studentId: id, category: "BOOKS" }, data: { studentId: null } }),
+    prisma.student.delete({ where: { id } }),
+  ]);
   if (student.photoPublicId) await deleteStudentPhoto(student.photoPublicId).catch(() => {});
 
   return success(`${formatStudentNumber(student.number)} deleted.`);

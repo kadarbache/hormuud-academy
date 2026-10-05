@@ -3,13 +3,15 @@
 import { FormDialog } from "@/components/form-dialog";
 import { SelectField, TextField, type Option } from "@/components/form-fields";
 import type { ActionResult } from "@/lib/action-result";
+import { StudentPicker } from "../../students/student-picker";
 import { AmountFields } from "../amount-fields";
 import { paymentMethodOptions, walkInIncomeOptions } from "../labels";
 
 /**
- * Money taken at the counter that isn't a fee: books, an examination fee, or
- * anything else. Registration and monthly fees are recorded on the student's
- * own page, where the amount and the skill are already known.
+ * Money taken at the counter that isn't a fee or a book sale: an examination
+ * fee, or anything else. Registration and monthly fees are recorded on the
+ * student's own page, where the amount and the skill are already known, and
+ * books have their own Sell books.
  */
 export function IncomeDialog({
   action,
@@ -31,7 +33,7 @@ export function IncomeDialog({
   return (
     <FormDialog
       title="Record income"
-      description="For books, examination fees and anything else paid over the counter."
+      description="For examination fees and anything else paid over the counter. Books have Sell books."
       trigger={trigger}
       action={action}
       submitLabel="Record income"
@@ -75,17 +77,14 @@ export function IncomeDialog({
               errors={errors.branchId}
             />
           )}
-          <TextField
-            label="Student ID"
-            name="student"
-            placeholder="STU-00042"
-            description="Optional. Fill it in to show this payment on the student's record."
+          <StudentPicker
+            description="Optional. Pick the student to show this payment on their record."
             errors={errors.student}
           />
           <TextField
             label="Note"
             name="note"
-            placeholder="Two textbooks"
+            placeholder="Final exam, Graphic Design"
             errors={errors.note}
           />
         </>

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Form from "next/form";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { BookCopy, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,7 @@ import { collegeToday, formatDate, formatMonth, fromDbMonth } from "@/lib/dates"
 import { currentRate } from "@/lib/exchange-rate";
 import { formatMoney, formatStudentNumber } from "@/lib/format";
 import { requireUser } from "@/lib/session";
+import { sellableBooks } from "../../books/queries";
 import { Amount, Breakdown, StatCard, StatRow } from "../figures";
 import {
   ANY,
@@ -29,8 +30,9 @@ import {
 import { PeriodPicker } from "../period-picker";
 import { periodLabel, periodParams, periodPhrase } from "../period";
 import { incomeByCategory, incomeByMethod } from "../queries";
-import { deletePayment, recordIncome } from "./actions";
+import { deletePayment, recordIncome, sellBooks } from "./actions";
 import { IncomeDialog } from "./income-dialog";
+import { SellBooksDialog } from "./sell-books-dialog";
 import {
   branchOptions,
   earningTeacherOptions,
@@ -63,8 +65,16 @@ function paidFor(payment: {
   note: string | null;
   forMonth: Date | null;
   enrollment: { skill: { name: string } } | null;
+  bookLines: { quantity: number; branchBook: { book: { title: string } } }[];
 }) {
   const skill = payment.enrollment?.skill.name;
+  // A sale from before the book list has no lines, only its note.
+  if (payment.bookLines.length > 0) {
+    const titles = payment.bookLines
+      .map((line) => `${line.branchBook.book.title}${line.quantity > 1 ? ` × ${line.quantity}` : ""}`)
+      .join(", ");
+    return { title: "Books", detail: payment.note ? `${titles}. ${payment.note}` : titles };
+  }
   if (payment.category === "REGISTRATION_FEE") {
     return { title: skill ?? "Registration fee", detail: "Registration fee" };
   }
@@ -83,17 +93,26 @@ export default async function IncomePage({ searchParams }: PageProps<"/finance/i
   const filters = readIncomeFilters(await searchParams);
   const where = incomeWhere(user, filters);
 
-  const [byMethod, byCategory, { rows, total, pageCount }, branches, recordable, teachers, rate] =
-    await Promise.all([
-      incomeByMethod(where),
-      incomeByCategory(where),
-      listPayments(where, filters.page),
-      isAdmin ? branchOptions() : [],
-      recordableBranches(user),
-      // Only the admin sees teacher shares, so only they can filter by one.
-      isAdmin ? earningTeacherOptions() : [],
-      currentRate(),
-    ]);
+  const [
+    byMethod,
+    byCategory,
+    { rows, total, pageCount },
+    branches,
+    recordable,
+    teachers,
+    rate,
+    onShelf,
+  ] = await Promise.all([
+    incomeByMethod(where),
+    incomeByCategory(where),
+    listPayments(where, filters.page),
+    isAdmin ? branchOptions() : [],
+    recordableBranches(user),
+    // Only the admin sees teacher shares, so only they can filter by one.
+    isAdmin ? earningTeacherOptions() : [],
+    currentRate(),
+    sellableBooks(user),
+  ]);
 
   const when = periodLabel(filters.period);
   const firstShown = (filters.page - 1) * PAGE_SIZE + 1;
@@ -117,6 +136,19 @@ export default async function IncomePage({ searchParams }: PageProps<"/finance/i
             : `What your branch took, ${when}.`
         }
       >
+        <SellBooksDialog
+          action={sellBooks}
+          branches={recordable}
+          books={onShelf}
+          rate={rate}
+          today={collegeToday()}
+          trigger={
+            <Button variant="outline" disabled={onShelf.length === 0}>
+              <BookCopy />
+              Sell books
+            </Button>
+          }
+        />
         <IncomeDialog
           action={recordIncome}
           branches={recordable}
@@ -281,6 +313,7 @@ export default async function IncomePage({ searchParams }: PageProps<"/finance/i
               ]}
               rows={rows.map((payment) => {
                 const what = paidFor(payment);
+                const sold = payment.bookLines.reduce((count, line) => count + line.quantity, 0);
                 return {
                   key: payment.id,
                   title: `Receipt ${payment.number}`,
@@ -341,7 +374,10 @@ export default async function IncomePage({ searchParams }: PageProps<"/finance/i
                           action={deletePayment.bind(null, payment.id)}
                           confirm={{
                             title: `Remove receipt ${payment.number}?`,
-                            description: `${formatMoney(payment.amount.toString(), payment.currency)} comes out of the books, and out of any teacher's share it earned. Use this only for a payment recorded by mistake.`,
+                            description:
+                              sold > 0
+                                ? `${formatMoney(payment.amount.toString(), payment.currency)} comes out of the income, and ${sold === 1 ? "the copy it sold goes" : `the ${sold} copies it sold go`} back on the shelf. Use this for a sale recorded by mistake, or books handed back.`
+                                : `${formatMoney(payment.amount.toString(), payment.currency)} comes out of the books, and out of any teacher's share it earned. Use this only for a payment recorded by mistake.`,
                             confirmLabel: "Remove payment",
                             destructive: true,
                           }}

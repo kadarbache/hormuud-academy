@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight, ChevronLeft, Pencil, Plus, UserRound } from "lucide-react";
+import { ArrowRight, BookCopy, ChevronLeft, Pencil, Plus, UserRound } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,8 +26,11 @@ import { formatPhone } from "@/lib/phone";
 import { isPositiveMoney, sumMoney, toCents } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
+import { sellableBooks } from "../../books/queries";
 import { feeMonths } from "../../finance/fee-months";
-import { recordMonthlyFee, recordRegistrationFee } from "../../finance/income/actions";
+import { recordMonthlyFee, recordRegistrationFee, sellBooks } from "../../finance/income/actions";
+import { recordableBranches } from "../../finance/income/queries";
+import { SellBooksDialog } from "../../finance/income/sell-books-dialog";
 import { paymentMethodLabels } from "../../finance/labels";
 import { canEditStudent } from "../access";
 import {
@@ -178,7 +181,11 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
   const isAdmin = user.role === "admin";
   const canEdit = canEditStudent(user, student);
   const today = collegeToday();
-  const rate = await currentRate();
+  const [rate, sellingBranches, onShelf] = await Promise.all([
+    currentRate(),
+    recordableBranches(user),
+    sellableBooks(user),
+  ]);
   // The admin sees every enrollment, so this is the student's whole record.
   const paidAMonthlyFee = student.enrollments.some((enrollment) =>
     enrollment.payments.some((payment) => payment.category === "MONTHLY_FEE"),
@@ -295,6 +302,20 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
               </Button>
             }
           />
+          <SellBooksDialog
+            action={sellBooks}
+            branches={sellingBranches}
+            books={onShelf}
+            rate={rate}
+            today={today}
+            student={{ number: formatStudentNumber(student.number), name: student.fullName }}
+            trigger={
+              <Button variant="outline" disabled={onShelf.length === 0}>
+                <BookCopy />
+                Sell books
+              </Button>
+            }
+          />
           {isAdmin && (
             <ActionButton
               variant="destructive"
@@ -309,7 +330,7 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
               confirm={{
                 title: `Delete ${student.fullName}?`,
                 description:
-                  "Only for duplicates and typing mistakes. The student, every skill record they have and every payment they made go for good, which changes the income already recorded for those days.",
+                  "Only for duplicates and typing mistakes. The student, every skill record they have and every payment they made go for good, which changes the income already recorded for those days. Only books they bought stay sold, with no student named.",
                 confirmLabel: "Delete student",
                 destructive: true,
               }}

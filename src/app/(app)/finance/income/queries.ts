@@ -94,6 +94,10 @@ export async function listPayments(where: Prisma.PaymentWhereInput, page: number
         enrollment: { select: { skill: { select: { name: true } } } },
         teacher: { select: { id: true, name: true } },
         recordedBy: { select: { name: true } },
+        bookLines: {
+          select: { quantity: true, branchBook: { select: { book: { select: { title: true } } } } },
+          orderBy: { branchBook: { book: { title: "asc" } } },
+        },
       },
     }),
   ]);
