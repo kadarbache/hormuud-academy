@@ -1,6 +1,6 @@
 # Hormuud Academy
 
-Runs Hormuud Academy, one college with several branches: the skills it teaches, the students it registers, and which skills each student takes at which branch.
+Runs Hormuud Academy, one college with several branches: the skills it teaches, the students it registers, which skills each student takes at which branch, and the books each branch sells.
 
 ## Language
 
@@ -134,7 +134,7 @@ What the two currencies are worth together in US dollars now: the dollars plus t
 _Avoid_: Grand total, total in dollars, overall
 
 **Payment**:
-Money the college received, recorded once with the day it came in, the branch that took it, what it was for, how it was paid and its currency. Registration fees and monthly fees are payments, and so is a book sold over the counter.
+Money the college received, recorded once with the day it came in, the branch that took it, what it was for, how it was paid and its currency. Registration fees and monthly fees are payments, and so is a book sale.
 _Avoid_: Receipt, transaction, income record
 
 **Payment method**:
@@ -142,7 +142,7 @@ How the money changed hands: Cash, ZAAD, eDahab, or Bank / other. ZAAD and eDaha
 _Avoid_: Channel, mode, wallet
 
 **Income category**:
-What a payment was for: Registration fee, Monthly fee, Books, Examination fee or Other income. The first two always belong to one enrollment; the rest are entered on their own.
+What a payment was for: Registration fee, Monthly fee, Books, Examination fee or Other income. The first two always belong to one enrollment, and Books is a book sale; the last two are entered on their own.
 _Avoid_: Income type, source
 
 **Fee month**:
@@ -192,3 +192,29 @@ _Avoid_: Forecast, target, projection
 **Net balance**:
 Income minus expenses over a day, a month or a branch, worked out for each currency and for the combined figures. Negative means the college spent more than it took.
 _Avoid_: Profit, surplus, bottom line
+
+### Books
+
+**Book**:
+Something the college sells over the counter, like a textbook for a skill. One list serves every branch. A book carries a default price in US dollars, which a branch starts from when the book is added to it. Changing the default touches no branch that sells the book already.
+_Avoid_: Product, item, material
+
+**Branch book**:
+A book as one branch sells it, with that branch's price and its own stock. Only the admin adds a book to a branch and sets its price, because a branch in a poorer city may charge less. The code calls it `BranchBook`; the screens just name the book and the branch.
+_Avoid_: Listing, inventory item
+
+**Stock**:
+How many copies of a book one branch has on its shelf, which is what the screens call it: "on the shelf". A sale takes copies off, a delivery puts them on, and a fixed count sets it to what's really there. It never goes below zero, and it always equals every delivery and fixed count, less every copy sold. See [ADR 0008](docs/adr/0008-a-shelf-keeps-its-count.md).
+_Avoid_: Inventory, quantity on hand, balance
+
+**Delivery**:
+Copies that arrived at a branch, recorded by staff there or by the admin. It adds to the stock and is kept with who recorded it and an optional note.
+_Avoid_: Restock, purchase, stock in
+
+**Fixed count**:
+Setting a branch's stock to what is really on the shelf, with the reason, like two damaged copies. Staff at the branch or the admin can do it. Kept with the difference, the new count and who made it.
+_Avoid_: Adjustment, write-off, correction
+
+**Book sale**:
+A payment in the Books category listing one or more books from one branch's shelf, each with how many copies and the branch's price that day. The amount starts at what the books come to and can be lowered for a discount, never raised. Naming a student is optional. Removing the sale puts its copies back on the shelf. A Books payment from before the book list has a note instead of books, and took nothing off any shelf.
+_Avoid_: Order, invoice, book payment
