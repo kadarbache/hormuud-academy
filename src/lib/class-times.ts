@@ -85,6 +85,22 @@ export function slotsClash(a: Slot, b: Slot) {
   return hoursOverlap(a, b) && sharedDays(a.days, b.days).length > 0;
 }
 
+/** JavaScript counts the week from Sunday; the college's runs from Saturday. */
+const BY_JS_DAY: Weekday[] = [
+  "SUNDAY",
+  "MONDAY",
+  "TUESDAY",
+  "WEDNESDAY",
+  "THURSDAY",
+  "FRIDAY",
+  "SATURDAY",
+];
+
+/** The day of the week a YYYY-MM-DD date falls on. */
+export function weekdayOf(isoDate: string): Weekday {
+  return BY_JS_DAY[new Date(`${isoDate}T00:00:00.000Z`).getUTCDay()];
+}
+
 /** A class time's slot, or null while its hours aren't set. */
 export function slotOf({ startMinute, endMinute, days }: ClassTimeHours): Slot | null {
   return startMinute !== null && endMinute !== null ? { startMinute, endMinute, days } : null;

@@ -28,6 +28,14 @@ export function toCollegeDate(moment: Date): string {
   return collegeDay.format(moment);
 }
 
+/**
+ * The moment a day starts at the college, to compare with a stamp like
+ * statusChangedAt. East Africa Time keeps UTC+3 all year, with no summer time.
+ */
+export function collegeDayStart(isoDate: string): Date {
+  return new Date(`${isoDate}T00:00:00+03:00`);
+}
+
 export function isIsoDate(value: string) {
   if (!ISO_DATE.test(value)) return false;
   // Month 13 makes no Date at all; 31 September rolls over to 1 October.

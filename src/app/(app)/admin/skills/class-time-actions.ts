@@ -161,10 +161,11 @@ export async function deleteClassTime(id: string): Promise<ActionResult> {
   await requireAdmin();
   const classTime = await prisma.classTime.findUnique({
     where: { id },
-    include: { _count: { select: { enrollments: true } } },
+    include: { _count: { select: { enrollments: true, attendanceSheets: true } } },
   });
   if (!classTime) return failure("That class time no longer exists.");
-  if (classTime._count.enrollments > 0) {
+  // Moving every student out leaves no enrollments, but its attendance stays.
+  if (classTime._count.enrollments > 0 || classTime._count.attendanceSheets > 0) {
     return failure("Students have been in this class time. Deactivate it instead.");
   }
 

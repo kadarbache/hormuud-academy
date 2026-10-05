@@ -181,8 +181,11 @@ export async function deleteBranchSkill(id: string): Promise<ActionResult> {
     return failure("Students have taken this skill at this branch. Deactivate it instead.");
   }
 
-  // Nobody ever joined, so its class times go with it.
+  // Nobody ever joined, so its class times go with it. A sheet can only be
+  // left if the students on it were deleted as duplicates, and then it marks
+  // nobody.
   await prisma.$transaction([
+    prisma.attendanceSheet.deleteMany({ where: { classTime: { branchSkillId: id } } }),
     prisma.classTime.deleteMany({ where: { branchSkillId: id } }),
     prisma.branchSkill.delete({ where: { id } }),
   ]);

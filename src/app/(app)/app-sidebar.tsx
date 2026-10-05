@@ -7,6 +7,7 @@ import {
   Building2,
   CalendarRange,
   ChartNoAxesColumn,
+  ClipboardCheck,
   DoorOpen,
   GraduationCap,
   HandCoins,
@@ -62,6 +63,12 @@ const studentItems: NavItem[] = [
     label: "Register student",
     icon: UserPlus,
     match: (pathname) => pathname === "/students/new",
+  },
+  {
+    href: "/attendance",
+    label: "Attendance",
+    icon: ClipboardCheck,
+    match: under("/attendance"),
   },
 ];
 
