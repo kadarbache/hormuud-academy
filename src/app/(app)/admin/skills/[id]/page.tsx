@@ -2,6 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, Plus } from "lucide-react";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { ActionButton } from "@/components/action-button";
 import { DataTable } from "@/components/data-table";
@@ -192,181 +198,192 @@ export default async function SkillPage({ params }: PageProps<"/admin/skills/[id
           <EmptyRow message="No branch teaches this skill yet, so nobody can enroll in it." />
         )}
 
-        {skill.branchSkills.map((bs) => {
-          const counts = countsFor(bs.classTimes.map((classTime) => classTime.id));
-          const choices = choicesFor(bs.branchId);
-          // By the clock, with the ones still waiting for a time first.
-          const classTimes = bs.classTimes.toSorted(
-            (a, b) =>
-              (a.startMinute ?? -1) - (b.startMinute ?? -1) ||
-              a.classroom.name.localeCompare(b.classroom.name),
-          );
-          const registration = bs.registrationFee.gt(0)
-            ? `${formatMoney(bs.registrationFee.toString())} to register`
-            : "no registration fee";
-          return (
-            <div key={bs.id} className="space-y-3 rounded-lg border p-4">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <h3 className="flex items-center gap-2 font-semibold">
-                    {bs.branch.name}
-                    <ActiveBadge active={bs.active} />
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {formatMonths(bs.durationMonths)}, {registration},{" "}
-                    {formatMoney(bs.monthlyFee.toString())} a month ·{" "}
-                    {counts.active === 1 ? "1 active student" : `${counts.active} active students`}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  <ClassTimeDialog
-                    action={addClassTime.bind(null, bs.id)}
-                    branchName={bs.branch.name}
-                    choices={choices}
-                    trigger={
-                      <Button variant="outline" size="sm">
-                        <Plus />
-                        Add class time
-                      </Button>
-                    }
-                  />
-                  <BranchSkillDialog
-                    action={updateBranchSkill.bind(null, bs.id)}
-                    branches={[]}
-                    branchName={bs.branch.name}
-                    pricing={{
-                      durationMonths: bs.durationMonths,
-                      registrationFee: bs.registrationFee.toString(),
-                      monthlyFee: bs.monthlyFee.toString(),
-                    }}
-                    trigger={
-                      <Button variant="ghost" size="sm">
-                        Change fees
-                      </Button>
-                    }
-                  />
-                  <ActionButton
-                    variant="ghost"
-                    size="sm"
-                    action={setBranchSkillActive.bind(null, bs.id, !bs.active)}
-                  >
-                    {bs.active ? "Deactivate" : "Activate"}
-                  </ActionButton>
-                  {counts.total === 0 && (
-                    <ActionButton
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive"
-                      action={deleteBranchSkill.bind(null, bs.id)}
-                      confirm={{
-                        title: `Remove ${skill.name} from ${bs.branch.name}?`,
-                        description:
-                          "No student has taken it at this branch, so it can be removed for good, with its class times.",
-                        confirmLabel: "Remove",
-                        destructive: true,
-                      }}
-                    >
-                      Remove
-                    </ActionButton>
-                  )}
-                </div>
-              </div>
+        <Accordion
+          type="multiple"
+          // Every branch starts closed: open one to see its class times.
+          defaultValue={[]}
+          className="space-y-3"
+        >
+          {skill.branchSkills.map((bs) => {
+            const counts = countsFor(bs.classTimes.map((classTime) => classTime.id));
+            const choices = choicesFor(bs.branchId);
+            // By the clock, with the ones still waiting for a time first.
+            const classTimes = bs.classTimes.toSorted(
+              (a, b) =>
+                (a.startMinute ?? -1) - (b.startMinute ?? -1) ||
+                a.classroom.name.localeCompare(b.classroom.name),
+            );
+            const registration = bs.registrationFee.gt(0)
+              ? `${formatMoney(bs.registrationFee.toString())} to register`
+              : "no registration fee";
+            return (
+              <AccordionItem key={bs.id} value={bs.id}>
+                <AccordionTrigger>
+                  <span className="flex flex-col gap-0.5">
+                    <span className="flex items-center gap-2 font-semibold">
+                      {bs.branch.name}
+                      <ActiveBadge active={bs.active} />
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      {formatMonths(bs.durationMonths)}, {registration},{" "}
+                      {formatMoney(bs.monthlyFee.toString())} a month ·{" "}
+                      {counts.active === 1 ? "1 active student" : `${counts.active} active students`}
+                    </span>
+                  </span>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-3 pt-3">
+                    <div className="flex flex-wrap gap-1">
+                      <ClassTimeDialog
+                        action={addClassTime.bind(null, bs.id)}
+                        branchName={bs.branch.name}
+                        choices={choices}
+                        trigger={
+                          <Button variant="outline" size="sm">
+                            <Plus />
+                            Add class time
+                          </Button>
+                        }
+                      />
+                      <BranchSkillDialog
+                        action={updateBranchSkill.bind(null, bs.id)}
+                        branches={[]}
+                        branchName={bs.branch.name}
+                        pricing={{
+                          durationMonths: bs.durationMonths,
+                          registrationFee: bs.registrationFee.toString(),
+                          monthlyFee: bs.monthlyFee.toString(),
+                        }}
+                        trigger={
+                          <Button variant="ghost" size="sm">
+                            Change fees
+                          </Button>
+                        }
+                      />
+                      <ActionButton
+                        variant="ghost"
+                        size="sm"
+                        action={setBranchSkillActive.bind(null, bs.id, !bs.active)}
+                      >
+                        {bs.active ? "Deactivate" : "Activate"}
+                      </ActionButton>
+                      {counts.total === 0 && (
+                        <ActionButton
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive"
+                          action={deleteBranchSkill.bind(null, bs.id)}
+                          confirm={{
+                            title: `Remove ${skill.name} from ${bs.branch.name}?`,
+                            description:
+                              "No student has taken it at this branch, so it can be removed for good, with its class times.",
+                            confirmLabel: "Remove",
+                            destructive: true,
+                          }}
+                        >
+                          Remove
+                        </ActionButton>
+                      )}
+                    </div>
 
-              {classTimes.length === 0 ? (
-                <EmptyRow message="No class times yet, so nobody can join it here. Add one to say when, where and with whom." />
-              ) : (
-                <DataTable
-                  columns={[
-                    { label: "Time", className: "font-medium tabular-nums" },
-                    { label: "Days" },
-                    { label: "Class" },
-                    { label: "Teacher" },
-                    { label: "Students", className: "text-right tabular-nums" },
-                    { label: "Status" },
-                    { label: "Actions", actions: true, className: "text-right" },
-                  ]}
-                  rows={classTimes.map((classTime) => {
-                    const students = countsFor([classTime.id]);
-                    const slot = slotOf(classTime);
-                    const hours = slot ? formatHours(slot) : null;
-                    return {
-                      key: classTime.id,
-                      title: hours ?? "Time not set",
-                      description: `${classTime.classroom.name} with ${classTime.teacher.name}`,
-                      cells: {
-                        Time: hours ? (
-                          <Link href={`/class-times/${classTime.id}`} className="hover:underline">
-                            {hours}
-                          </Link>
-                        ) : (
-                          <Badge
-                            variant="outline"
-                            className="border-warning-border bg-warning text-warning-foreground"
-                          >
-                            Time not set
-                          </Badge>
-                        ),
-                        Days: classTime.days.length > 0 ? formatDays(classTime.days) : "None",
-                        Class: classTime.classroom.name,
-                        Teacher: classTime.teacher.name,
-                        Students: students.active,
-                        Status: <ActiveBadge active={classTime.active} />,
-                        Actions: (
-                          <div className="flex justify-end gap-1">
-                            <Button variant="outline" size="sm" asChild>
-                              <Link href={`/class-times/${classTime.id}`}>Students</Link>
-                            </Button>
-                            <ClassTimeDialog
-                              action={updateClassTime.bind(null, classTime.id)}
-                              branchName={bs.branch.name}
-                              choices={choices}
-                              current={{
-                                classroomId: classTime.classroomId,
-                                teacherId: classTime.teacherId,
-                                start: slot ? toClockInput(slot.startMinute) : "",
-                                end: slot ? toClockInput(slot.endMinute) : "",
-                                days: classTime.days,
-                              }}
-                              trigger={
-                                <Button variant="ghost" size="sm">
-                                  {slot ? "Change" : "Set time"}
-                                </Button>
-                              }
-                            />
-                            <ActionButton
-                              variant="ghost"
-                              size="sm"
-                              action={setClassTimeActive.bind(null, classTime.id, !classTime.active)}
-                            >
-                              {classTime.active ? "Deactivate" : "Activate"}
-                            </ActionButton>
-                            {students.total === 0 && (
-                              <ActionButton
-                                variant="ghost"
-                                size="sm"
-                                className="text-destructive"
-                                action={deleteClassTime.bind(null, classTime.id)}
-                                confirm={{
-                                  title: "Remove this class time?",
-                                  description:
-                                    "No student has been in it, so it can be removed for good.",
-                                  confirmLabel: "Remove",
-                                  destructive: true,
-                                }}
-                              >
-                                Remove
-                              </ActionButton>
-                            )}
-                          </div>
-                        ),
-                      },
-                    };
-                  })}
-                />
-              )}
-            </div>
-          );
-        })}
+                    {classTimes.length === 0 ? (
+                      <EmptyRow message="No class times yet, so nobody can join it here. Add one to say when, where and with whom." />
+                    ) : (
+                      <DataTable
+                        columns={[
+                          { label: "Time", className: "font-medium tabular-nums" },
+                          { label: "Days" },
+                          { label: "Class" },
+                          { label: "Teacher" },
+                          { label: "Students", className: "text-right tabular-nums" },
+                          { label: "Status" },
+                          { label: "Actions", actions: true, className: "text-right" },
+                        ]}
+                        rows={classTimes.map((classTime) => {
+                          const students = countsFor([classTime.id]);
+                          const slot = slotOf(classTime);
+                          const hours = slot ? formatHours(slot) : null;
+                          return {
+                            key: classTime.id,
+                            title: hours ?? "Time not set",
+                            description: `${classTime.classroom.name} with ${classTime.teacher.name}`,
+                            cells: {
+                              Time: hours ? (
+                                <Link href={`/class-times/${classTime.id}`} className="hover:underline">
+                                  {hours}
+                                </Link>
+                              ) : (
+                                <Badge
+                                  variant="outline"
+                                  className="border-warning-border bg-warning text-warning-foreground"
+                                >
+                                  Time not set
+                                </Badge>
+                              ),
+                              Days: classTime.days.length > 0 ? formatDays(classTime.days) : "None",
+                              Class: classTime.classroom.name,
+                              Teacher: classTime.teacher.name,
+                              Students: students.active,
+                              Status: <ActiveBadge active={classTime.active} />,
+                              Actions: (
+                                <div className="flex justify-end gap-1">
+                                  <Button variant="outline" size="sm" asChild>
+                                    <Link href={`/class-times/${classTime.id}`}>Students</Link>
+                                  </Button>
+                                  <ClassTimeDialog
+                                    action={updateClassTime.bind(null, classTime.id)}
+                                    branchName={bs.branch.name}
+                                    choices={choices}
+                                    current={{
+                                      classroomId: classTime.classroomId,
+                                      teacherId: classTime.teacherId,
+                                      start: slot ? toClockInput(slot.startMinute) : "",
+                                      end: slot ? toClockInput(slot.endMinute) : "",
+                                      days: classTime.days,
+                                    }}
+                                    trigger={
+                                      <Button variant="ghost" size="sm">
+                                        {slot ? "Change" : "Set time"}
+                                      </Button>
+                                    }
+                                  />
+                                  <ActionButton
+                                    variant="ghost"
+                                    size="sm"
+                                    action={setClassTimeActive.bind(null, classTime.id, !classTime.active)}
+                                  >
+                                    {classTime.active ? "Deactivate" : "Activate"}
+                                  </ActionButton>
+                                  {students.total === 0 && (
+                                    <ActionButton
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-destructive"
+                                      action={deleteClassTime.bind(null, classTime.id)}
+                                      confirm={{
+                                        title: "Remove this class time?",
+                                        description:
+                                          "No student has been in it, so it can be removed for good.",
+                                        confirmLabel: "Remove",
+                                        destructive: true,
+                                      }}
+                                    >
+                                      Remove
+                                    </ActionButton>
+                                  )}
+                                </div>
+                              ),
+                            },
+                          };
+                        })}
+                      />
+                    )}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            );
+          })}
+        </Accordion>
       </section>
     </>
   );
