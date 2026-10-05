@@ -35,13 +35,15 @@ model User {
   sessions Session[]
   accounts Account[]
 
-  studentsCreated    Student[]       @relation("StudentCreatedBy")
-  enrollmentsCreated Enrollment[]    @relation("EnrollmentCreatedBy")
-  paymentsRecorded   Payment[]       @relation("PaymentRecordedBy")
-  expensesRecorded   Expense[]       @relation("ExpenseRecordedBy")
-  budgetsSaved       MonthlyBudget[] @relation("BudgetSavedBy")
-  exchangeRatesSet   ExchangeRate[]  @relation("ExchangeRateSetBy")
-  stockChanges       StockChange[]   @relation("StockChangeRecordedBy")
+  studentsCreated    Student[]         @relation("StudentCreatedBy")
+  enrollmentsCreated Enrollment[]      @relation("EnrollmentCreatedBy")
+  paymentsRecorded   Payment[]         @relation("PaymentRecordedBy")
+  expensesRecorded   Expense[]         @relation("ExpenseRecordedBy")
+  budgetsSaved       MonthlyBudget[]   @relation("BudgetSavedBy")
+  exchangeRatesSet   ExchangeRate[]    @relation("ExchangeRateSetBy")
+  stockChanges       StockChange[]     @relation("StockChangeRecordedBy")
+  sheetsTaken        AttendanceSheet[] @relation("AttendanceTakenBy")
+  sheetsChanged      AttendanceSheet[] @relation("AttendanceChangedBy")
 
   @@unique([email])
   @@index([branchId])
@@ -223,7 +225,8 @@ model ClassTime {
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
-  enrollments Enrollment[]
+  enrollments      Enrollment[]
+  attendanceSheets AttendanceSheet[]
 
   /// Lets an enrollment name its class time and branch skill together, so
   /// the database refuses a class time that belongs to another skill.
@@ -377,7 +380,8 @@ model Enrollment {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
-  payments Payment[]
+  payments   Payment[]
+  attendance AttendanceEntry[]
 
   @@unique([studentId, skillId], where: raw("status = 'ACTIVE'"), map: "enrollments_one_active_per_skill")
   @@index([studentId])
@@ -709,4 +713,52 @@ model StockChange {
 
   @@index([branchBookId, createdAt])
   @@map("stock_changes")
+}
+
+/// What a student got on one attendance sheet. Late counts as present in their
+/// attendance rate, because they came. Excused counts neither way.
+enum AttendanceMark {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+/// One class time's attendance on one day: everyone in it that day, each with
+/// a mark. One per class time per day, so whoever saves it second changes the
+/// first one's marks rather than adding a sheet. The date is the real day,
+/// and only one of the class time's days, until make-up classes are allowed.
+model AttendanceSheet {
+  id          String    @id @default(cuid())
+  classTimeId String
+  classTime   ClassTime @relation(fields: [classTimeId], references: [id])
+  date        DateTime  @db.Date
+  takenById   String
+  takenBy     User      @relation("AttendanceTakenBy", fields: [takenById], references: [id])
+  createdAt   DateTime  @default(now())
+  /// Who last changed a mark, and when. Null until someone does.
+  changedById String?
+  changedBy   User?     @relation("AttendanceChangedBy", fields: [changedById], references: [id], onDelete: Restrict)
+  changedAt   DateTime?
+
+  entries AttendanceEntry[]
+
+  @@unique([classTimeId, date])
+  @@map("attendance_sheets")
+}
+
+/// One student's mark on one sheet. It names the enrollment and the sheet
+/// names the class time, so moving the student to another class time later
+/// leaves their past marks where they were taken. Deleting a student, which
+/// is only for duplicates and mistakes, takes their marks with them.
+model AttendanceEntry {
+  sheetId      String
+  sheet        AttendanceSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  enrollmentId String
+  enrollment   Enrollment      @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  mark         AttendanceMark
+
+  @@id([sheetId, enrollmentId])
+  @@index([enrollmentId])
+  @@map("attendance_entries")
 }
