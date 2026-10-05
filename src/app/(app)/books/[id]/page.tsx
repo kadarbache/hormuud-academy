@@ -2,6 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, Plus } from "lucide-react";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { ActionButton } from "@/components/action-button";
 import { DataTable } from "@/components/data-table";
@@ -155,149 +161,161 @@ export default async function BookPage({ params }: PageProps<"/books/[id]">) {
           <EmptyRow message="No branch sells this book yet, so it can't be sold." />
         )}
 
-        {book.branchBooks.map((bb, index) => {
-          const history = histories[index];
-          const unused = bb._count.saleLines === 0 && bb._count.stockChanges === 0;
-          return (
-            <div key={bb.id} className="space-y-3 rounded-lg border p-4">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <h3 className="flex items-center gap-2 font-semibold">
-                    {bb.branch.name}
-                    <ActiveBadge active={bb.active} />
-                  </h3>
-                  <p className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
-                    {formatMoney(bb.price.toString())} a copy · on the shelf: <Stock stock={bb.stock} />
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  <AddCopiesDialog
-                    action={addCopies.bind(null, bb.id)}
-                    title={book.title}
-                    branchName={bb.branch.name}
-                    stock={bb.stock}
-                    trigger={
-                      <Button variant="outline" size="sm">
-                        <Plus />
-                        Add copies
-                      </Button>
-                    }
-                  />
-                  <FixCountDialog
-                    action={fixCount.bind(null, bb.id)}
-                    title={book.title}
-                    branchName={bb.branch.name}
-                    stock={bb.stock}
-                    trigger={
-                      <Button variant="ghost" size="sm">
-                        Fix count
-                      </Button>
-                    }
-                  />
-                  {isAdmin && (
-                    <>
-                      <BranchBookDialog
-                        action={updateBranchBook.bind(null, bb.id)}
-                        branches={[]}
+        <Accordion
+          type="multiple"
+          // Every branch starts closed for the admin, who sees them all. Branch staff see
+          // only their own, so there is nothing to choose between and it starts open.
+          defaultValue={isAdmin ? [] : book.branchBooks.map((bb) => bb.id)}
+          className="space-y-3"
+        >
+          {book.branchBooks.map((bb, index) => {
+            const history = histories[index];
+            const unused = bb._count.saleLines === 0 && bb._count.stockChanges === 0;
+            return (
+              <AccordionItem key={bb.id} value={bb.id}>
+                <AccordionTrigger>
+                  <span className="flex flex-col gap-0.5">
+                    <span className="flex items-center gap-2 font-semibold">
+                      {bb.branch.name}
+                      <ActiveBadge active={bb.active} />
+                    </span>
+                    <span className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
+                      {formatMoney(bb.price.toString())} a copy · on the shelf: <Stock stock={bb.stock} />
+                    </span>
+                  </span>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-3 pt-3">
+                    <div className="flex flex-wrap gap-1">
+                      <AddCopiesDialog
+                        action={addCopies.bind(null, bb.id)}
+                        title={book.title}
                         branchName={bb.branch.name}
-                        price={bb.price.toString()}
+                        stock={bb.stock}
                         trigger={
-                          <Button variant="ghost" size="sm">
-                            Change price
+                          <Button variant="outline" size="sm">
+                            <Plus />
+                            Add copies
                           </Button>
                         }
                       />
-                      <ActionButton
-                        variant="ghost"
-                        size="sm"
-                        action={setBranchBookActive.bind(null, bb.id, !bb.active)}
-                      >
-                        {bb.active ? "Deactivate" : "Activate"}
-                      </ActionButton>
-                      {unused && (
-                        <ActionButton
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive"
-                          action={deleteBranchBook.bind(null, bb.id)}
-                          confirm={{
-                            title: `Remove ${book.title} from ${bb.branch.name}?`,
-                            description:
-                              "No copies have been recorded or sold here, so it can be removed for good.",
-                            confirmLabel: "Remove",
-                            destructive: true,
-                          }}
-                        >
-                          Remove
-                        </ActionButton>
+                      <FixCountDialog
+                        action={fixCount.bind(null, bb.id)}
+                        title={book.title}
+                        branchName={bb.branch.name}
+                        stock={bb.stock}
+                        trigger={
+                          <Button variant="ghost" size="sm">
+                            Fix count
+                          </Button>
+                        }
+                      />
+                      {isAdmin && (
+                        <>
+                          <BranchBookDialog
+                            action={updateBranchBook.bind(null, bb.id)}
+                            branches={[]}
+                            branchName={bb.branch.name}
+                            price={bb.price.toString()}
+                            trigger={
+                              <Button variant="ghost" size="sm">
+                                Change price
+                              </Button>
+                            }
+                          />
+                          <ActionButton
+                            variant="ghost"
+                            size="sm"
+                            action={setBranchBookActive.bind(null, bb.id, !bb.active)}
+                          >
+                            {bb.active ? "Deactivate" : "Activate"}
+                          </ActionButton>
+                          {unused && (
+                            <ActionButton
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive"
+                              action={deleteBranchBook.bind(null, bb.id)}
+                              confirm={{
+                                title: `Remove ${book.title} from ${bb.branch.name}?`,
+                                description:
+                                  "No copies have been recorded or sold here, so it can be removed for good.",
+                                confirmLabel: "Remove",
+                                destructive: true,
+                              }}
+                            >
+                              Remove
+                            </ActionButton>
+                          )}
+                        </>
                       )}
-                    </>
-                  )}
-                </div>
-              </div>
+                    </div>
 
-              {history.length === 0 ? (
-                <EmptyRow message="Nothing has happened to its copies here yet. Add the copies the branch has so it can be sold." />
-              ) : (
-                <>
-                  <DataTable
-                    columns={[
-                      { label: "When", className: "whitespace-nowrap" },
-                      { label: "What" },
-                      { label: "Copies", className: "text-right tabular-nums" },
-                      { label: "Details", className: "max-w-80 whitespace-normal" },
-                      { label: "By", className: "text-muted-foreground" },
-                    ]}
-                    rows={history.map((event) => {
-                      const what = event.kind === "SOLD" ? "Sale" : stockChangeLabels[event.kind];
-                      return {
-                        key: event.key,
-                        title: `${what}, ${signed(event.quantity)}`,
-                        description: formatDateTime(event.at),
-                        cells: {
-                          When: formatDateTime(event.at),
-                          What: what,
-                          Copies: signed(event.quantity),
-                          Details:
-                            event.kind === "SOLD" ? (
-                              <>
-                                Receipt {event.receipt}
-                                {event.student && (
-                                  <>
-                                    {" to "}
-                                    <Link
-                                      href={`/students/${event.student.id}`}
-                                      className="hover:underline"
-                                    >
-                                      {event.student.fullName}
-                                    </Link>{" "}
-                                    <span className="font-mono text-xs text-muted-foreground">
-                                      {formatStudentNumber(event.student.number)}
-                                    </span>
-                                  </>
-                                )}
-                              </>
-                            ) : (
-                              <>
-                                {event.kind === "CORRECTED" && `Counted ${copies(event.stockAfter ?? 0)}. `}
-                                {event.note}
-                              </>
-                            ),
-                          By: event.recordedBy,
-                        },
-                      };
-                    })}
-                  />
-                  {history.length === HISTORY_SIZE && (
-                    <p className="text-xs text-muted-foreground">
-                      The latest {HISTORY_SIZE}. Older sales are on the Income screen, under Books.
-                    </p>
-                  )}
-                </>
-              )}
-            </div>
-          );
-        })}
+                    {history.length === 0 ? (
+                      <EmptyRow message="Nothing has happened to its copies here yet. Add the copies the branch has so it can be sold." />
+                    ) : (
+                      <>
+                        <DataTable
+                          columns={[
+                            { label: "When", className: "whitespace-nowrap" },
+                            { label: "What" },
+                            { label: "Copies", className: "text-right tabular-nums" },
+                            { label: "Details", className: "max-w-80 whitespace-normal" },
+                            { label: "By", className: "text-muted-foreground" },
+                          ]}
+                          rows={history.map((event) => {
+                            const what = event.kind === "SOLD" ? "Sale" : stockChangeLabels[event.kind];
+                            return {
+                              key: event.key,
+                              title: `${what}, ${signed(event.quantity)}`,
+                              description: formatDateTime(event.at),
+                              cells: {
+                                When: formatDateTime(event.at),
+                                What: what,
+                                Copies: signed(event.quantity),
+                                Details:
+                                  event.kind === "SOLD" ? (
+                                    <>
+                                      Receipt {event.receipt}
+                                      {event.student && (
+                                        <>
+                                          {" to "}
+                                          <Link
+                                            href={`/students/${event.student.id}`}
+                                            className="hover:underline"
+                                          >
+                                            {event.student.fullName}
+                                          </Link>{" "}
+                                          <span className="font-mono text-xs text-muted-foreground">
+                                            {formatStudentNumber(event.student.number)}
+                                          </span>
+                                        </>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <>
+                                      {event.kind === "CORRECTED" && `Counted ${copies(event.stockAfter ?? 0)}. `}
+                                      {event.note}
+                                    </>
+                                  ),
+                                By: event.recordedBy,
+                              },
+                            };
+                          })}
+                        />
+                        {history.length === HISTORY_SIZE && (
+                          <p className="text-xs text-muted-foreground">
+                            The latest {HISTORY_SIZE}. Older sales are on the Income screen, under Books.
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            );
+          })}
+        </Accordion>
       </section>
     </>
   );
