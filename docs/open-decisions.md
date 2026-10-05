@@ -157,11 +157,39 @@ tried in the browser: "demo" listing the five demo students, `3` and
 `3333333` both finding STU-00003, a pick by click and by arrow keys and
 Enter, a sale recorded for the picked student (receipt 239), a name typed
 without picking refused, and abdaal staff finding only their branch's
-students by name but STU-00001 by ID. Committed on local `main`
-(`038ebc0` to `6256ffe`), not pushed. Production needs the
-`20261005090000_books` migration applied *before* the push, after a backup, or
-the Income screen and the student pages break. Then the admin adds the books,
-adds each to its branches and records the copies on each shelf.
+students by name but STU-00001 by ID. Live since 5 Oct 2026: after a backup
+the `20261005090000_books` migration was applied to `ep-square-silence` (not
+`ep-polished-paper`), then main was pushed (`038ebc0` to `dce03e4`, with the
+branch rows on a book's page opening like an FAQ) and the deploy was ready in
+under a minute. Left: the admin adds the books on the live site, adds each to
+its branches and records the copies on each shelf.
+
+**The Computer students are in production; what is left.** Imported on 4 Oct
+2026 from the paper registration list with `pnpm db:import-students`: 75
+students, STU-00001 to STU-00075, at the Technology skills branch in the
+"Computer lab" class, all registered and started on 1 Sep 2026 and Active, in
+the existing Computer Basics class times (5 to 9 pm, one hour each, Sat to
+Wed, Suhayb Faysal). The course has no monthly fee and a $5 registration fee.
+**No payments were written**, so all 75 registration fees show as unpaid
+($375.00) until staff record them; 63 of the 75 had a payment written next
+to their name on the list. Sex was set from first names, and nine doubtful
+ones (#7, #10, #16, #22, #28, #47, #60, #61, #63) are marked CHECK in the list
+and still to be confirmed; it can be changed on Edit details. The list is
+`imports/computer-students.csv`, kept out of git because it holds real names
+and numbers. Tried locally first, then a dry run on Neon (no warnings), then
+the write. Free months were fixed first (commit `89b9540`, deployed): a skill
+with a monthly fee of 0 has no fee months, see "Monthly fee" in CONTEXT.md.
+Left to do:
+
+- Reset the Neon database password, which was pasted into chat again during
+  this import, then update `DATABASE_URL` in Vercel.
+- Record the registration fees of the 63 who paid, or ask for a script to
+  write them as payments dated 1 Sep 2026 from the list. Not decided.
+- The 13 left out of the import, added later by fixing their row in the list,
+  setting `action` to `import` and running it again (with `--as
+  kadargoespro@gmail.com` against production): #32, #41, #43, #55, #78, #79,
+  #83 and #84 need a usable phone number, #86 to #88 need a class time, and
+  #53 and #54 are duplicates of #50 and #51.
 
 **Two currencies, before it goes live.** Built on 29 Sep 2026 and tried in
 the browser the same day: no rate refuses shillings; setting the rate (8,550,
@@ -293,7 +321,10 @@ migration made, which show "Time not set" until then. Students can join them
 meanwhile, but the app can't check them for clashes. The steps are in the
 system guide, under "Setting the hours on class times that say Time not
 set". Also still to do: reset the Neon database password, which was pasted
-into chat twice.
+into chat three times, the last on 4 Oct 2026 while running the student
+import. Reset it in the Neon console right after the import, then update
+`DATABASE_URL` in Vercel, because the app reads the old one until it's
+changed.
 
 ## Decided
 
