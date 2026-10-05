@@ -4,7 +4,7 @@ Questions we haven't answered yet, and the code work waiting on them. Move a
 decision to "Decided" when it's settled, and write the rule into CONTEXT.md or
 an ADR if it changes how the system behaves.
 
-Last updated 4 October 2026.
+Last updated 5 October 2026.
 
 ## Open
 
@@ -71,7 +71,47 @@ can now reach the same result without the admin.
 Not decided. The change is in `recordRegistrationFee`; the second option would
 mean allowing a smaller amount only for admins.
 
+### 6. Book discounts and delivery costs
+
+Two choices made by default when books were built on 5 Oct 2026, to confirm
+or change:
+
+- **Staff can sell books for less**, the same as fees: the amount starts at
+  what the books come to and can be lowered, never raised. Income shows every
+  amount. The other way is to make book prices exact, so only the admin
+  could give a discount (by changing the branch's price). Same question as
+  number 5, for books.
+- **A delivery costs nothing in the app.** Add copies only counts copies; what
+  the college paid for them is recorded on Expenses by the admin, as now.
+  Recording a cost with each delivery would mean branch staff writing
+  expenses, which number 3 hasn't decided.
+
 ## Still to do (no decision needed)
+
+**Books, before it goes live.** Built and tried in the browser on 5 Oct
+2026: the book list, each branch's price and copies, deliveries and fixed
+counts with their history, and Sell books on Income, Books and the student's
+page. Tried: a price of 0 refused; a book added to Main Branch at $4.50 against
+a $5 default; 20 copies delivered, then the count fixed to 18 ("Two copies
+damaged"), with the same count and a missing reason refused; a two-title sale
+($9 + $3) whose amount followed the books as they were added, more copies than
+the shelf held refused ("Only 10 copies left") and more than the total refused,
+then recorded at $11 for STU-00001 ("3 books sold for $11.00 instead of
+$12.00"); a sale in shillings from the student's page (54,000 SLSH at 12,000);
+removing that receipt put the copy back; as abdaal staff, only their own
+branch's shelf, Add copies, a sale with no branch picker, another branch's book
+refused by the server and its page Not found. Every shelf's count matched its
+deliveries and fixes less its sales afterwards. The same day the Student
+box in Sell books and Record income became a search by name, ID or phone,
+tried in the browser: "demo" listing the five demo students, `3` and
+`3333333` both finding STU-00003, a pick by click and by arrow keys and
+Enter, a sale recorded for the picked student (receipt 239), a name typed
+without picking refused, and abdaal staff finding only their branch's
+students by name but STU-00001 by ID. Committed on local `main`
+(`038ebc0` to `6256ffe`), not pushed. Production needs the
+`20261005090000_books` migration applied *before* the push, after a backup, or
+the Income screen and the student pages break. Then the admin adds the books,
+adds each to its branches and records the copies on each shelf.
 
 **Two currencies, before it goes live.** Built on 29 Sep 2026 and tried in
 the browser the same day: no rate refuses shillings; setting the rate (8,550,
@@ -207,6 +247,20 @@ into chat twice.
 
 ## Decided
 
+- **Books: one list, a price and a shelf per branch.** Asked on 5 Oct 2026
+  ("how am I going to sell a book to a student?") and built the same day; see
+  "Still to do" for going live, and
+  [ADR 0008](adr/0008-a-shelf-keeps-its-count.md). (5 Oct 2026)
+  - One book list for the college. Each branch that sells a book has its own
+    copies, because the copies sit on that branch's shelf.
+  - Each branch sets its own price, starting from the book's default, like
+    skill fees. Only the admin adds books and sets prices.
+  - Branch staff record deliveries (Add copies) and fix the count at their
+    own branch, with a reason. The admin can at any branch.
+  - One sale can hold several titles, each with its copies, on one receipt.
+    Books left Record income: a Books payment is a sale from the shelf now.
+  - Removing a sale puts its copies back. Deleting a student keeps the books
+    they bought, with no student named.
 - **Class times: a class hosts different skills at different times, and a
   skill can run more than once at a branch.** Room 3 can have Graphic Design
   4–6 pm and Tailoring 6–8 pm, and Graphic Design can also run 8–10 am in

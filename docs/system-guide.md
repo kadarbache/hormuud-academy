@@ -30,6 +30,7 @@ Hormuud Academy is one college with several branches. The system keeps track of:
 - the registration fee a student pays for each skill they start, and whether it's paid
 - every payment the college takes, by day, by category and by how it was paid
 - in two currencies, US dollars and Somaliland shillings, kept apart like two separate books
+- the books the college sells: what each branch charges, how many copies are on its shelf, and every sale
 - every month of every skill: paid, or still owed
 - what the college spends, at which branch and on what
 - what each teacher earns, whether that's a fixed salary or a share of the fees they bring in
@@ -59,6 +60,8 @@ Enrollment   STU-00003 takes Graphic Design at Main Branch, $30 a month
 ```
 
 A monthly fee payment names the **month it pays for**, not just the day the money arrived, so the system can say which months a student has settled and which they still owe. Money out is an **expense**, which always names a branch. Nothing stores a running total: a day's takings, a month's spending and a teacher's earnings are counted from those rows every time a screen asks.
+
+Books follow the skills' pattern. A **book** is on one list for the whole college with a default price, and each branch that sells it gets a **branch book** with its own price and its own **stock**, the copies on its shelf. Selling books is a payment in the Books category with a line per title, and the copies come off that branch's shelf as the sale is recorded. The stock is the one count the system does store, because two people mustn't sell the last copy; every delivery and fixed count is kept beside it, so it can always be checked.
 
 Fees are set in dollars, but a student can pay in dollars or in Somaliland shillings. The two are never added together: every screen shows dollars and shillings separately, and underneath them what the two are worth together in dollars at today's rate. The admin sets the exchange rate on the Settings page. Each shilling payment keeps the rate it was recorded at, like a receipt, while the totals always use today's.
 
@@ -282,7 +285,8 @@ hormuud-academy/
 │   │       ├── app-sidebar.tsx  The menu
 │   │       ├── actions.ts       Log out
 │   │       ├── page.tsx         "/" sends you on to /students
-│   │       ├── students/        Student list, registration, student page, editing
+│   │       ├── students/        Student list, registration, student page, editing, and the
+│   │       │                    student picker the money dialogs search with
 │   │       ├── finance/         The money screens
 │   │       │   ├── page.tsx     The financial dashboard, admins only
 │   │       │   ├── labels.ts    The words for each stored code, shared by every screen
@@ -293,12 +297,16 @@ hormuud-academy/
 │   │       │   ├── amount-fields.tsx The amount box and its USD / SLSH dropdown
 │   │       │   ├── fee-months.ts Which months an enrollment owes a fee for
 │   │       │   ├── payments.ts  The registration fee written with a new enrollment
-│   │       │   ├── income/      Income, and every action that records a payment
+│   │       │   ├── income/      Income, and every action that records a payment, book
+│   │       │   │                sales included, with the Sell books dialog
 │   │       │   ├── owed/        Who still owes a registration fee or a month
 │   │       │   ├── expenses/    Expenses, admins only
 │   │       │   ├── expense-categories/ The list of expense categories, admins only
 │   │       │   ├── teacher-pay/ What each teacher earned and was paid, admins only
 │   │       │   └── budget/      The plan per branch per month, admins only
+│   │       ├── books/           The book list and each branch's shelf. Admins set books and
+│   │       │                    prices; branch staff add copies and fix their branch's count.
+│   │       │                    [id]/ is one book: its branches and what happened to its copies
 │   │       ├── teachers/        Admins manage them; branch staff see their branch's
 │   │       ├── classes/         Admins manage them; branch staff see their branch's.
 │   │       │                    [id]/ is one class's week
@@ -566,6 +574,12 @@ erDiagram
     MonthlyBudget ||--o{ MonthlyBudgetLine : "plans to spend"
     User ||--o{ MonthlyBudget : "saved"
     User ||--o{ ExchangeRate : "set"
+    Book ||--o{ BranchBook : "is sold as"
+    Branch ||--o{ BranchBook : "sells"
+    Payment ||--o{ BookSaleLine : "lists"
+    BranchBook ||--o{ BookSaleLine : "is sold on"
+    BranchBook ||--o{ StockChange : "is counted by"
+    User ||--o{ StockChange : "recorded"
 
     Branch {
         string id PK
@@ -709,6 +723,35 @@ erDiagram
         string categoryId PK, FK "one line per expense category"
         decimal amount
     }
+    Book {
+        string id PK
+        string title UK
+        decimal price "the default for a new branch"
+        boolean active
+    }
+    BranchBook {
+        string id PK
+        string bookId FK
+        string branchId FK
+        decimal price "this branch's, in dollars"
+        int stock "copies on the shelf, never below 0"
+        boolean active
+    }
+    BookSaleLine {
+        string paymentId PK, FK
+        string branchBookId PK, FK "one line per title"
+        int quantity
+        decimal unitPrice "the branch's price that day"
+    }
+    StockChange {
+        string id PK
+        string branchBookId FK
+        enum kind "RECEIVED or CORRECTED"
+        int quantity "copies added, below 0 when taken off"
+        int stockAfter
+        string note
+        string recordedById FK
+    }
     User {
         string id PK
         string name
@@ -771,7 +814,7 @@ A student has no status column. They are Active when at least one of their enrol
 | `statusChangedAt` | When the status last changed |
 | `createdById` | The staff account that added it |
 
-**Payment** (`payments`). Money received. One row per registration fee, per month of a skill, and per book or examination fee taken at the counter:
+**Payment** (`payments`). Money received. One row per registration fee, per month of a skill, per book sale and per examination fee taken at the counter. A book sale's titles are in `book_sale_lines`, below:
 
 | Column | Meaning |
 |---|---|
@@ -783,7 +826,7 @@ A student has no status column. They are Active when at least one of their enrol
 | `usdValue` | What it was worth in dollars the day it was recorded: the amount itself for dollars, the shillings at `exchangeRate` for shillings. Worked out once and never changed, like the rest of the receipt. Totals use today's rate instead |
 | `paidOn` | The college day the money came in. Daily income counts by `paidOn`, not by when the row was typed |
 | `branchId` | Where the money was taken. For a fee, the branch teaching the skill |
-| `studentId` | Empty for income with nobody behind it, like a book sold over the counter |
+| `studentId` | Empty for income with nobody behind it, like books sold to somebody walking in |
 | `enrollmentId` | Set for a registration fee or a monthly fee, which always belong to one skill |
 | `forMonth` | The month a monthly fee pays for, as that month's first day |
 | `teacherId`, `teacherSharePercent`, `teacherShare`, `teacherShareUsdValue` | Filled in only when the teacher of the student's class time is paid by percentage. The share is in the payment's currency, with its dollar value beside it. The rate is kept beside the amount so a later change never rewrites it |
@@ -797,6 +840,14 @@ A student has no status column. They are Active when at least one of their enrol
 
 **MonthlyBudget** (`monthly_budgets`) and **MonthlyBudgetLine** (`monthly_budget_lines`). One branch's plan for one month: the income it expects, a note, and one line per expense category it plans to spend on. A category with no line simply wasn't planned for. Nothing about what *actually* happened is stored here — that's counted from the payments and expenses each time the screen opens, so the comparison always matches the ledger.
 
+**Book** (`books`). One book the college sells. Title (unique), `price` in dollars, and `active`. The price is a default, like a skill's fees: it's copied onto a branch book when the book is added to a branch, and changing it later touches no branch that sells it already. A deactivated book can't be sold anywhere.
+
+**BranchBook** (`branch_books`). A book as one branch sells it: which book, which branch, that branch's `price`, its `stock`, and `active`. At most one per book per branch. `stock` is the copies on the shelf now. It's the one count the system stores instead of adding up every time, so that two people can't both sell the last copy: a sale takes its copies off with an update that only succeeds while enough are left, in the same transaction that records the payment. [ADR 0008](adr/0008-a-shelf-keeps-its-count.md) explains why.
+
+**BookSaleLine** (`book_sale_lines`). One title on one book sale: the payment, the branch book, the `quantity` of copies and the `unitPrice`, the branch's price for one copy on the day. One line per title per sale. The payment's amount is what was actually paid, which can be less than its lines add up to after a discount.
+
+**StockChange** (`stock_changes`). Copies put on or taken off a shelf by hand, never by a sale. `kind` is `RECEIVED` for a delivery or `CORRECTED` for a fixed count, `quantity` is the copies added (below zero when a fixed count took some off), `stockAfter` is the count once the change was made, with a note and who recorded it. A branch book's `stock` always equals its stock changes added up, less the copies on its sale lines.
+
 **User** (`user`). A login account. Better Auth's own columns (name, email, `emailVerified`, `image`), the admin plugin's columns (`role`, `banned`, `banReason`, `banExpires`), and this app's `branchId`. Branch staff have a branch. Admins have none. `emailVerified` is true once the admin has created or saved the account, and Google sign-in needs it.
 
 **Session**, **Account**, **Verification** (`session`, `account`, `verification`). Better Auth's tables. A session is one login on one device. An account row is one way to sign in: `providerId = "google"` links a Google account, and `providerId = "credential"` holds an old password's hash. Verification holds the `state` of each Google sign-in while the person is at Google.
@@ -807,13 +858,14 @@ A student has no status column. They are Active when at least one of their enrol
 
 These hold even if a bug slips into the code:
 
-- Unique: branch names, category names, expense category names, skill names, class names within a branch, one branch skill per skill per branch, student numbers, user emails.
+- Unique: branch names, category names, expense category names, skill names, class names within a branch, one branch skill per skill per branch, book titles, one branch book per book per branch, student numbers, user emails.
 - One active enrollment per student per skill, at any branch. This is a **partial unique index**: it only counts rows whose status is `ACTIVE`, so a student can finish a skill and take it again later.
 - One registration fee per enrollment, and one monthly fee payment per enrollment per fee month. Both are partial unique indexes too, counting only rows of that category. Two clicks on Record payment can't charge a student twice, whatever the code does.
 - One budget per branch per month.
 - A class time starts before it ends, within the day. It has a start, an end and at least one day, or none of them while it waits for the admin. An enrollment's class time belongs to the enrollment's own branch skill: the foreign key names the two together.
 - A dollar payment or expense has no exchange rate and is worth exactly its amount. A shilling one has a rate above zero, and a dollar value within a cent of its shillings at that rate. The same goes for a teacher's share. These are **check constraints**, written by hand in the migrations because Prisma's schema can't describe them. An exchange rate is always above zero.
-- A row can't be deleted while other rows point at it. You can't delete a teacher a class time still uses, for example. The exceptions are deliberate: deleting a student deletes their enrollments and every payment they made, deleting an enrollment deletes its payments, deleting a budget deletes its lines, deleting a teacher deletes their branch links, and deleting a user deletes their sessions and accounts. The app refuses to delete a teacher who has any money on record, so nobody's earnings vanish by accident.
+- A book's price and a branch's price for it are above zero. A shelf never holds fewer than no copies, which is what stops two people selling the last one. A sale line sells at least one copy at a price above zero, a delivery adds copies, a fixed count changes the count, and neither leaves it below zero. Check constraints too.
+- A row can't be deleted while other rows point at it. You can't delete a teacher a class time still uses, for example. The exceptions are deliberate: deleting a student deletes their enrollments and every payment they made, deleting an enrollment deletes its payments, deleting a payment deletes its book sale lines, deleting a budget deletes its lines, deleting a teacher deletes their branch links, and deleting a user deletes their sessions and accounts. The app refuses to delete a teacher who has any money on record, so nobody's earnings vanish by accident. Before deleting a student, the app takes their name off the books they bought, so those sales stay: the copies have left the shelf either way.
 
 The app adds its own checks on top. Names are compared ignoring upper and lower case, so "main branch" is refused when "Main Branch" exists. The database compares exact text only. The app also keeps everything in one place at a time (`src/lib/clashes.ts`): a class holds one class time at a time, a teacher teaches one at a time at any branch, and a student sits in one at a time. "At the same time" means overlapping hours on a day both meet, so 4–6 pm on Saturdays and 4–6 pm on Sundays can share a room. A class time that's been deactivated still counts while students are in it, because they still come.
 
@@ -833,6 +885,7 @@ The app adds its own checks on top. Names are compared ignoring upper and lower 
 | `20260929130000_dollar_values` | Gives every payment, expense and teacher share its dollar value, worked out at the row's own rate, and adds the checks that keep those values right |
 | `20261003090000_class_times` | Adds class times, and moves the teacher and class off the branch skill onto its class times. Every branch skill already set up becomes one class time, in the class and with the teacher it had, and its students all go into it. Those class times have no hours or days until the admin sets them. It also added fixed shifts, which the next migration takes out again |
 | `20261003120000_class_time_hours` | Gives each class time its own start and end, copied from its shift, and drops the shifts, so classes of different lengths can share an afternoon |
+| `20261005090000_books` | Adds the book list (`books`), each branch's price and copies (`branch_books`), the titles on a sale (`book_sale_lines`) and the deliveries and fixed counts (`stock_changes`), with the checks that keep prices above zero and shelves at zero or more. Books payments from before keep their notes and have no lines |
 
 ### Looking at the data yourself
 
@@ -852,9 +905,13 @@ The app adds its own checks on top. Names are compared ignoring upper and lower 
 | See who is in a class time | Every class time | Their own branch's class times |
 | Record a registration fee payment, for less than the fee if the student can't pay it all | At any branch | Only for skills at their branch |
 | Record a monthly fee payment | At any branch | Only for skills at their branch |
-| Record books, examination fees and other income | At any branch | At their own branch only |
+| Sell books, for less than they come to if the student was given a discount | At any branch | At their own branch only |
+| Record examination fees and other income | At any branch | At their own branch only |
+| See the books and the copies on the shelf | Every branch's | Their own branch's |
+| Add books, add them to a branch, set prices | Yes | No |
+| Record copies that arrived, fix the count | At any branch | At their own branch only |
 | Lower or waive a registration fee | Yes, while it's unpaid | No |
-| Remove a payment from the books | Yes | No |
+| Remove a payment from the books (a book sale's copies go back on the shelf) | Yes | No |
 | See the Income screen | Every branch, with a branch filter | Their own branch only |
 | See the Fees owed screen | Every branch, with a branch filter | Their own branch's students only |
 | See a teacher's share on a payment | Yes | No, the column is hidden |
@@ -897,7 +954,7 @@ The installed app logs in the same way and shows the same screens. Without inter
 
 ### The screen layout
 
-- **The sidebar** on the left. Students (**Students** and **Register student**) is there for everyone. Admins also get Money (**Dashboard**, **Income**, **Fees owed**, **Expenses**, **Expense categories**, **Teacher pay**, **Monthly budget**) and Admin (**Branches**, **Skills**, **Categories**, **Teachers**, **Classes**, **Staff accounts**, **Settings**). Branch staff get Your branch instead (**Income**, **Fees owed**, **Teachers** and **Classes**), which shows only their own branch; the teachers and classes there can't be changed. The bottom shows your name, your role and your branch.
+- **The sidebar** on the left. Students (**Students** and **Register student**) is there for everyone. Admins also get Money (**Dashboard**, **Income**, **Fees owed**, **Expenses**, **Expense categories**, **Teacher pay**, **Monthly budget**) and Admin (**Branches**, **Skills**, **Categories**, **Books**, **Teachers**, **Classes**, **Staff accounts**, **Settings**). Branch staff get Your branch instead (**Income**, **Fees owed**, **Books**, **Teachers** and **Classes**), which shows only their own branch; the teachers and classes there can't be changed, and of the books only the copies on the shelf can. The bottom shows your name, your role and your branch.
 - **The header** shows "All branches" for an admin, or your branch's name for branch staff. The button on the left of the header hides and shows the sidebar.
 - **On a phone**, the sidebar folds away. Open it with the button at the top left.
 - **Tables** are wider than a phone, so the last columns sit off the side. Instead of scrolling across, tap a row: a pop-up lists everything in it, one line per column, with that row's buttons at the bottom. Tapping a link inside the row, such as a student's name, still opens that page. The same click works on a computer.
@@ -915,6 +972,7 @@ Log in as the admin and do these in order, because each step needs the one befor
 6. **On each skill's page**, press **Add to a branch** for every branch that teaches it, then **Add class time** under that branch: the hours, the days, a class and a teacher. A skill no branch teaches can't be taken by anyone, and neither can a branch skill with no class time.
 7. **Staff accounts.** Create an account for each person at each branch with their Gmail address, and tell them to sign in with Google.
 8. **Settings.** Set the exchange rate, so staff can take shillings.
+9. **Books**, if the college sells any. Add each book with its default price, then on its page **Add to a branch** for every branch that sells it, and **Add copies** for what's on that branch's shelf. Staff at the branch can add copies themselves from then on.
 
 After that, staff can register students.
 
@@ -1008,6 +1066,28 @@ When you're done, check it three ways:
 - On the Classes page, click each class's name: the **Time not set** box is gone and the week looks like the real timetable.
 - The Teachers page doesn't say "time not set" anywhere.
 
+#### Books
+
+The **Books** page lists every book with its default price, each branch that sells it with that branch's price and copies, the copies across all branches, and Active or Inactive. **Add book** takes a title and a default price in dollars, above zero, and then opens the book's page. **Sell books** at the top is the same dialog as on the Income screen.
+
+On a **book's page** you can:
+
+- **Edit book** to change the title or the default price. The default only fills in branches you add afterwards; a branch that sells the book already keeps its own price.
+- **Deactivate** the book, so no branch can sell it. Its copies and its sales stay.
+- **Delete** it, only while no branch sells it.
+- **Add to a branch.** Pick the branch. The price starts at the book's default; change it if this branch charges differently.
+
+Each branch that sells the book has a box of its own, with its price and the copies on its shelf (a yellow **Out of stock** badge at zero):
+
+- **Add copies** when a delivery arrives: how many, and an optional note like "From the head office". The count goes up straight away.
+- **Fix count** when the shelf doesn't match the app: count the copies, type what's really there, and say why, like "Two copies damaged". The reason is required, so copies never vanish without a word. If a sale changes the count while you're typing, nothing is saved and the app asks you to look again.
+- **Change price** sets that branch's price. Sales from then on use it; past sales keep the price they were sold at.
+- **Deactivate** stops that branch selling the book. Its copies stay on the count. **Remove** appears only while no copies were ever recorded or sold there.
+
+Under the buttons is what happened to the copies, newest first: each **Delivery** (+20) and **Count fixed** (−2, with what was counted and why), and each **Sale** (−1) with its receipt number and the student, if one was named, and who recorded it. It shows the latest 20; older sales are on the Income screen under Books.
+
+Branch staff see the Books page too, with only their branch's books: the price, the copies on the shelf, and **Add copies** and **Fix count** on each row. A book's page shows them only their branch's box, without the price and setup buttons, and a book their branch doesn't sell gives Not found.
+
 #### Staff accounts
 
 - **Add staff account.** Enter a name, the person's Gmail address, a role and, for branch staff, their branch. There's no password and no email sending: tell the person yourself that they can sign in with Google.
@@ -1068,7 +1148,8 @@ The top shows the photo, name, student ID and Active or Inactive. The buttons ar
 
 - **Edit details**, for an admin or staff at the student's home branch.
 - **Add skill.** Pick a skill, its class time if it has more than one, and a start date. The dialog shows the fees, roughly when the skill will end and, for a skill with one class time, when and where it is. A skill with no class time yet isn't in the list; the dialog names it underneath. The app refuses a class time that clashes with another skill the student takes now, at any branch. When the skill has a registration fee, tick **Registration fee paid** if the student paid now and say how: it's recorded as paid today. Branch staff only see their branch's skills, and skills the student already has Active don't appear. The button is greyed out when there's nothing left to add.
-- **Delete**, for admins only. Use it only for duplicates and typing mistakes: it removes the student, every skill record they have and every payment they made, for good, which changes the income already recorded for those days. It's greyed out for a student who has paid even one monthly fee, and the app refuses it too. The money is already in the books, and a percentage teacher may have been paid a share of it. To take that student out of their classes, drop their skills instead: they show as Inactive and their history stays.
+- **Sell books**, the same dialog as on the Income screen with this student already filled in. It's greyed out when no branch you can sell at has copies of anything.
+- **Delete**, for admins only. Use it only for duplicates and typing mistakes: it removes the student, every skill record they have and every payment they made, for good, which changes the income already recorded for those days. Books they bought are the exception: those sales stay, with no student named, because the copies have left the shelf either way. It's greyed out for a student who has paid even one monthly fee, and the app refuses it too. The money is already in the books, and a percentage teacher may have been paid a share of it. To take that student out of their classes, drop their skills instead: they show as Inactive and their history stays.
 
 **Details** shows sex, phones, home branch, registration date, and who registered the student and when.
 
@@ -1121,9 +1202,13 @@ Everything the college was paid. Filter by period, branch (admins), income categ
 
 At the top, **Total income** for the period, then what came in as **Cash**, **ZAAD**, **eDahab** and **Bank / other**. Below that, a table with one row per income category — Registration fee, Monthly fee, Books, Examination fee, Other income — so a zero is visibly a zero rather than a missing line, and the total at the bottom.
 
-Then every payment, newest first, 25 per page: receipt number, date, student, what it was for, branch, method, amount, the teacher's share (admins only) and who recorded it. Admins get **Remove** on each row, after confirming, for money recorded by mistake; the day's income and any teacher's share change with it. A monthly fee that earned a percentage teacher a share can't be removed once that teacher has been paid for the month it was taken in: the college doesn't refund money whose share has already gone out.
+Then every payment, newest first, 25 per page: receipt number, date, student, what it was for, branch, method, amount, the teacher's share (admins only) and who recorded it. A book sale says Books with its titles underneath, like "Computer Basics Workbook, English Grammar Book 1 × 2". Admins get **Remove** on each row, after confirming, for money recorded by mistake; the day's income and any teacher's share change with it, and a book sale's copies go back on the shelf, which is also how to take back books a student handed back. A monthly fee that earned a percentage teacher a share can't be removed once that teacher has been paid for the month it was taken in: the college doesn't refund money whose share has already gone out.
 
-**Record income** at the top right is for money that isn't a fee: **Books**, **Examination fee** or **Other income**. Give the amount and its currency, the method, the day, the branch, and a note. A student ID like `STU-00042` is optional — fill it in and the payment shows on that student's record too. Registration and monthly fees aren't in this list, because they're recorded on the student's own page where the amount, the skill and the teacher's share are already known.
+**Sell books** at the top right sells books over the counter. Admins pick the branch first; branch staff sell at their own. Then pick a book and how many copies, and **Add another book** for each other title: one receipt can hold several. Only books with copies on that branch's shelf are listed, each with its price and how many are left, and a title already on the sale isn't offered twice. The dialog adds up what the books come to at the branch's prices, and **Amount paid** starts at that, in dollars or at today's rate in shillings. Lower it if the student was given a discount; it can't be more. Then the method, the day, an optional student and an optional note. The copies come off the shelf the moment the sale is recorded. Asking for more copies than are left is refused with how many there are, and if someone else sells the last copy while you're typing, nothing is saved.
+
+**Record income** beside it is for money that is neither a fee nor books: **Examination fee** or **Other income**. Give the amount and its currency, the method, the day, the branch, and a note. A student is optional — pick one and the payment shows on that student's record too. Registration and monthly fees aren't in this list, because they're recorded on the student's own page where the amount, the skill and the teacher's share are already known.
+
+The **Student** box in both dialogs is a search. Type part of a name, a student ID like `42` or `STU-00042`, or a phone number, and the matching students appear underneath with their ID, home branch and phone, at most eight at a time. Click one, or move to it with the arrow keys and press Enter, and it shows as the chosen student, with an × to change it. It searches the way the student list does: an ID or a phone number finds the student at any branch, and a name only finds the students you can already see, so branch staff find their own branch's students by name. A whole ID typed without picking still works. A name typed without picking is refused with "Pick the student from the list, or clear the box", so a payment never loses its student by accident.
 
 ### Fees owed
 
@@ -1209,6 +1294,18 @@ Admins only, and the first thing under Money. Pick a day, a month and optionally
 **A payment was recorded by mistake.** An admin opens Income, finds the receipt — searching the student's ID narrows it fast — and presses Remove. The money leaves the day's income, the month goes back to unpaid, and any teacher's share it earned comes back out. If the payment earned a percentage teacher a share and that teacher has already been paid for the month, the app refuses, with a message naming the teacher and the month. To change a registration fee that's already paid, remove the payment first.
 
 **Counting the till at the end of the day.** Open Income. The day is already today. The four figures across the top are the cash, ZAAD, eDahab and bank that came in.
+
+**Selling a book to a student.** Open the student's page and press Sell books, or press it on Income or Books and search for the student by name, ID or phone in the Student box. Pick the book and how many copies, add another row for each other title, check the amount and the method, and press Record sale. The copies come off your branch's shelf at once. Somebody who isn't a student is the same, with the Student box left empty.
+
+**Books arrive at the branch.** Open Books, find the book and press Add copies with how many came. Staff at the branch can do it themselves. A book the branch doesn't sell yet has to be added to the branch by the admin first, on the book's page.
+
+**The shelf doesn't match the app.** Count the copies, press Fix count, type what's really there and say why. The book's page keeps the change, with who made it.
+
+**A student hands books back, or a sale was typed wrong.** An admin opens Income, finds the receipt and presses Remove. The money leaves the day's income and the copies go back on the shelf. A sale can't be edited, so to keep part of it, remove it and record the right sale again.
+
+**A book's price changes.** An admin opens the book and presses Change price on the branch's box. Sales from then on use the new price; past receipts keep theirs. Edit book's price is only the default for branches added later.
+
+**Moving copies to another branch.** There's no transfer. Fix count at the branch they leave, saying where they went, then Add copies at the branch they arrive at, saying where they came from.
 
 **Recording the rent or the electricity.** An admin opens Expenses, presses Record expense, and picks the category, amount, method, day and the branch the money was spent for.
 
@@ -1305,7 +1402,7 @@ The [README](../README.md) has the full first-time setup and the steps to deploy
 
 `pnpm db:demo` adds two branches (Main Branch and Second Branch), four skills with six class times (the Computer Lab holds Computer Basics from 4 to 6 pm and Graphic Design after it, Computer Basics also runs in the morning, and Tailoring takes Room 1 for one hour), four teachers, four students and a branch staff account `staff@college.local` at Main Branch. That address isn't a Google account, so it signs in with a password, which the script prints once. If you lose it, set a new one under Staff accounts.
 
-The sample students cover a student with two skills, a student past their end date, a student taking skills at both branches, an Inactive student, and both paid and unpaid registration fees. The money is there too: two of the four teachers are on a fixed salary (one of them in shillings) and two on a percentage, fees are paid across all four methods with some months left owing, books were sold over the counter, rent and electricity went out for this month and last, last month's salaries were paid and this month's weren't, and both branches have a plan for this month to compare against. The exchange rate is set at 8,550, one student pays the Second Branch in shillings, which earns her teacher a shilling share, and the Second Branch pays its electricity in shillings. Never run it on the real database. It refuses anyway if branches already exist.
+The sample students cover a student with two skills, a student past their end date, a student taking skills at both branches, an Inactive student, and both paid and unpaid registration fees. The money is there too: two of the four teachers are on a fixed salary (one of them in shillings) and two on a percentage, fees are paid across all four methods with some months left owing, books were sold over the counter (one Books payment with a note, from before the book list, so the list itself starts empty), rent and electricity went out for this month and last, last month's salaries were paid and this month's weren't, and both branches have a plan for this month to compare against. The exchange rate is set at 8,550, one student pays the Second Branch in shillings, which earns her teacher a shilling share, and the Second Branch pays its electricity in shillings. Never run it on the real database. It refuses anyway if branches already exist.
 
 ## Adding new features
 
@@ -1352,6 +1449,7 @@ Everything here was left out of Phase 1 on purpose, or is a known gap:
 - No printed receipts or statements. Payments have receipt numbers, but nothing prints them.
 - Removing a payment deletes it rather than writing a reversing entry, so the books show what is true now, not what was once typed. That's the right trade for a college this size, but it means a removed payment leaves no trace.
 - Office staff salaries are an expense category with no person attached. Only teachers are named on their pay.
+- Books: what the college paid for a delivery isn't linked to it, so record it on Expenses yourself. There's no transfer of copies between branches, no warning when a shelf runs low beyond the Out of stock badge, and a sale can't be edited or partly returned: remove it and record it again.
 - Fees owed reads every enrollment a person can see and works the months out in the app, because the months a fee is due for are arithmetic the database can't do. That's comfortable for a college of this size; tens of thousands of enrollments would need a stored count of months paid.
 - Nothing chases anybody by itself. Fees owed lists who is behind, but there are no reminders, no SMS and no yellow bar on the student list for unpaid months the way there is for registration fees.
 - A budget is per branch per month and has to be written by hand each month. Last month's plan isn't copied forward.
