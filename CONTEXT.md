@@ -1,6 +1,6 @@
 # Hormuud Academy
 
-Runs Hormuud Academy, one college with several branches: the skills it teaches, the students it registers, which skills each student takes at which branch, and the books each branch sells.
+Runs Hormuud Academy, one college with several branches: the skills it teaches, the students it registers, which skills each student takes at which branch and whether they come, and the books each branch sells.
 
 ## Language
 
@@ -114,6 +114,20 @@ A student with at least one Active enrollment, at any branch. Every other studen
 **Deactivate**:
 Take a branch, category, expense category, skill, branch skill, teacher, class, class time or staff account out of new use while keeping its history. Deleting is only for records nothing uses yet.
 _Avoid_: Archive, disable
+
+### Attendance
+
+**Attendance sheet**:
+One class time's attendance on one of the days it meets: everyone in it that day, each with a mark. A class time has at most one a day, kept with who took it and who last changed it, and a day without one is not taken. A lesson made up on another day isn't recorded.
+_Avoid_: Register, roll call, attendance list
+
+**Mark**:
+What one student got on one attendance sheet: Present, Absent, Late or Excused. It stays with the class time the sheet was taken in, even after the student moves to another.
+_Avoid_: Status, attendance status
+
+**Attendance rate**:
+How often a student came to one skill: the days marked Present or Late, out of the days marked Present, Late or Absent. Excused days and days not taken count neither way.
+_Avoid_: Attendance percentage, score
 
 ### Money
 
