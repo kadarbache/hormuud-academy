@@ -26,6 +26,13 @@ import { formatPhone } from "@/lib/phone";
 import { isPositiveMoney, sumMoney, toCents } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
+import {
+  attendanceRate,
+  formatCounts,
+  formatRate,
+  type MarkCounts,
+} from "../../attendance/labels";
+import { marksByEnrollment } from "../../attendance/queries";
 import { sellableBooks } from "../../books/queries";
 import { feeMonths } from "../../finance/fee-months";
 import { recordMonthlyFee, recordRegistrationFee, sellBooks } from "../../finance/income/actions";
@@ -86,6 +93,21 @@ function Detail({ label, children }: { label: string; children: React.ReactNode 
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className="text-sm">{children}</dd>
     </div>
+  );
+}
+
+/**
+ * How often the student came to one skill, over every sheet they were on,
+ * whichever of its class times it was taken in.
+ */
+function Attendance({ counts }: { counts: MarkCounts | undefined }) {
+  const rate = counts ? attendanceRate(counts) : null;
+  if (!counts) return <span className="text-muted-foreground">Not taken yet</span>;
+  return (
+    <>
+      <div className="tabular-nums">{rate === null ? "—" : formatRate(rate)}</div>
+      <div className="text-xs text-muted-foreground">{formatCounts(counts)}</div>
+    </>
   );
 }
 
@@ -181,10 +203,11 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
   const isAdmin = user.role === "admin";
   const canEdit = canEditStudent(user, student);
   const today = collegeToday();
-  const [rate, sellingBranches, onShelf] = await Promise.all([
+  const [rate, sellingBranches, onShelf, attendance] = await Promise.all([
     currentRate(),
     recordableBranches(user),
     sellableBooks(user),
+    marksByEnrollment(student.enrollments.map((enrollment) => enrollment.id)),
   ]);
   // The admin sees every enrollment, so this is the student's whole record.
   const paidAMonthlyFee = student.enrollments.some((enrollment) =>
@@ -377,6 +400,7 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
               { label: "Skill" },
               { label: "Class time" },
               { label: "Dates" },
+              { label: "Attendance" },
               { label: "Registration fee" },
               { label: "Monthly fee", className: "text-right tabular-nums" },
               { label: "Status" },
@@ -426,6 +450,7 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
                       )}
                     </>
                   ),
+                  Attendance: <Attendance counts={attendance.get(enrollment.id)} />,
                   "Registration fee": (
                     <RegistrationFee
                       enrollment={enrollment}

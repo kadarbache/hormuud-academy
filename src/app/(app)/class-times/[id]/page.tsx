@@ -1,25 +1,30 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft, UserRound } from "lucide-react";
+import { Check, ChevronLeft, UserRound } from "lucide-react";
 import type { EnrollmentStatus } from "@/generated/prisma/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/data-table";
 import { PageHeader } from "@/components/page-header";
 import { EmptyRow } from "@/components/status-badge";
 import { canActAtBranch } from "@/lib/access";
 import { formatDays, formatHours, slotOf } from "@/lib/class-times";
-import { collegeToday, formatDate, fromDbDate } from "@/lib/dates";
+import { collegeToday, formatDate, fromDbDate, toDbDate } from "@/lib/dates";
 import { formatMoney, formatMonths, formatStudentNumber } from "@/lib/format";
 import { isPositiveMoney } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
+import { recentClassDays } from "../../attendance/days";
+import { formatShortDay } from "../../attendance/labels";
 
 const warning = "border-warning-border bg-warning text-warning-foreground";
+
+/** How many of its latest days the attendance card offers. */
+const RECENT_DAYS = 6;
 
 /** Which of the class time's students to list. Opens on the ones in it now. */
 const FILTERS = [
@@ -68,7 +73,7 @@ export async function generateMetadata({
 
 /**
  * Everyone studying one skill at one time, with what the class time is: when,
- * where, who teaches it and what it costs. It's the page behind a class time
+ * where, who teaches it and what it costs, and its last few days' attendance. It's the page behind a class time
  * row on a skill's page and behind the student count on a class's week.
  * Branch staff see only their own branch's class times.
  */
@@ -103,7 +108,9 @@ export default async function ClassTimePage({
   });
   if (!classTime || !canActAtBranch(user, classTime.branchSkill.branchId)) notFound();
 
-  const [enrollments, counts] = await Promise.all([
+  const today = collegeToday();
+  const recentDays = recentClassDays(classTime, today, RECENT_DAYS);
+  const [enrollments, counts, recentSheets] = await Promise.all([
     prisma.enrollment.findMany({
       where: { classTimeId: id, ...(filter.status ? { status: filter.status } : {}) },
       orderBy: [{ student: { fullName: "asc" } }, { startDate: "asc" }],
@@ -132,7 +139,12 @@ export default async function ClassTimePage({
       where: { classTimeId: id },
       _count: { _all: true },
     }),
+    prisma.attendanceSheet.findMany({
+      where: { classTimeId: id, date: { in: recentDays.map(toDbDate) } },
+      select: { date: true },
+    }),
   ]);
+  const takenOn = new Set(recentSheets.map((sheet) => fromDbDate(sheet.date)));
 
   const countOf = (statusOf: EnrollmentStatus) =>
     counts.find((row) => row.status === statusOf)?._count._all ?? 0;
@@ -144,7 +156,6 @@ export default async function ClassTimePage({
   const skillName = bs.skill.name;
   const slot = slotOf(classTime);
   const hours = slot ? formatHours(slot) : null;
-  const today = collegeToday();
   const here = `/class-times/${classTime.id}`;
 
   return (
@@ -215,6 +226,53 @@ export default async function ClassTimePage({
                 : "Free"}
             </Detail>
           </dl>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Attendance</CardTitle>
+          {slot && (
+            <CardAction>
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`${here}/attendance`}>By month</Link>
+              </Button>
+            </CardAction>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {slot ? (
+            <>
+              <div className="flex flex-wrap gap-2">
+                {recentDays.map((day) => {
+                  const taken = takenOn.has(day);
+                  return (
+                    <Button
+                      key={day}
+                      variant={!taken && day === today ? "default" : "outline"}
+                      size="sm"
+                      asChild
+                    >
+                      <Link href={`${here}/attendance/${day}`}>
+                        {taken && <Check />}
+                        {day === today ? "Today" : formatShortDay(day)}
+                        {!taken && <span className="font-normal opacity-70">not taken</span>}
+                      </Link>
+                    </Button>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                The last {RECENT_DAYS} days this class time met. Open one to take its attendance or
+                correct it.
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No attendance until this class time has hours and days.
+              {isAdmin ? " Set them on the skill's page." : " The admin sets them."}
+            </p>
+          )}
         </CardContent>
       </Card>
 
