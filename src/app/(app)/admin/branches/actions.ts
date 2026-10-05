@@ -71,7 +71,14 @@ export async function deleteBranch(id: string): Promise<ActionResult> {
     where: { id },
     include: {
       _count: {
-        select: { staff: true, classrooms: true, teachers: true, branchSkills: true, homeStudents: true },
+        select: {
+          staff: true,
+          classrooms: true,
+          teachers: true,
+          branchSkills: true,
+          branchBooks: true,
+          homeStudents: true,
+        },
       },
     },
   });
@@ -79,7 +86,9 @@ export async function deleteBranch(id: string): Promise<ActionResult> {
 
   const inUse = Object.values(branch._count).some((count) => count > 0);
   if (inUse) {
-    return failure("This branch has staff, classes, teachers, skills or students. Deactivate it instead.");
+    return failure(
+      "This branch has staff, classes, teachers, skills, books or students. Deactivate it instead.",
+    );
   }
 
   await prisma.branch.delete({ where: { id } });

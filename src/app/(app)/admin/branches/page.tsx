@@ -17,7 +17,14 @@ export default async function BranchesPage() {
     orderBy: { name: "asc" },
     include: {
       _count: {
-        select: { staff: true, classrooms: true, teachers: true, branchSkills: true, homeStudents: true },
+        select: {
+          staff: true,
+          classrooms: true,
+          teachers: true,
+          branchSkills: true,
+          branchBooks: true,
+          homeStudents: true,
+        },
       },
     },
   });

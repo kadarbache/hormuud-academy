@@ -12,6 +12,7 @@ import {
   HandCoins,
   HandHelping,
   KeyRound,
+  Library,
   LogOut,
   Presentation,
   Receipt,
@@ -95,7 +96,16 @@ const owedItem: NavItem = {
   match: under("/finance/owed"),
 };
 
-const branchItems: NavItem[] = [incomeItem, owedItem, teachersItem, classesItem];
+// The admin keeps the list and the prices; branch staff sell from their own
+// shelf and keep its count.
+const booksItem: NavItem = {
+  href: "/books",
+  label: "Books",
+  icon: Library,
+  match: under("/books"),
+};
+
+const branchItems: NavItem[] = [incomeItem, owedItem, booksItem, teachersItem, classesItem];
 
 const financeItems: NavItem[] = [
   {
@@ -131,6 +141,7 @@ const adminItems: NavItem[] = [
   { href: "/admin/branches", label: "Branches", icon: Building2, match: under("/admin/branches") },
   { href: "/admin/skills", label: "Skills", icon: BookOpen, match: under("/admin/skills") },
   { href: "/admin/categories", label: "Categories", icon: Tags, match: under("/admin/categories") },
+  booksItem,
   teachersItem,
   classesItem,
   { href: "/admin/staff", label: "Staff accounts", icon: KeyRound, match: under("/admin/staff") },
