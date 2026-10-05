@@ -41,6 +41,7 @@ model User {
   expensesRecorded   Expense[]       @relation("ExpenseRecordedBy")
   budgetsSaved       MonthlyBudget[] @relation("BudgetSavedBy")
   exchangeRatesSet   ExchangeRate[]  @relation("ExchangeRateSetBy")
+  stockChanges       StockChange[]   @relation("StockChangeRecordedBy")
 
   @@unique([email])
   @@index([branchId])
@@ -126,6 +127,7 @@ model Branch {
   classrooms   Classroom[]
   teachers     TeacherBranch[]
   branchSkills BranchSkill[]
+  branchBooks  BranchBook[]
   homeStudents Student[]
   payments     Payment[]
   expenses     Expense[]
@@ -507,6 +509,10 @@ model Payment {
   /// The share's dollar value, worked out like usdValue.
   teacherShareUsdValue Decimal? @db.Decimal(14, 2)
 
+  /// The books on a book sale, one line per title. Empty for anything else,
+  /// and for a book sale recorded before the college kept a list of books.
+  bookLines BookSaleLine[]
+
   note         String?
   recordedById String
   recordedBy   User     @relation("PaymentRecordedBy", fields: [recordedById], references: [id])
@@ -604,4 +610,103 @@ model MonthlyBudgetLine {
   @@id([budgetId, categoryId])
   @@index([categoryId])
   @@map("monthly_budget_lines")
+}
+
+// ---------------------------------------------------------------------------
+// Books
+//
+// The college sells books over the counter. One list serves every branch, but
+// each branch that sells a book sets its own price and keeps its own copies,
+// the way each branch sets its own fees for a skill. A sale is a payment in
+// the Books category, with a line for each title on it.
+// ---------------------------------------------------------------------------
+
+/// One book the college sells, like a textbook for a skill. The price here
+/// is only the default a branch starts from when the book is added to it.
+model Book {
+  id        String   @id @default(cuid())
+  title     String   @unique
+  /// In US dollars, like a fee. Always above zero.
+  price     Decimal  @db.Decimal(10, 2)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  branchBooks BranchBook[]
+
+  @@map("books")
+}
+
+/// A book as one branch sells it: that branch's price, and how many copies
+/// are on its shelf. Only the admin sets the price; staff at the branch
+/// record deliveries and fix the count.
+model BranchBook {
+  id        String   @id @default(cuid())
+  bookId    String
+  book      Book     @relation(fields: [bookId], references: [id])
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id])
+  /// In US dollars. A new price applies to sales from then on; each sale
+  /// keeps the price it was sold at.
+  price     Decimal  @db.Decimal(10, 2)
+  /// Copies on the shelf now. A sale takes them off in the same write that
+  /// records it, and the database refuses a count below zero, so two people
+  /// can't both sell the last copy.
+  stock     Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  saleLines    BookSaleLine[]
+  stockChanges StockChange[]
+
+  @@unique([bookId, branchId])
+  @@index([branchId])
+  @@map("branch_books")
+}
+
+/// One title on one book sale: how many copies, at the branch's price that
+/// day. The payment's amount is what was actually paid, which can be less
+/// than its lines add up to, never more.
+model BookSaleLine {
+  paymentId    String
+  payment      Payment    @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  branchBookId String
+  branchBook   BranchBook @relation(fields: [branchBookId], references: [id])
+  quantity     Int
+  /// One copy's price on the day of the sale, in US dollars.
+  unitPrice    Decimal    @db.Decimal(10, 2)
+
+  @@id([paymentId, branchBookId])
+  @@index([branchBookId])
+  @@map("book_sale_lines")
+}
+
+/// Why copies went onto or came off a shelf, other than by a sale.
+enum StockChangeKind {
+  /// A delivery: copies arrived at the branch.
+  RECEIVED
+  /// The count was fixed to match what's on the shelf.
+  CORRECTED
+}
+
+/// Copies put on or taken off a branch's shelf by hand, with who did it and
+/// why. Sales aren't here: their lines say what each one took. So the count
+/// on the shelf is always every change here, less every copy sold.
+model StockChange {
+  id           String          @id @default(cuid())
+  branchBookId String
+  branchBook   BranchBook      @relation(fields: [branchBookId], references: [id])
+  kind         StockChangeKind
+  /// Copies added, or taken off when below zero.
+  quantity     Int
+  /// The count once this change was made.
+  stockAfter   Int
+  note         String?
+  recordedById String
+  recordedBy   User            @relation("StockChangeRecordedBy", fields: [recordedById], references: [id])
+  createdAt    DateTime        @default(now())
+
+  @@index([branchBookId, createdAt])
+  @@map("stock_changes")
 }
