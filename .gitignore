@@ -46,3 +46,6 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# student lists with real names and phone numbers
+/imports/
