@@ -27,6 +27,7 @@ Hormuud Academy is one college with several branches. The system keeps track of:
 - the skills the college teaches, like Graphic Design or Tailoring, in one list for the whole college
 - when, where and by whom each skill is taught at each branch: its class times, each in a class (room), from a start time to an end time on chosen days, with a teacher
 - the students, and which skills each student is taking
+- who came to each class time on each day it meets
 - the registration fee a student pays for each skill they start, and whether it's paid
 - every payment the college takes, by day, by category and by how it was paid
 - in two currencies, US dollars and Somaliland shillings, kept apart like two separate books
@@ -63,16 +64,18 @@ A monthly fee payment names the **month it pays for**, not just the day the mone
 
 Books follow the skills' pattern. A **book** is on one list for the whole college with a default price, and each branch that sells it gets a **branch book** with its own price and its own **stock**, the copies on its shelf. Selling books is a payment in the Books category with a line per title, and the copies come off that branch's shelf as the sale is recorded. The stock is the one count the system does store, because two people mustn't sell the last copy; every delivery and fixed count is kept beside it, so it can always be checked.
 
+Attendance hangs off the class time. On each day a class time meets, staff take its **attendance sheet**: everyone in it that day, each marked Present, Absent, Late or Excused. The mark belongs to the enrollment, so a student's **attendance rate** for a skill is counted over every sheet they were on: the days they came, Late included, out of the days that count. Excused days count neither way, and so do days nobody took.
+
 Fees are set in dollars, but a student can pay in dollars or in Somaliland shillings. The two are never added together: every screen shows dollars and shillings separately, and underneath them what the two are worth together in dollars at today's rate. The admin sets the exchange rate on the Settings page. Each shilling payment keeps the rate it was recorded at, like a receipt, while the totals always use today's.
 
 Two kinds of people log in:
 
 - **Admins** see every branch and set everything up.
-- **Branch staff** work at one branch. They register students and look after those students' skills at that branch.
+- **Branch staff** work at one branch. They register students, look after those students' skills and take attendance at that branch.
 
 Nobody signs up on their own. The admin creates every account, and the person signs in with the Google account for that account's email. Passwords from before Google sign-in still work until the switch-over finishes.
 
-Phase 1 was the college itself: branches, skills, teachers, classes, students and enrollments. Phase 2 is the money described above. Attendance, exams and certificates aren't built yet, and the last section lists everything else that's missing.
+Phase 1 was the college itself: branches, skills, teachers, classes, students and enrollments. Phase 2 is the money described above. Phase 3 has begun with attendance, taken by staff for now; teachers will take it themselves once they can sign in. Exams and certificates aren't built yet, and the last section lists everything else that's missing.
 
 ## Technology stack
 
@@ -287,6 +290,9 @@ hormuud-academy/
 │   │       ├── page.tsx         "/" sends you on to /students
 │   │       ├── students/        Student list, registration, student page, editing, and the
 │   │       │                    student picker the money dialogs search with
+│   │       ├── attendance/      The day's class times and whether their attendance is taken,
+│   │       │                    with the sheet's form, its save action, and the queries and
+│   │       │                    rules every attendance page shares
 │   │       ├── finance/         The money screens
 │   │       │   ├── page.tsx     The financial dashboard, admins only
 │   │       │   ├── labels.ts    The words for each stored code, shared by every screen
@@ -310,8 +316,10 @@ hormuud-academy/
 │   │       ├── teachers/        Admins manage them; branch staff see their branch's
 │   │       ├── classes/         Admins manage them; branch staff see their branch's.
 │   │       │                    [id]/ is one class's week
-│   │       ├── class-times/     [id]/ is one class time: its details and every student in it.
-│   │       │                    Admins and the branch's own staff
+│   │       ├── class-times/     [id]/ is one class time: its details, its last few days'
+│   │       │                    attendance and every student in it. [id]/attendance/ is its
+│   │       │                    month of attendance, and [id]/attendance/[date]/ one day's
+│   │       │                    sheet. Admins and the branch's own staff
 │   │       └── admin/           Setup screens, admins only
 │   │           ├── layout.tsx   Sends anyone who isn't an admin back to /students
 │   │           ├── branches/
@@ -580,6 +588,10 @@ erDiagram
     BranchBook ||--o{ BookSaleLine : "is sold on"
     BranchBook ||--o{ StockChange : "is counted by"
     User ||--o{ StockChange : "recorded"
+    ClassTime ||--o{ AttendanceSheet : "is taken on"
+    AttendanceSheet ||--o{ AttendanceEntry : "marks"
+    Enrollment ||--o{ AttendanceEntry : "is marked on"
+    User ||--o{ AttendanceSheet : "took"
 
     Branch {
         string id PK
@@ -752,6 +764,19 @@ erDiagram
         string note
         string recordedById FK
     }
+    AttendanceSheet {
+        string id PK
+        string classTimeId FK
+        date date "one per class time per day"
+        string takenById FK
+        string changedById FK "who last changed a mark"
+        datetime changedAt
+    }
+    AttendanceEntry {
+        string sheetId PK, FK
+        string enrollmentId PK, FK "one per student on the sheet"
+        enum mark "PRESENT, ABSENT, LATE or EXCUSED"
+    }
     User {
         string id PK
         string name
@@ -848,6 +873,10 @@ A student has no status column. They are Active when at least one of their enrol
 
 **StockChange** (`stock_changes`). Copies put on or taken off a shelf by hand, never by a sale. `kind` is `RECEIVED` for a delivery or `CORRECTED` for a fixed count, `quantity` is the copies added (below zero when a fixed count took some off), `stockAfter` is the count once the change was made, with a note and who recorded it. A branch book's `stock` always equals its stock changes added up, less the copies on its sale lines.
 
+**AttendanceSheet** (`attendance_sheets`). One class time's attendance on one day: the class time, the `date`, who took it (`takenById`, at `createdAt`), and who last changed a mark and when (`changedById` and `changedAt`, both empty until somebody does). At most one per class time per day. A new sheet can only be taken on a day the class time meets, but a saved one stays, and can still be corrected, if the class time's days change later.
+
+**AttendanceEntry** (`attendance_entries`). One student's mark on one sheet: the sheet, the enrollment and the `mark`, which is `PRESENT`, `ABSENT`, `LATE` or `EXCUSED`. It names the enrollment rather than the student, so the marks of a student taking two skills stay apart. The sheet names the class time, so moving the student to another class time later leaves the mark where it was taken. Nothing is added up and stored: an attendance rate is counted from these rows each time a screen shows one.
+
 **User** (`user`). A login account. Better Auth's own columns (name, email, `emailVerified`, `image`), the admin plugin's columns (`role`, `banned`, `banReason`, `banExpires`), and this app's `branchId`. Branch staff have a branch. Admins have none. `emailVerified` is true once the admin has created or saved the account, and Google sign-in needs it.
 
 **Session**, **Account**, **Verification** (`session`, `account`, `verification`). Better Auth's tables. A session is one login on one device. An account row is one way to sign in: `providerId = "google"` links a Google account, and `providerId = "credential"` holds an old password's hash. Verification holds the `state` of each Google sign-in while the person is at Google.
@@ -858,14 +887,14 @@ A student has no status column. They are Active when at least one of their enrol
 
 These hold even if a bug slips into the code:
 
-- Unique: branch names, category names, expense category names, skill names, class names within a branch, one branch skill per skill per branch, book titles, one branch book per book per branch, student numbers, user emails.
+- Unique: branch names, category names, expense category names, skill names, class names within a branch, one branch skill per skill per branch, book titles, one branch book per book per branch, one attendance sheet per class time per day, one mark per student per sheet, student numbers, user emails.
 - One active enrollment per student per skill, at any branch. This is a **partial unique index**: it only counts rows whose status is `ACTIVE`, so a student can finish a skill and take it again later.
 - One registration fee per enrollment, and one monthly fee payment per enrollment per fee month. Both are partial unique indexes too, counting only rows of that category. Two clicks on Record payment can't charge a student twice, whatever the code does.
 - One budget per branch per month.
 - A class time starts before it ends, within the day. It has a start, an end and at least one day, or none of them while it waits for the admin. An enrollment's class time belongs to the enrollment's own branch skill: the foreign key names the two together.
 - A dollar payment or expense has no exchange rate and is worth exactly its amount. A shilling one has a rate above zero, and a dollar value within a cent of its shillings at that rate. The same goes for a teacher's share. These are **check constraints**, written by hand in the migrations because Prisma's schema can't describe them. An exchange rate is always above zero.
-- A book's price and a branch's price for it are above zero. A shelf never holds fewer than no copies, which is what stops two people selling the last one. A sale line sells at least one copy at a price above zero, a delivery adds copies, a fixed count changes the count, and neither leaves it below zero. Check constraints too.
-- A row can't be deleted while other rows point at it. You can't delete a teacher a class time still uses, for example. The exceptions are deliberate: deleting a student deletes their enrollments and every payment they made, deleting an enrollment deletes its payments, deleting a payment deletes its book sale lines, deleting a budget deletes its lines, deleting a teacher deletes their branch links, and deleting a user deletes their sessions and accounts. The app refuses to delete a teacher who has any money on record, so nobody's earnings vanish by accident. Before deleting a student, the app takes their name off the books they bought, so those sales stay: the copies have left the shelf either way.
+- A book's price and a branch's price for it are above zero. A shelf never holds fewer than no copies, which is what stops two people selling the last one. A sale line sells at least one copy at a price above zero, a delivery adds copies, a fixed count changes the count, and neither leaves it below zero. An attendance sheet names who last changed it and when, or neither. Check constraints too.
+- A row can't be deleted while other rows point at it. You can't delete a teacher a class time still uses, for example. The exceptions are deliberate: deleting a student deletes their enrollments, every payment they made and their attendance marks, deleting an enrollment deletes its payments and marks, deleting an attendance sheet deletes its marks, deleting a payment deletes its book sale lines, deleting a budget deletes its lines, deleting a teacher deletes their branch links, and deleting a user deletes their sessions and accounts. The app refuses to delete a teacher who has any money on record, so nobody's earnings vanish by accident. Before deleting a student, the app takes their name off the books they bought, so those sales stay: the copies have left the shelf either way.
 
 The app adds its own checks on top. Names are compared ignoring upper and lower case, so "main branch" is refused when "Main Branch" exists. The database compares exact text only. The app also keeps everything in one place at a time (`src/lib/clashes.ts`): a class holds one class time at a time, a teacher teaches one at a time at any branch, and a student sits in one at a time. "At the same time" means overlapping hours on a day both meet, so 4–6 pm on Saturdays and 4–6 pm on Sundays can share a room. A class time that's been deactivated still counts while students are in it, because they still come.
 
@@ -886,6 +915,7 @@ The app adds its own checks on top. Names are compared ignoring upper and lower 
 | `20261003090000_class_times` | Adds class times, and moves the teacher and class off the branch skill onto its class times. Every branch skill already set up becomes one class time, in the class and with the teacher it had, and its students all go into it. Those class times have no hours or days until the admin sets them. It also added fixed shifts, which the next migration takes out again |
 | `20261003120000_class_time_hours` | Gives each class time its own start and end, copied from its shift, and drops the shifts, so classes of different lengths can share an afternoon |
 | `20261005090000_books` | Adds the book list (`books`), each branch's price and copies (`branch_books`), the titles on a sale (`book_sale_lines`) and the deliveries and fixed counts (`stock_changes`), with the checks that keep prices above zero and shelves at zero or more. Books payments from before keep their notes and have no lines |
+| `20261005120000_attendance` | Adds attendance: `attendance_sheets`, one per class time per day with who took it and who last changed it, and `attendance_entries`, one mark per student on a sheet. Nothing already recorded changes |
 
 ### Looking at the data yourself
 
@@ -903,6 +933,8 @@ The app adds its own checks on top. Names are compared ignoring upper and lower 
 | Mark finished, drop, set active again | At any branch | Only for skills at their branch |
 | Move a student to another class time | At any branch | Only for skills at their branch |
 | See who is in a class time | Every class time | Their own branch's class times |
+| Take attendance, or correct a sheet already taken | Any class time, on any of its days up to today | Their own branch's class times, on any of their days up to today |
+| See attendance: the day's class times, a class time's month, a student's rate | Every branch's | Their own branch's |
 | Record a registration fee payment, for less than the fee if the student can't pay it all | At any branch | Only for skills at their branch |
 | Record a monthly fee payment | At any branch | Only for skills at their branch |
 | Sell books, for less than they come to if the student was given a discount | At any branch | At their own branch only |
@@ -954,7 +986,7 @@ The installed app logs in the same way and shows the same screens. Without inter
 
 ### The screen layout
 
-- **The sidebar** on the left. Students (**Students** and **Register student**) is there for everyone. Admins also get Money (**Dashboard**, **Income**, **Fees owed**, **Expenses**, **Expense categories**, **Teacher pay**, **Monthly budget**) and Admin (**Branches**, **Skills**, **Categories**, **Books**, **Teachers**, **Classes**, **Staff accounts**, **Settings**). Branch staff get Your branch instead (**Income**, **Fees owed**, **Books**, **Teachers** and **Classes**), which shows only their own branch; the teachers and classes there can't be changed, and of the books only the copies on the shelf can. The bottom shows your name, your role and your branch.
+- **The sidebar** on the left. Students (**Students**, **Register student** and **Attendance**) is there for everyone. Admins also get Money (**Dashboard**, **Income**, **Fees owed**, **Expenses**, **Expense categories**, **Teacher pay**, **Monthly budget**) and Admin (**Branches**, **Skills**, **Categories**, **Books**, **Teachers**, **Classes**, **Staff accounts**, **Settings**). Branch staff get Your branch instead (**Income**, **Fees owed**, **Books**, **Teachers** and **Classes**), which shows only their own branch; the teachers and classes there can't be changed, and of the books only the copies on the shelf can. The bottom shows your name, your role and your branch.
 - **The header** shows "All branches" for an admin, or your branch's name for branch staff. The button on the left of the header hides and shows the sidebar.
 - **On a phone**, the sidebar folds away. Open it with the button at the top left.
 - **Tables** are wider than a phone, so the last columns sit off the side. Instead of scrolling across, tap a row: a pop-up lists everything in it, one line per column, with that row's buttons at the bottom. Tapping a link inside the row, such as a student's name, still opens that page. The same click works on a computer.
@@ -1035,6 +1067,8 @@ Each class time row shows its time, days, class, teacher and how many students i
 Everyone studying one skill at one time is on one page. Open it from the **Students** button on a class time's row on the skill's page, or from the student count on a box in a class's week. Branch staff reach it from the week, and only for their own branch's class times: another branch's gives Not found, the same as a class there does.
 
 The top card says what the class time is: the skill, the branch, the class, the teacher, the hours and days, how many students are in it now (and how many have ever joined, when that's more), the length of the course and the two fees, with "Free" for a monthly fee of zero. Under it is the list of students, A to Z, each with their phone and the responsible person's phone, the day they joined, their end date, whether the registration fee is paid, and Active, Finished or Dropped. An Active student past their end date gets a yellow **Past end date** badge, and an unpaid fee shows its amount. A student's name opens their page. The list opens on the **Active** students; **Finished**, **Dropped** and **All** beside the heading switch it, each with its count.
+
+Between the two is the **Attendance** card: the last six days the class time met, oldest first, with a tick on each day whose attendance was taken and "not taken" on the others. Today's button is filled in until it's taken. Each opens that day's sheet, and **By month** opens [the month's grid](#a-class-times-month). A class time that says "Time not set" takes no attendance, and the card says so.
 
 #### Setting the hours on class times that say "Time not set"
 
@@ -1153,7 +1187,7 @@ The top shows the photo, name, student ID and Active or Inactive. The buttons ar
 
 **Details** shows sex, phones, home branch, registration date, and who registered the student and when.
 
-**Skills** lists each enrollment with its branch, its class time (the hours and days, then the class and teacher), start and end dates, registration fee, monthly fee and status. A yellow **Class time deactivated** badge means the student still comes to a class time that takes nobody new: move them to another one. Branch staff see only the skills at their branch, with a note saying so.
+**Skills** lists each enrollment with its branch, its class time (the hours and days, then the class and teacher), start and end dates, attendance, registration fee, monthly fee and status. **Attendance** is the student's rate for that skill, like 92%, over every sheet they were on, with how many days they got each mark underneath. It says "Not taken yet" until a sheet has marked them. A yellow **Class time deactivated** badge means the student still comes to a class time that takes nobody new: move them to another one. Branch staff see only the skills at their branch, with a note saying so.
 
 The **Registration fee** column shows one of three things:
 
@@ -1187,6 +1221,37 @@ The panel's heading counts the months paid, what's been collected in each curren
 #### Editing a student
 
 **Edit details** opens the same fields as registration, filled in. Admins can also change the home branch. Moving a student doesn't move their skills: those stay at the branch that teaches them. If the student has a photo, you can replace it or tick **Remove the current photo**. The student ID never changes.
+
+### Attendance screens
+
+Staff at a branch and the admin take attendance. Teachers can't sign in yet, so a teacher who keeps the list on paper hands it to the office, and staff type it in. A sheet can be taken for any day the class time met, up to today, so typing in last week's paper works the same as taking today's.
+
+#### The day's class times
+
+**Attendance** in the sidebar lists the class times meeting today, in clock order: the hours, the skill, the class, the teacher, the branch for an admin, how many students are on the sheet, and whether its attendance is **Taken** or **Not taken**. A taken one shows its marks counted ("18 present, 2 absent") and who took it. **Take attendance** opens the sheet; **Open** opens one already taken. Pick another day in the **Day** box and press **Show** to see that day instead, and **Today** to come back.
+
+Branch staff see their own branch's class times, the admin every branch's. A class time with nobody in it that day isn't listed, because there's no one to mark. A class time that says "Time not set" isn't either, and a line under the table counts them.
+
+#### Taking a class time's attendance
+
+The sheet has a row for each student, A to Z, with four buttons: **Present**, **Absent**, **Late** and **Excused**. A new sheet starts with everyone Present, so taking it is tapping the students who weren't. **Everyone present** puts every row back to Present. The bar at the bottom counts the marks as you go and holds **Save attendance**, so it's in reach on a phone without scrolling back up.
+
+Saving records who took the sheet and when, and the page says so above the list. Open a saved sheet to correct it: change the marks and press **Save changes**, and the page adds who changed it and when. Saving without changing anything says "Nothing changed" and records nothing. The arrows beside the date go to the class time's day before and after, for going through a week of paper sheets in a row.
+
+Who is on the sheet: everyone in the class time that day, meaning they had started by then and were still Active, or only finished or dropped after it. A saved sheet keeps everyone it marked, even after they move to another class time or finish. A student moved in since, who is already marked that day on their old class time's sheet, isn't listed, so a day taken late doesn't count them twice.
+
+The app refuses a sheet for:
+
+- a day the class time doesn't meet, like a Friday for a class that meets Saturday to Thursday. A lesson made up on another day isn't recorded for now.
+- a day that hasn't come yet.
+- a class time that says "Time not set", until the admin sets its hours and days.
+- another branch's class time, for branch staff: the page is Not found, the same as the class time's own page.
+
+If the list changed while the sheet was open, say a student joined, saving is refused with a message to reload the page and mark it again. If two people take the same sheet at once, the second save is refused and they reload to see the first one's marks.
+
+#### A class time's month
+
+**By month** on the Attendance card shows the whole month as a grid: a row for each student, a column for each day the class time met up to today, and each student's rate for the month at the end. Each mark is a letter, **P**, **A**, **L** or **E**. A dot means that day's sheet wasn't taken, and a dash means the sheet was taken without that student, because they joined later or had already left. The column headings open that day's sheet. Above the grid, every day not taken yet is a button that opens its sheet. The arrows beside the month go back a month and forward again, up to this one. On a phone the grid scrolls sideways with the names staying put.
 
 ## The money screens
 
@@ -1337,6 +1402,16 @@ Admins only, and the first thing under Money. Pick a day, a month and optionally
 
 **A teacher leaves.** On each skill page where they teach, press Change on their class times and pick another teacher. Then deactivate the teacher.
 
+**Taking today's attendance.** Open Attendance, press Take attendance on the class time, tap the students who aren't Present and save.
+
+**The teacher kept the list on paper.** Open the class time's page and press By month: every day not taken yet is a button above the grid. Open each one, mark it from the paper and save, then use the arrow to go to the next class day.
+
+**A student was marked wrong.** Open that day's sheet from the class time's month or the Attendance list, change the mark and press Save changes. The sheet says who changed it and when.
+
+**A class didn't happen, say on a holiday.** Leave that day's sheet untaken. A day nobody took counts against no student.
+
+**A lesson was made up on another day.** It can't be recorded yet: sheets are only for the days the class time meets.
+
 **A skill gets a second group.** Too many students for one room at 4 pm? On the skill's page, press Add class time under that branch and give it other hours, or another class at the same hours. New students pick which one they join.
 
 **A class moves to another time.** On the skill's page, press Change on that class time and type the new hours or tick other days. Its students move with it. If the new time clashes with another skill one of them takes, the app says who.
@@ -1432,7 +1507,7 @@ Most new features follow the same steps:
 
 | Future module | What it attaches to | Why that's already ready |
 |---|---|---|
-| Attendance | Enrollment and ClassTime | A class time is one teacher's group in one room at one time, and each enrollment is one student in it |
+| Teachers taking attendance | `User`, with a link to `Teacher`, and `src/lib/session.ts` | A sheet already records who took it, and the same marking screen can sit on a teacher's own page. `getCurrentUser` treats every role that isn't `admin` as staff, so roles have to be made strict before a teacher role is added |
 | Exams and results | Enrollment | Results belong to one student in one skill at one branch |
 | Printed receipts | Payment | Every payment already has a receipt number, an amount, a method and a date |
 | Office staff salaries | Expense, with User | Staff salaries are already a category; a `userId` beside `teacherId` would name the person |
@@ -1444,7 +1519,8 @@ Most new features follow the same steps:
 
 Everything here was left out of Phase 1 on purpose, or is a known gap:
 
-- No attendance, exams, results or certificates.
+- No exams, results or certificates.
+- Attendance is taken by staff, because teachers can't sign in yet. A sheet can only be taken on a day its class time meets, so a lesson made up on another day isn't recorded. Moving a student isn't dated, so a sheet taken late for a past day lists who is in the class time now: someone who moved in since is on it, unless their old class time's sheet already marks them that day, and someone who moved out isn't. A saved sheet keeps everyone it marked. Nothing warns about a student who keeps missing class, and attendance can't be taken offline.
 - A fee is settled or it isn't. There are no part payments to add up later, for a registration fee or for a month. Paying less, for a discount or because the student couldn't pay it all, is recorded by lowering the amount, and the fee still counts as settled. The difference isn't kept as a balance, so nothing chases it.
 - No printed receipts or statements. Payments have receipt numbers, but nothing prints them.
 - Removing a payment deletes it rather than writing a reversing entry, so the books show what is true now, not what was once typed. That's the right trade for a college this size, but it means a removed payment leaves no trace.
