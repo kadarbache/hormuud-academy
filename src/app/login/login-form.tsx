@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { FieldGroup } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
-import { FormError, TextField } from "@/components/form-fields";
+import { FormError, PasswordField, TextField } from "@/components/form-fields";
 import { useFormAction } from "@/hooks/use-form-action";
 import { signIn } from "./actions";
 
@@ -31,10 +31,9 @@ export function LoginForm() {
           required
           errors={fieldErrors.login}
         />
-        <TextField
+        <PasswordField
           label="Password"
           name="password"
-          type="password"
           autoComplete="current-password"
           required
           errors={fieldErrors.password}

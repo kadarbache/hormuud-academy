@@ -1,6 +1,8 @@
 "use client";
 
 import { useId, useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Field,
   FieldDescription,
@@ -36,6 +38,51 @@ export function TextField({
     <Field data-invalid={invalid || undefined}>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
       <Input id={id} name={name} aria-invalid={invalid || undefined} {...input} />
+      {description && <FieldDescription>{description}</FieldDescription>}
+      <FieldError errors={toFieldErrors(errors)} />
+    </Field>
+  );
+}
+
+/**
+ * A password, with an eye button that shows what was typed and hides it
+ * again. On a phone it's easy to mistype a password you can't see.
+ */
+export function PasswordField({
+  label,
+  name,
+  errors,
+  description,
+  ...input
+}: BaseProps & Omit<React.ComponentProps<typeof Input>, "name" | "id" | "type">) {
+  const id = useId();
+  const invalid = Boolean(errors?.length);
+  const [shown, setShown] = useState(false);
+
+  return (
+    <Field data-invalid={invalid || undefined}>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <div className="relative">
+        <Input
+          id={id}
+          name={name}
+          type={shown ? "text" : "password"}
+          aria-invalid={invalid || undefined}
+          className="pr-10"
+          {...input}
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="absolute top-1/2 right-0.5 -translate-y-1/2 text-muted-foreground"
+          aria-label={shown ? "Hide password" : "Show password"}
+          aria-pressed={shown}
+          onClick={() => setShown((value) => !value)}
+        >
+          {shown ? <EyeOff /> : <Eye />}
+        </Button>
+      </div>
       {description && <FieldDescription>{description}</FieldDescription>}
       <FieldError errors={toFieldErrors(errors)} />
     </Field>
