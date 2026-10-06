@@ -16,7 +16,8 @@ const roleOptions: Option[] = [
 const roleDescriptions: Record<Role, string> = {
   admin: "Admins see every branch and manage skills, teachers, classes and accounts.",
   staff: "Branch staff register and enroll students at their own branch.",
-  teacher: "A teacher takes today's attendance for the class times they teach and sees their own pay. Nothing else.",
+  teacher:
+    "A teacher takes today's attendance for the class times they teach and sees their own pay. Nothing else. They sign in with Google, or their Teacher ID and a password you give them.",
 };
 
 export function StaffAccountDialog({
@@ -34,7 +35,10 @@ export function StaffAccountDialog({
   /** Missing when creating a new account. */
   account?: {
     name: string;
+    /** Blank for a teacher with no Gmail. */
     email: string;
+    /** The email, or the Teacher ID of a teacher with no Gmail. */
+    shownAs: string;
     role: Role;
     branchId: string | null;
     teacherId: string | null;
@@ -49,8 +53,8 @@ export function StaffAccountDialog({
       title={account ? `Edit ${account.name}` : "Add staff account"}
       description={
         account
-          ? account.email
-          : "The person signs in with the Google account that has this email. There is no sign-up page."
+          ? account.shownAs
+          : "The person signs in with the Google account that has this email. A teacher can sign in with a Teacher ID and password instead. There is no sign-up page."
       }
       trigger={trigger}
       action={action}
@@ -66,11 +70,13 @@ export function StaffAccountDialog({
             autoComplete="off"
             defaultValue={account?.email}
             description={
-              account
-                ? "Changing it logs them out. They sign back in with the Google account for the new address."
-                : "The address of their Google account. Tell them yourself that the account is ready."
+              role === "teacher"
+                ? "Optional for a teacher. Leave it blank if they have no Google account: they'll sign in with their Teacher ID and a password you give them."
+                : account
+                  ? "Changing it logs them out. They sign back in with the Google account for the new address."
+                  : "The address of their Google account. Tell them yourself that the account is ready."
             }
-            required
+            required={role !== "teacher"}
             errors={errors.email}
           />
           <SelectField

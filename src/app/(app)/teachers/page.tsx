@@ -8,10 +8,11 @@ import { PageHeader } from "@/components/page-header";
 import { ActiveBadge, EmptyRow } from "@/components/status-badge";
 import { formatHours, slotOf } from "@/lib/class-times";
 import { currentRate } from "@/lib/exchange-rate";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, formatTeacherNumber } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
 import { requireStaff } from "@/lib/session";
+import { isMadeUpEmail } from "@/lib/teacher-logins";
 import { salaryTypeLabels } from "../finance/labels";
 import { TeacherDialog } from "./teacher-dialog";
 import { createTeacher, deleteTeacher, setTeacherActive, updateTeacher } from "./actions";
@@ -113,17 +114,24 @@ export default async function TeachersPage() {
             return {
               key: teacher.id,
               title: teacher.name,
-              description: teacher.phone ? formatPhone(teacher.phone) : undefined,
+              description: teacher.phone
+                ? `${formatTeacherNumber(teacher.number)}, ${formatPhone(teacher.phone)}`
+                : formatTeacherNumber(teacher.number),
               cells: {
                 Teacher: (
                   <>
                     <div className="font-medium">{teacher.name}</div>
-                    {teacher.phone && (
-                      <div className="text-xs text-muted-foreground">{formatPhone(teacher.phone)}</div>
-                    )}
+                    <div className="text-xs text-muted-foreground">
+                      {formatTeacherNumber(teacher.number)}
+                      {teacher.phone && `, ${formatPhone(teacher.phone)}`}
+                    </div>
                     {/* Made on Staff accounts, with the role Teacher. */}
                     {isAdmin && teacher.login && (
-                      <div className="text-xs text-muted-foreground">Logs in as {teacher.login.email}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {isMadeUpEmail(teacher.login.email)
+                          ? "Logs in with Teacher ID"
+                          : `Logs in as ${teacher.login.email}`}
+                      </div>
                     )}
                   </>
                 ),

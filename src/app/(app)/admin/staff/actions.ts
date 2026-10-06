@@ -5,8 +5,10 @@ import { refresh } from "next/cache";
 import { APIError } from "better-auth/api";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
+import { hasPassword } from "@/lib/passwords";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
+import { isMadeUpEmail, teacherLoginEmail } from "@/lib/teacher-logins";
 import {
   failure,
   invalid,
@@ -25,16 +27,28 @@ const accountSchema = z
   .object({
     name: requiredText("Enter the person's name.", 100),
     // The person's Google address: they sign in with Google, not a password.
+    // A teacher may have none and sign in with their Teacher ID instead.
     email: z
-      .string({ error: "Enter the person's Gmail address." })
+      .string()
       .trim()
       .toLowerCase()
-      .pipe(z.email("Enter a valid email address.")),
+      .optional()
+      .transform((email) => email || undefined),
     role: z.enum(["admin", "staff", "teacher"], { error: "Pick a role." }),
     branchId: z.string().optional(),
     teacherId: z.string().optional(),
   })
   .superRefine((value, ctx) => {
+    if (!value.email) {
+      if (value.role !== "teacher") {
+        ctx.addIssue({ code: "custom", path: ["email"], message: "Enter the person's Gmail address." });
+      }
+    } else if (!z.email().safeParse(value.email).success) {
+      ctx.addIssue({ code: "custom", path: ["email"], message: "Enter a valid email address." });
+    } else if (isMadeUpEmail(value.email)) {
+      // Those stand for a Student ID or a Teacher ID at sign-in.
+      ctx.addIssue({ code: "custom", path: ["email"], message: "Enter a real Gmail address." });
+    }
     if (value.role === "staff" && !value.branchId) {
       ctx.addIssue({
         code: "custom",
@@ -78,7 +92,11 @@ async function checkPlace({ role, branchId, teacherId }: Account, accountId?: st
     }
     if (teacher.login && teacher.login.id !== accountId) {
       return failure("Check the highlighted fields.", {
-        teacherId: [`This teacher already logs in as ${teacher.login.email}.`],
+        teacherId: [
+          isMadeUpEmail(teacher.login.email)
+            ? "This teacher already has a login."
+            : `This teacher already logs in as ${teacher.login.email}.`,
+        ],
       });
     }
   }
@@ -93,18 +111,33 @@ function placeOf({ role, branchId, teacherId }: Account) {
   };
 }
 
+/**
+ * The email the account is saved with: the Gmail address, or for a teacher
+ * without one, the made-up address their Teacher ID stands for.
+ */
+async function loginEmailOf({ email, teacherId }: Account) {
+  if (email) return email;
+  const teacher = await prisma.teacher.findUniqueOrThrow({
+    where: { id: teacherId },
+    select: { number: true },
+  });
+  return teacherLoginEmail(teacher.number);
+}
+
 export async function createStaffAccount(formData: FormData): Promise<ActionResult> {
   await requireAdmin();
   const parsed = accountSchema.safeParse(formObject(formData));
   if (!parsed.success) return invalid(parsed.error);
-  const { name, email, role } = parsed.data;
+  const { name, role } = parsed.data;
   const placeProblem = await checkPlace(parsed.data);
   if (placeProblem) return placeProblem;
+  const email = await loginEmailOf(parsed.data);
 
   try {
     // No password: the person signs in with the Google account that has this
     // email. Marked verified because the admin chose it, and Better Auth
-    // links a Google sign-in only to a verified email.
+    // links a Google sign-in only to a verified email. A teacher's password
+    // is given afterwards, on their row.
     await auth.api.createUser({
       body: {
         name,
@@ -123,6 +156,11 @@ export async function createStaffAccount(formData: FormData): Promise<ActionResu
   }
 
   refresh();
+  if (isMadeUpEmail(email)) {
+    return success(
+      `Login made for ${name}. They have no Gmail, so press Give password on their row and hand it to them.`,
+    );
+  }
   return success(`Account created for ${name}. Tell them to sign in with Google as ${email}.`);
 }
 
@@ -130,7 +168,7 @@ export async function updateStaffAccount(id: string, formData: FormData): Promis
   const admin = await requireAdmin();
   const parsed = accountSchema.safeParse(formObject(formData));
   if (!parsed.success) return invalid(parsed.error);
-  const { name, email, role } = parsed.data;
+  const { name, role } = parsed.data;
 
   // An admin who demotes themselves could leave the college with no admin.
   if (id === admin.id && role !== "admin") {
@@ -138,6 +176,7 @@ export async function updateStaffAccount(id: string, formData: FormData): Promis
   }
   const placeProblem = await checkPlace(parsed.data, id);
   if (placeProblem) return placeProblem;
+  const email = await loginEmailOf(parsed.data);
 
   const before = await prisma.user.findUniqueOrThrow({ where: { id }, select: { email: true } });
   const emailChanged = before.email !== email;
@@ -167,10 +206,14 @@ export async function updateStaffAccount(id: string, formData: FormData): Promis
   }
 
   refresh();
+  if (!emailChanged) return success("Account saved.");
+  if (!isMadeUpEmail(email)) {
+    return success(`Account saved. ${name} now signs in with Google as ${email}.`);
+  }
   return success(
-    emailChanged
-      ? `Account saved. ${name} now signs in with Google as ${email}.`
-      : "Account saved.",
+    (await hasPassword(id))
+      ? `Account saved. ${name} now signs in with their Teacher ID and password only.`
+      : `Account saved. ${name} has no Gmail now, so press Give password on their row and hand it to them.`,
   );
 }
 
@@ -180,10 +223,15 @@ export async function resetStaffPassword(id: string, formData: FormData): Promis
   const parsed = z.object({ password }).safeParse(formObject(formData));
   if (!parsed.success) return invalid(parsed.error);
 
+  // A teacher gets a temporary password instead, from Give password on their
+  // row, which they then replace with their own.
+  const account = await prisma.user.findUnique({ where: { id }, select: { teacherId: true } });
+  if (account?.teacherId) return failure("Use Reset password on the teacher's row.");
   // Better Auth would add a password to a Google-only account, and nobody on
   // staff gets a new one.
-  const hasPassword = await prisma.account.count({ where: { userId: id, providerId: "credential" } });
-  if (!hasPassword) return failure("This person signs in with Google, so there's no password to change.");
+  if (!(await hasPassword(id))) {
+    return failure("This person signs in with Google, so there's no password to change.");
+  }
 
   const requestHeaders = await headers();
   await auth.api.setUserPassword({

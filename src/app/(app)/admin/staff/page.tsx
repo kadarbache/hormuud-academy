@@ -4,10 +4,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ActionButton } from "@/components/action-button";
 import { DataTable } from "@/components/data-table";
+import { IssuePasswordButton } from "@/components/issue-password-button";
 import { PageHeader } from "@/components/page-header";
+import { formatDateTime } from "@/lib/dates";
+import { formatTeacherNumber } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
+import { isMadeUpEmail, TEMPORARY_PASSWORD_HOURS } from "@/lib/teacher-logins";
 import { ResetPasswordDialog, StaffAccountDialog } from "./staff-dialogs";
+import { TeacherLoginHistory } from "./teacher-login-history";
+import { giveTeacherPassword, removeTeacherPassword } from "./teacher-password-actions";
 import {
   createStaffAccount,
   resetStaffPassword,
@@ -29,7 +35,19 @@ export default async function StaffPage() {
         teacher: {
           select: {
             name: true,
+            number: true,
             branches: { select: { branch: { select: { name: true } } } },
+            loginEvents: {
+              orderBy: { createdAt: "desc" },
+              take: 30,
+              select: {
+                id: true,
+                action: true,
+                ipAddress: true,
+                createdAt: true,
+                by: { select: { id: true, name: true } },
+              },
+            },
           },
         },
         accounts: { select: { providerId: true } },
@@ -39,7 +57,7 @@ export default async function StaffPage() {
     prisma.teacher.findMany({
       where: { OR: [{ active: true }, { login: { isNot: null } }] },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, active: true, login: { select: { id: true } } },
+      select: { id: true, number: true, name: true, active: true, login: { select: { id: true } } },
     }),
   ]);
   const branchOptions = branches.map((branch) => ({ value: branch.id, label: branch.name }));
@@ -50,7 +68,11 @@ export default async function StaffPage() {
       .filter((teacher) =>
         teacher.login ? teacher.login.id === accountId : teacher.active,
       )
-      .map((teacher) => ({ value: teacher.id, label: teacher.name }));
+      .map((teacher) => ({
+        value: teacher.id,
+        label: `${teacher.name} (${formatTeacherNumber(teacher.number)})`,
+      }));
+  const now = new Date();
 
   return (
     <>
@@ -89,15 +111,21 @@ export default async function StaffPage() {
             account.branchId && !branchOptions.some((option) => option.value === account.branchId)
               ? [{ value: account.branchId, label: account.branch?.name ?? "Current branch" }, ...branchOptions]
               : branchOptions;
-          // Google is linked on the person's first Google sign-in. A password
-          // is left over from before Google sign-in.
+          // Google is linked on the person's first Google sign-in. Staff with
+          // a password have it from before Google sign-in; a teacher's is
+          // from the admin, under Give password.
           const hasGoogle = account.accounts.some((a) => a.providerId === "google");
           const hasPassword = account.accounts.some((a) => a.providerId === "credential");
+          // A teacher login with no Gmail has a made-up email, never shown.
+          const noGmail = isMadeUpEmail(account.email);
+          const teacher = role === "teacher" ? account.teacher : null;
+          const teacherId = teacher ? formatTeacherNumber(teacher.number) : null;
+          const shownEmail = noGmail ? "No Gmail" : account.email;
 
           return {
             key: account.id,
             title: account.name,
-            description: account.email,
+            description: noGmail ? teacherId : account.email,
             cells: {
               Name: (
                 <>
@@ -105,18 +133,19 @@ export default async function StaffPage() {
                     {account.name}
                     {isSelf && <span className="ml-2 text-xs text-muted-foreground">(you)</span>}
                   </div>
-                  <div className="text-xs text-muted-foreground">{account.email}</div>
+                  <div className="text-xs text-muted-foreground">{shownEmail}</div>
                 </>
               ),
               Role:
                 role === "admin" ? (
                   "Admin"
-                ) : role === "teacher" ? (
+                ) : teacher ? (
                   <>
                     Teacher
-                    {account.teacher && account.teacher.name !== account.name && (
-                      <div className="text-xs text-muted-foreground">{account.teacher.name}</div>
-                    )}
+                    <div className="text-xs text-muted-foreground">
+                      {teacher.name !== account.name && `${teacher.name}, `}
+                      {teacherId}
+                    </div>
                   </>
                 ) : (
                   "Branch staff"
@@ -127,7 +156,17 @@ export default async function StaffPage() {
                   : role === "teacher"
                     ? (account.teacher?.branches.map((link) => link.branch.name).join(", ") ?? "Not set")
                     : (account.branch?.name ?? "Not set"),
-              "Signs in with": hasGoogle ? (
+              "Signs in with": teacher ? (
+                <TeacherSignIn
+                  hasGoogle={hasGoogle}
+                  noGmail={noGmail}
+                  hasPassword={hasPassword}
+                  temporaryUntil={
+                    account.mustChangePassword ? account.temporaryPasswordExpires : null
+                  }
+                  now={now}
+                />
+              ) : hasGoogle ? (
                 hasPassword ? "Google or password" : "Google"
               ) : hasPassword ? (
                 "Password"
@@ -142,14 +181,16 @@ export default async function StaffPage() {
                 <Badge variant="secondary">Active</Badge>
               ),
               Actions: (
-                <div className="flex justify-end gap-1">
+                <div className="flex flex-wrap justify-end gap-1">
                   <StaffAccountDialog
                     action={updateStaffAccount.bind(null, account.id)}
                     branches={options}
                     teachers={teacherOptions(account.id)}
                     account={{
                       name: account.name,
-                      email: account.email,
+                      // Left blank, so saving keeps a teacher without Gmail that way.
+                      email: noGmail ? "" : account.email,
+                      shownAs: noGmail && teacherId ? teacherId : account.email,
                       role,
                       branchId: account.branchId,
                       teacherId: account.teacherId,
@@ -161,7 +202,51 @@ export default async function StaffPage() {
                       </Button>
                     }
                   />
-                  {hasPassword && (
+                  {teacher && teacherId && !account.banned && (
+                    <IssuePasswordButton
+                      action={giveTeacherPassword.bind(null, account.id)}
+                      who="teacher"
+                      loginId={teacherId}
+                      expiresNote={`It stops working in ${TEMPORARY_PASSWORD_HOURS} hours if they don't.`}
+                      label={hasPassword ? "Reset password" : "Give password"}
+                      variant="ghost"
+                      title={
+                        hasPassword
+                          ? `Give ${teacher.name} a new password?`
+                          : `Give ${teacher.name} a password?`
+                      }
+                      description={
+                        hasPassword
+                          ? `Their old password stops working and they're logged out everywhere. You'll see a temporary password once; it works for ${TEMPORARY_PASSWORD_HOURS} hours.`
+                          : `They'll sign in with ${teacherId} and a password${noGmail ? "" : " as well as Google"}. You'll see a temporary password once; it works for ${TEMPORARY_PASSWORD_HOURS} hours, and they choose their own the first time they sign in.`
+                      }
+                      confirmLabel={hasPassword ? "Reset password" : "Give password"}
+                    />
+                  )}
+                  {teacher && hasPassword && !noGmail && (
+                    <ActionButton
+                      variant="ghost"
+                      size="sm"
+                      action={removeTeacherPassword.bind(null, account.id)}
+                      confirm={{
+                        title: `Take away ${teacher.name}'s password?`,
+                        description:
+                          "They'll sign in with Google only, and they're logged out everywhere now.",
+                        confirmLabel: "Take it away",
+                        destructive: true,
+                      }}
+                    >
+                      Remove password
+                    </ActionButton>
+                  )}
+                  {teacher && (
+                    <TeacherLoginHistory
+                      name={teacher.name}
+                      loginId={account.id}
+                      events={teacher.loginEvents}
+                    />
+                  )}
+                  {!teacher && hasPassword && (
                     <ResetPasswordDialog
                       action={resetStaffPassword.bind(null, account.id)}
                       name={account.name}
@@ -198,6 +283,43 @@ export default async function StaffPage() {
           };
         })}
       />
+    </>
+  );
+}
+
+/** How a teacher login gets in: Google, their Teacher ID and password, or both. */
+function TeacherSignIn({
+  hasGoogle,
+  noGmail,
+  hasPassword,
+  temporaryUntil,
+  now,
+}: {
+  hasGoogle: boolean;
+  noGmail: boolean;
+  hasPassword: boolean;
+  /** When the temporary password stops working, while they're still on it. */
+  temporaryUntil: Date | null;
+  now: Date;
+}) {
+  const google = hasGoogle ? "Google" : noGmail ? null : "Google, not signed in yet";
+  const password = !hasPassword
+    ? null
+    : !temporaryUntil
+      ? "Teacher ID and password"
+      : temporaryUntil > now
+        ? `Temporary password until ${formatDateTime(temporaryUntil)}`
+        : "Temporary password, expired";
+
+  if (!google && !password) {
+    return <span className="text-muted-foreground">No way in yet. Give them a password.</span>;
+  }
+  return (
+    <>
+      {google && <div className={hasGoogle ? undefined : "text-muted-foreground"}>{google}</div>}
+      {password && (
+        <div className={temporaryUntil ? "text-xs text-muted-foreground" : undefined}>{password}</div>
+      )}
     </>
   );
 }
