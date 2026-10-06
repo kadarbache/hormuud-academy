@@ -6,7 +6,7 @@ import { collegeToday, fromDbDate } from "@/lib/dates";
 import { formatStudentNumber } from "@/lib/format";
 import { phoneEntry } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import { canEditStudent } from "../../access";
 import { updateStudent } from "../../actions";
 import { EditStudentForm } from "./edit-form";
@@ -14,7 +14,7 @@ import { EditStudentForm } from "./edit-form";
 export const metadata: Metadata = { title: "Edit student" };
 
 export default async function EditStudentPage({ params }: PageProps<"/students/[id]/edit">) {
-  const user = await requireUser();
+  const user = await requireStaff();
   const { id } = await params;
   const student = await prisma.student.findUnique({ where: { id } });
   if (!student) notFound();

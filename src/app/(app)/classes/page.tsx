@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/page-header";
 import { ActiveBadge, EmptyRow } from "@/components/status-badge";
 import { formatSlot } from "@/lib/class-times";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import { AddClassDialog, RenameClassDialog } from "./class-dialog";
 import {
   createClassroom,
@@ -20,7 +20,7 @@ import {
 export const metadata: Metadata = { title: "Classes" };
 
 export default async function ClassesPage() {
-  const user = await requireUser();
+  const user = await requireStaff();
   const isAdmin = user.role === "admin";
   // Branch staff see their own branch's classes, read-only. Changes stay
   // with the admin, and the actions check that again on the server.

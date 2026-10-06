@@ -25,7 +25,7 @@ import { formatBoth, formatMoney, formatStudentNumber } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { isPositiveMoney, sumMoney, toCents } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import {
   attendanceRate,
   formatCounts,
@@ -194,7 +194,7 @@ function RegistrationFee({
 }
 
 export default async function StudentPage({ params }: PageProps<"/students/[id]">) {
-  const user = await requireUser();
+  const user = await requireStaff();
   const { id } = await params;
   const profile = await getStudentProfile(user, id);
   if (!profile) notFound();

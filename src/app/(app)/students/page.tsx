@@ -14,7 +14,7 @@ import { SelectInput, type Option } from "@/components/select-input";
 import { EmptyRow } from "@/components/status-badge";
 import { formatStudentNumber } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
-import { requireUser } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import {
   ANY_SKILL,
   countPastEnd,
@@ -49,7 +49,7 @@ function pageHref(filters: StudentFilters, page: number) {
 }
 
 export default async function StudentsPage({ searchParams }: PageProps<"/students">) {
-  const user = await requireUser();
+  const user = await requireStaff();
   const filters = readFilters(await searchParams);
   const [{ students, total, pageCount }, skills, pastEndCount, unpaidCount] = await Promise.all([
     listStudents(user, filters),

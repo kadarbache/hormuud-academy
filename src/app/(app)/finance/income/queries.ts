@@ -3,7 +3,7 @@ import type { Currency, IncomeCategory, PaymentMethod, Prisma } from "@/generate
 import { parseStudentLookup } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { one, type SearchParams } from "@/lib/search-params";
-import type { CurrentUser } from "@/lib/session";
+import type { StaffUser } from "@/lib/session";
 import { reportBranchId, visiblePayments } from "../access";
 import { ANY, currencies, incomeCategories, paymentMethods } from "../labels";
 import { periodFilter, readPeriod, type Period } from "../period";
@@ -44,7 +44,7 @@ export function readIncomeFilters(params: SearchParams): IncomeFilters {
   };
 }
 
-export function incomeWhere(user: CurrentUser, filters: IncomeFilters): Prisma.PaymentWhereInput {
+export function incomeWhere(user: StaffUser, filters: IncomeFilters): Prisma.PaymentWhereInput {
   const conditions: Prisma.PaymentWhereInput[] = [visiblePayments(user)];
 
   const branchId = reportBranchId(user, filters.branchId);
@@ -124,7 +124,7 @@ export async function earningTeacherOptions() {
 }
 
 /** The branches a member of staff may record income at. */
-export async function recordableBranches(user: CurrentUser) {
+export async function recordableBranches(user: StaffUser) {
   const branches = await prisma.branch.findMany({
     where: { active: true, ...(user.role === "admin" ? {} : { id: user.branchId ?? "" }) },
     orderBy: { name: "asc" },

@@ -15,6 +15,8 @@ const nextConfig: NextConfig = {
     // When the connection drops, page loads and saves wait and retry once it's
     // back instead of failing. The offline banner tells staff why it's waiting.
     useOffline: true,
+    // Lets requireAdmin() call forbidden(), which shows (app)/forbidden.tsx.
+    authInterrupts: true,
   },
 };
 

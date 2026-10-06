@@ -1,5 +1,5 @@
 import type { Prisma } from "@/generated/prisma/client";
-import type { CurrentUser } from "@/lib/session";
+import type { StaffUser } from "@/lib/session";
 
 // Who sees which students.
 //
@@ -13,13 +13,13 @@ import type { CurrentUser } from "@/lib/session";
 // skill's own branch: that rule is canActAtBranch in @/lib/access.
 
 /** Enrollments the user may see and act on. */
-export function visibleEnrollments(user: CurrentUser): Prisma.EnrollmentWhereInput {
+export function visibleEnrollments(user: StaffUser): Prisma.EnrollmentWhereInput {
   if (user.role === "admin") return {};
   return { branchSkill: { branchId: user.branchId ?? "" } };
 }
 
 /** Students the user can find by name and see in the list without a lookup. */
-export function browsableStudents(user: CurrentUser): Prisma.StudentWhereInput {
+export function browsableStudents(user: StaffUser): Prisma.StudentWhereInput {
   if (user.role === "admin") return {};
   const branchId = user.branchId ?? "";
   return {
@@ -31,6 +31,6 @@ export function browsableStudents(user: CurrentUser): Prisma.StudentWhereInput {
 }
 
 /** Profile details change only at the student's home branch, or by an admin. */
-export function canEditStudent(user: CurrentUser, student: { homeBranchId: string }) {
+export function canEditStudent(user: StaffUser, student: { homeBranchId: string }) {
   return user.role === "admin" || student.homeBranchId === user.branchId;
 }

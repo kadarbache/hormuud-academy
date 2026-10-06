@@ -13,7 +13,7 @@ import { FormError } from "@/components/form-fields";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { googleSignInEnabled } from "@/lib/auth";
 import { one } from "@/lib/search-params";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, homeOf } from "@/lib/session";
 import { GoogleSignIn } from "./google-sign-in";
 import { LoginForm } from "./login-form";
 
@@ -32,7 +32,8 @@ const googleErrors: Record<string, string> = {
 };
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
-  if (await getCurrentUser()) redirect("/students");
+  const user = await getCurrentUser();
+  if (user) redirect(homeOf(user));
   const error = one(await searchParams, "error");
   const googleError = error ? (googleErrors[error] ?? "Google sign-in didn't work. Try again.") : null;
 

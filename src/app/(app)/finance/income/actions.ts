@@ -24,7 +24,7 @@ import { ledgerFields, NO_RATE_MESSAGE } from "@/lib/exchange-rate";
 import { formatMoney, parseStudentLookup } from "@/lib/format";
 import { dollarsToShillings, fromCents, inLedger, isPositiveMoney, toCents } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin, requireUser } from "@/lib/session";
+import { requireAdmin, requireStaff } from "@/lib/session";
 import { teacherShareOf } from "@/lib/teacher-share";
 import {
   currency,
@@ -104,7 +104,7 @@ export async function recordRegistrationFee(
   enrollmentId: string,
   formData: FormData,
 ): Promise<ActionResult> {
-  const user = await requireUser();
+  const user = await requireStaff();
   const values = formObject(formData);
   const parsed = z
     .object({
@@ -178,7 +178,7 @@ export async function recordMonthlyFee(
   enrollmentId: string,
   formData: FormData,
 ): Promise<ActionResult> {
-  const user = await requireUser();
+  const user = await requireStaff();
   const values = formObject(formData);
   const parsed = z
     .object({
@@ -266,7 +266,7 @@ export async function recordMonthlyFee(
  * record, but somebody walking in doesn't need to be.
  */
 export async function recordIncome(formData: FormData): Promise<ActionResult> {
-  const user = await requireUser();
+  const user = await requireStaff();
   const values = formObject(formData);
   const parsed = z
     .object({
@@ -335,7 +335,7 @@ class SoldOut extends Error {
  * raised past what the books come to.
  */
 export async function sellBooks(formData: FormData): Promise<ActionResult> {
-  const user = await requireUser();
+  const user = await requireStaff();
   const values = formObject(formData);
   const parsed = z
     .object({

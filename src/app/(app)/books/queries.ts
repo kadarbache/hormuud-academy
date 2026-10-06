@@ -1,13 +1,13 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import type { CurrentUser } from "@/lib/session";
+import type { StaffUser } from "@/lib/session";
 import type { SellableBook } from "../finance/income/sell-books-dialog";
 
 /**
  * What can be sold now at the branches this user takes money at: books on
  * the list and on sale at the branch, with copies on its shelf.
  */
-export async function sellableBooks(user: CurrentUser): Promise<SellableBook[]> {
+export async function sellableBooks(user: StaffUser): Promise<SellableBook[]> {
   const rows = await prisma.branchBook.findMany({
     where: {
       active: true,

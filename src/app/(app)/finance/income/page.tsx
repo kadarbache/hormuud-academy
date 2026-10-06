@@ -13,7 +13,7 @@ import { EmptyRow } from "@/components/status-badge";
 import { collegeToday, formatDate, formatMonth, fromDbMonth } from "@/lib/dates";
 import { currentRate } from "@/lib/exchange-rate";
 import { formatMoney, formatStudentNumber } from "@/lib/format";
-import { requireUser } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import { sellableBooks } from "../../books/queries";
 import { Amount, Breakdown, StatCard, StatRow } from "../figures";
 import {
@@ -88,7 +88,7 @@ function paidFor(payment: {
 }
 
 export default async function IncomePage({ searchParams }: PageProps<"/finance/income">) {
-  const user = await requireUser();
+  const user = await requireStaff();
   const isAdmin = user.role === "admin";
   const filters = readIncomeFilters(await searchParams);
   const where = incomeWhere(user, filters);

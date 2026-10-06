@@ -53,8 +53,8 @@ export async function signIn(formData: FormData): Promise<ActionResult> {
 
 /**
  * Sends the browser to Google. Google sends it back to Better Auth's callback,
- * which logs the person in and goes on to /students, or comes back to /login
- * with `?error=` when the Google account has no staff account here.
+ * which logs the person in and goes on to the home page, or comes back to
+ * /login with `?error=` when the Google account has no account here.
  */
 export async function signInWithGoogle() {
   const requestHeaders = await headers();
@@ -65,7 +65,7 @@ export async function signInWithGoogle() {
   // nextCookies() sets the cookie Better Auth checks when Google sends the
   // person back, so nobody can finish a sign-in someone else started.
   const { url } = await auth.api.signInSocial({
-    body: { provider: "google", callbackURL: "/students", errorCallbackURL: "/login" },
+    body: { provider: "google", callbackURL: "/", errorCallbackURL: "/login" },
     headers: requestHeaders,
   });
   if (!url) throw new Error("Better Auth returned no Google sign-in address.");

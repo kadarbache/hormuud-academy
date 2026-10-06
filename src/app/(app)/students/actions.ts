@@ -25,7 +25,7 @@ import { ledgerFields, NO_RATE_MESSAGE } from "@/lib/exchange-rate";
 import { formatMoney, formatStudentNumber, parseStudentLookup } from "@/lib/format";
 import { formatPhone, isBlankEntry, toStoredPhone } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin, requireUser } from "@/lib/session";
+import { requireAdmin, requireStaff } from "@/lib/session";
 import {
   failure,
   invalid,
@@ -236,7 +236,7 @@ function pickClassTimes<T extends { id: string; skill: { name: string }; classTi
 }
 
 export async function registerStudent(formData: FormData): Promise<ActionResult<{ id: string }>> {
-  const user = await requireUser();
+  const user = await requireStaff();
   const values = formObject(formData);
 
   const profile = profileSchema.safeParse(values);
@@ -320,7 +320,7 @@ export async function registerStudent(formData: FormData): Promise<ActionResult<
 }
 
 export async function updateStudent(id: string, formData: FormData): Promise<ActionResult<{ id: string }>> {
-  const user = await requireUser();
+  const user = await requireStaff();
   const student = await prisma.student.findUnique({ where: { id } });
   if (!student) return failure("That student no longer exists.");
   if (!canEditStudent(user, student)) {
@@ -380,7 +380,7 @@ export async function updateStudent(id: string, formData: FormData): Promise<Act
 }
 
 export async function enrollStudent(studentId: string, formData: FormData): Promise<ActionResult> {
-  const user = await requireUser();
+  const user = await requireStaff();
   const values = formObject(formData);
   const parsed = z
     .object({
@@ -453,7 +453,7 @@ export async function changeClassTime(
   enrollmentId: string,
   formData: FormData,
 ): Promise<ActionResult> {
-  const user = await requireUser();
+  const user = await requireStaff();
   const parsed = z
     .object({ classTimeId: z.string({ error: "Pick a class time." }).min(1, "Pick a class time.") })
     .safeParse(formObject(formData));
@@ -499,7 +499,7 @@ export async function setEnrollmentStatus(
   enrollmentId: string,
   status: "ACTIVE" | "FINISHED" | "DROPPED",
 ): Promise<ActionResult> {
-  const user = await requireUser();
+  const user = await requireStaff();
   const enrollment = await prisma.enrollment.findUnique({
     where: { id: enrollmentId },
     include: {
@@ -640,7 +640,7 @@ export async function deleteStudent(id: string): Promise<ActionResult> {
  * allowed across branches so the same person isn't registered twice.
  */
 export async function findStudentsByPhone(phone: string, excludeId?: string): Promise<PhoneMatch[]> {
-  await requireUser();
+  await requireStaff();
   const stored = toStoredPhone(phone);
   if (!stored) return [];
 
@@ -671,7 +671,7 @@ const PICKER_SIZE = 8;
  * searches the students this user can already browse.
  */
 export async function searchStudents(query: string): Promise<StudentMatch[]> {
-  const user = await requireUser();
+  const user = await requireStaff();
   const text = query.trim();
   if (!text) return [];
 

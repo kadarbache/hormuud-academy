@@ -4,14 +4,14 @@ import { photoUploadEnabled } from "@/lib/cloudinary";
 import { collegeToday } from "@/lib/dates";
 import { currentRate } from "@/lib/exchange-rate";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import { enrollableBranchSkills } from "../queries";
 import { RegistrationForm } from "./registration-form";
 
 export const metadata: Metadata = { title: "Register student" };
 
 export default async function NewStudentPage() {
-  const user = await requireUser();
+  const user = await requireStaff();
   const isAdmin = user.role === "admin";
 
   const [branches, fixedBranch, branchSkills, rate] = await Promise.all([

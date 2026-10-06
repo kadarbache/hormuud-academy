@@ -17,7 +17,7 @@ import { formatMoney, formatMonths, formatStudentNumber } from "@/lib/format";
 import { isPositiveMoney } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import { recentClassDays } from "../../attendance/days";
 import { formatShortDay } from "../../attendance/labels";
 
@@ -81,7 +81,7 @@ export default async function ClassTimePage({
   params,
   searchParams,
 }: PageProps<"/class-times/[id]">) {
-  const user = await requireUser();
+  const user = await requireStaff();
   const isAdmin = user.role === "admin";
   const { id } = await params;
   const { status } = await searchParams;

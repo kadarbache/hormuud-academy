@@ -5,7 +5,7 @@ import { parseStudentLookup } from "@/lib/format";
 import { subtractMoney, sumMoney, toCents } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import { one, type SearchParams } from "@/lib/search-params";
-import type { CurrentUser } from "@/lib/session";
+import type { StaffUser } from "@/lib/session";
 import { visibleEnrollments } from "../../students/access";
 import { reportBranchId } from "../access";
 import { feeMonths } from "../fee-months";
@@ -60,7 +60,7 @@ export type OwedStudent = {
   owed: string;
 };
 
-export async function listOwed(user: CurrentUser, filters: OwedFilters) {
+export async function listOwed(user: StaffUser, filters: OwedFilters) {
   const conditions: Prisma.EnrollmentWhereInput[] = [visibleEnrollments(user)];
 
   const branchId = reportBranchId(user, filters.branchId);

@@ -16,7 +16,7 @@ import { ActiveBadge, EmptyRow } from "@/components/status-badge";
 import { formatDateTime } from "@/lib/dates";
 import { formatMoney, formatStudentNumber } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import {
   addBranchBook,
   addCopies,
@@ -45,7 +45,7 @@ function signed(quantity: number) {
 }
 
 export default async function BookPage({ params }: PageProps<"/books/[id]">) {
-  const user = await requireUser();
+  const user = await requireStaff();
   const isAdmin = user.role === "admin";
   const { id } = await params;
   const book = await prisma.book.findUnique({

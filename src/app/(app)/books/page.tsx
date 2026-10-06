@@ -9,7 +9,7 @@ import { collegeToday } from "@/lib/dates";
 import { currentRate } from "@/lib/exchange-rate";
 import { formatMoney } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
-import { requireUser, type CurrentUser } from "@/lib/session";
+import { requireStaff, type StaffUser } from "@/lib/session";
 import { sellBooks } from "../finance/income/actions";
 import { recordableBranches } from "../finance/income/queries";
 import { SellBooksDialog } from "../finance/income/sell-books-dialog";
@@ -78,7 +78,7 @@ async function AdminBooks() {
 }
 
 /** The books one branch sells, with its shelf and the buttons to keep it right. */
-async function BranchBooks({ user }: { user: CurrentUser }) {
+async function BranchBooks({ user }: { user: StaffUser }) {
   const shelves = await prisma.branchBook.findMany({
     where: { branchId: user.branchId ?? "" },
     orderBy: { book: { title: "asc" } },
@@ -147,7 +147,7 @@ async function BranchBooks({ user }: { user: CurrentUser }) {
 }
 
 export default async function BooksPage() {
-  const user = await requireUser();
+  const user = await requireStaff();
   const isAdmin = user.role === "admin";
   const [branches, onShelf, rate] = await Promise.all([
     recordableBranches(user),

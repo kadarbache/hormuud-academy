@@ -81,14 +81,15 @@ export const auth = betterAuth({
     additionalFields: {
       // Set by the admin only, never from a sign-in form.
       branchId: { type: "string", required: false, input: false },
+      teacherId: { type: "string", required: false, input: false },
     },
   },
   plugins: [
     admin({
-      // Admins manage staff accounts. Branch staff get none of the admin
-      // plugin's permissions; what they may do with students is checked in
-      // our own code (src/lib/session.ts and each feature's actions).
-      roles: { admin: adminAc, staff: userAc },
+      // Admins manage staff accounts. Branch staff and teachers get none of
+      // the admin plugin's permissions; what they may do is checked in our
+      // own code (src/lib/session.ts and each feature's actions).
+      roles: { admin: adminAc, staff: userAc, teacher: userAc },
       defaultRole: "staff",
       adminRoles: ["admin"],
     }),

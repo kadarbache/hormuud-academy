@@ -144,6 +144,17 @@ const financeItems: NavItem[] = [
   },
 ];
 
+// A teacher's login: their own class times' attendance and their own pay.
+const teacherItems: NavItem[] = [
+  {
+    href: "/attendance",
+    label: "Attendance",
+    icon: ClipboardCheck,
+    match: (pathname) => under("/attendance")(pathname) || under("/class-times")(pathname),
+  },
+  { href: "/my-pay", label: "My pay", icon: HandCoins, match: under("/my-pay") },
+];
+
 const adminItems: NavItem[] = [
   { href: "/admin/branches", label: "Branches", icon: Building2, match: under("/admin/branches") },
   { href: "/admin/skills", label: "Skills", icon: BookOpen, match: under("/admin/skills") },
@@ -179,7 +190,8 @@ function NavMenu({ items, pathname }: { items: NavItem[]; pathname: string }) {
 export function AppSidebar({
   user,
 }: {
-  user: { name: string; email: string; role: Role; branchName: string | null };
+  /** `place` is where they work: all branches, their branch, or a teacher's branches. */
+  user: { name: string; email: string; role: Role; place: string };
 }) {
   const pathname = usePathname();
 
@@ -195,14 +207,23 @@ export function AppSidebar({
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Students</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <NavMenu items={studentItems} pathname={pathname} />
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {user.role === "teacher" ? (
+          <SidebarGroup>
+            <SidebarGroupLabel>Teaching</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <NavMenu items={teacherItems} pathname={pathname} />
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ) : (
+          <SidebarGroup>
+            <SidebarGroupLabel>Students</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <NavMenu items={studentItems} pathname={pathname} />
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
-        {user.role === "admin" ? (
+        {user.role === "teacher" ? null : user.role === "admin" ? (
           <>
             <SidebarGroup>
               <SidebarGroupLabel>Money</SidebarGroupLabel>
@@ -232,7 +253,11 @@ export function AppSidebar({
         <div className="px-2 py-1.5 text-sm">
           <p className="truncate font-medium">{user.name}</p>
           <p className="truncate text-xs text-muted-foreground">
-            {user.role === "admin" ? "Admin, all branches" : `Staff, ${user.branchName ?? "no branch"}`}
+            {user.role === "admin"
+              ? "Admin, all branches"
+              : user.role === "teacher"
+                ? `Teacher, ${user.place}`
+                : `Staff, ${user.place}`}
           </p>
         </div>
         <SidebarMenu>

@@ -5,7 +5,7 @@ import { collegeToday, toDbDate } from "@/lib/dates";
 import { parseStudentLookup } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { one, type SearchParams } from "@/lib/search-params";
-import type { CurrentUser } from "@/lib/session";
+import type { StaffUser } from "@/lib/session";
 import { browsableStudents, visibleEnrollments } from "./access";
 import type { BranchSkillOption, ClassTimeOption } from "./types";
 
@@ -68,7 +68,7 @@ export function readFilters(params: SearchParams): StudentFilters {
   };
 }
 
-export async function listStudents(user: CurrentUser, filters: StudentFilters) {
+export async function listStudents(user: StaffUser, filters: StudentFilters) {
   const today = toDbDate(collegeToday());
   const enrollmentScope = visibleEnrollments(user);
   const lookup = filters.q ? parseStudentLookup(filters.q) : null;
@@ -155,7 +155,7 @@ export async function listStudents(user: CurrentUser, filters: StudentFilters) {
 }
 
 /** How many of this user's active enrollments are past their end date. */
-export function countPastEnd(user: CurrentUser) {
+export function countPastEnd(user: StaffUser) {
   return prisma.enrollment.count({
     where: {
       ...visibleEnrollments(user),
@@ -166,14 +166,14 @@ export function countPastEnd(user: CurrentUser) {
 }
 
 /** How many registration fees at this user's branches are still unpaid. */
-export function countUnpaidRegistrationFees(user: CurrentUser) {
+export function countUnpaidRegistrationFees(user: StaffUser) {
   return prisma.enrollment.count({
     where: { ...visibleEnrollments(user), ...unpaidRegistrationFee },
   });
 }
 
 /** Skills for the list filter: the user's branch, or all of them for an admin. */
-export function skillFilterOptions(user: CurrentUser) {
+export function skillFilterOptions(user: StaffUser) {
   return prisma.skill.findMany({
     where:
       user.role === "admin"
@@ -184,7 +184,7 @@ export function skillFilterOptions(user: CurrentUser) {
   });
 }
 
-export async function getStudentProfile(user: CurrentUser, id: string) {
+export async function getStudentProfile(user: StaffUser, id: string) {
   const student = await prisma.student.findUnique({
     where: { id },
     include: {

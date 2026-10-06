@@ -12,7 +12,8 @@ export function LoginForm() {
   const router = useRouter();
   const { pending, fieldErrors, formError, onSubmit } = useFormAction(signIn, {
     onSuccess: () => {
-      router.replace("/students");
+      // The home page sends staff to Students and a teacher to Attendance.
+      router.replace("/");
       router.refresh();
     },
   });

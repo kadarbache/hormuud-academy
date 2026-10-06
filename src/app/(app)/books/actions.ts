@@ -13,7 +13,7 @@ import {
 } from "@/lib/action-result";
 import { isPositiveMoney } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin, requireUser } from "@/lib/session";
+import { requireAdmin, requireStaff } from "@/lib/session";
 import { formObject, money, optionalText, requiredId, requiredText } from "@/lib/validation";
 import { copies } from "./labels";
 
@@ -218,7 +218,7 @@ const copiesField = (message: string, min: number) =>
 
 /** A branch book the user may change the count of, with what the messages need. */
 async function findShelf(id: string) {
-  const user = await requireUser();
+  const user = await requireStaff();
   const branchBook = await prisma.branchBook.findUnique({
     where: { id },
     include: { book: { select: { title: true } }, branch: { select: { name: true } } },

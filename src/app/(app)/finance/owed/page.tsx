@@ -13,7 +13,7 @@ import { EmptyRow } from "@/components/status-badge";
 import { formatMonth } from "@/lib/dates";
 import { formatMoney, formatStudentNumber } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
-import { requireUser } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import { StatCard, StatRow } from "../figures";
 import { ANY, withAnyOption } from "../labels";
 import { branchOptions } from "../income/queries";
@@ -52,7 +52,7 @@ function owedFor(skill: OwedSkill) {
 }
 
 export default async function OwedPage({ searchParams }: PageProps<"/finance/owed">) {
-  const user = await requireUser();
+  const user = await requireStaff();
   const isAdmin = user.role === "admin";
   const filters = readOwedFilters(await searchParams);
 

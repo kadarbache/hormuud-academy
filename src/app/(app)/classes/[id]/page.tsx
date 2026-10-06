@@ -9,7 +9,7 @@ import { EmptyRow } from "@/components/status-badge";
 import { formatHours, slotOf, WEEKDAYS, type Slot } from "@/lib/class-times";
 import { inUse } from "@/lib/clashes";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 
 export async function generateMetadata({ params }: PageProps<"/classes/[id]">): Promise<Metadata> {
   const { id } = await params;
@@ -35,7 +35,7 @@ type Entry = {
  * ones, and deactivated ones that still have students coming.
  */
 export default async function ClassTimetablePage({ params }: PageProps<"/classes/[id]">) {
-  const user = await requireUser();
+  const user = await requireStaff();
   const isAdmin = user.role === "admin";
   const { id } = await params;
   const classroom = await prisma.classroom.findUnique({

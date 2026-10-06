@@ -1,5 +1,5 @@
 import type { Prisma } from "@/generated/prisma/client";
-import type { CurrentUser } from "@/lib/session";
+import type { StaffUser } from "@/lib/session";
 
 // Who sees which money.
 //
@@ -12,7 +12,7 @@ import type { CurrentUser } from "@/lib/session";
 // that decides who may enroll a student.
 
 /** Payments the user may see. */
-export function visiblePayments(user: CurrentUser): Prisma.PaymentWhereInput {
+export function visiblePayments(user: StaffUser): Prisma.PaymentWhereInput {
   if (user.role === "admin") return {};
   return { branchId: user.branchId ?? "" };
 }
@@ -21,7 +21,7 @@ export function visiblePayments(user: CurrentUser): Prisma.PaymentWhereInput {
  * The branch to report on: the one the admin picked, or the staff member's
  * own whatever the query string asks for. Null means every branch.
  */
-export function reportBranchId(user: CurrentUser, requested: string): string | null {
+export function reportBranchId(user: StaffUser, requested: string): string | null {
   if (user.role !== "admin") return user.branchId ?? "";
   return requested || null;
 }
