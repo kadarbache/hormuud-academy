@@ -154,6 +154,7 @@ const teacherItems: NavItem[] = [
     match: (pathname) => under("/attendance")(pathname) || under("/class-times")(pathname),
   },
   { href: "/my-pay", label: "My pay", icon: HandCoins, match: under("/my-pay") },
+  { href: "/password", label: "Password", icon: KeyRound, match: under("/password") },
 ];
 
 // A student's login: their own record, read-only, in the portal.
@@ -212,8 +213,8 @@ export function AppSidebar({
   /**
    * `place` is where they work or study: all branches, their branch, a
    * teacher's branches or a student's home branch. `locked` hides the menu
-   * from a student who must choose a password first, since every page would
-   * only send them back.
+   * from a student or teacher who must choose a password first, since every
+   * page would only send them back.
    */
   user: { name: string; email: string; role: Role; place: string; locked?: boolean };
 }) {
@@ -241,12 +242,14 @@ export function AppSidebar({
             </SidebarGroup>
           )
         ) : user.role === "teacher" ? (
-          <SidebarGroup>
-            <SidebarGroupLabel>Teaching</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <NavMenu items={teacherItems} pathname={pathname} />
-            </SidebarGroupContent>
-          </SidebarGroup>
+          !user.locked && (
+            <SidebarGroup>
+              <SidebarGroupLabel>Teaching</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <NavMenu items={teacherItems} pathname={pathname} />
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )
         ) : (
           <SidebarGroup>
             <SidebarGroupLabel>Students</SidebarGroupLabel>

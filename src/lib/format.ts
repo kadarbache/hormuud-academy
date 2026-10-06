@@ -16,6 +16,22 @@ export function parseStudentNumber(text: string) {
   return match ? Number(match[1]) : null;
 }
 
+const TEACHER_NUMBER = /^\s*tch[\s-]*0*(\d{1,9})\s*$/i;
+
+/** 7 -> "TCH-00007" */
+export function formatTeacherNumber(number: number) {
+  return `TCH-${String(number).padStart(5, "0")}`;
+}
+
+/**
+ * "TCH-00007" or "tch7" -> 7. A bare number is a Student ID, so a Teacher ID
+ * always needs its "TCH".
+ */
+export function parseTeacherNumber(text: string) {
+  const match = TEACHER_NUMBER.exec(text);
+  return match ? Number(match[1]) : null;
+}
+
 export type StudentLookup =
   | { kind: "number"; number: number }
   | { kind: "phone"; phone: string }

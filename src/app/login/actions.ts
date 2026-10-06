@@ -7,9 +7,11 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { failure, invalid, success, type ActionResult } from "@/lib/action-result";
 import { formObject } from "@/lib/validation";
-import { parseStudentNumber } from "@/lib/format";
+import { parseStudentNumber, parseTeacherNumber } from "@/lib/format";
+import { prisma } from "@/lib/prisma";
 import { clientIp, consumeRateLimit } from "@/lib/rate-limit";
 import { studentLoginEmail } from "@/lib/student-logins";
+import { teacherLoginEmail } from "@/lib/teacher-logins";
 
 // Per account, to stop guessing one person's password from many machines.
 // Per IP, to stop one machine trying many accounts. A whole class signing in
@@ -20,30 +22,55 @@ const IP_LIMIT = { window: 60, max: 60 };
 const GOOGLE_IP_LIMIT = { window: 60, max: 20 };
 
 const signInSchema = z.object({
-  login: z.string().trim().min(1, "Enter your email or Student ID."),
+  login: z.string().trim().min(1, "Enter your email, Student ID or Teacher ID."),
   password: z.string().min(1, "Enter your password."),
 });
 
+type Who = { email: string; kind: "staff" | "student" | "teacher" };
+
 /**
- * Staff sign in with an email, a student with their Student ID. The ID
- * stands for the made-up email on the student's login.
+ * Staff sign in with an email, a student with their Student ID and a teacher
+ * with their Teacher ID or their email. A Student ID stands for the made-up
+ * email on the student's login. A Teacher ID stands for whatever email the
+ * teacher's login has, their Gmail or a made-up one; a Teacher ID with no
+ * login still gets a made-up one, so it's refused like a wrong password.
  */
-function loginEmail(login: string) {
+async function loginEmail(login: string): Promise<Who | null> {
   if (login.includes("@")) {
     const email = z.email().safeParse(login.toLowerCase());
-    return email.success ? { email: email.data, student: false } : null;
+    return email.success ? { email: email.data, kind: "staff" } : null;
+  }
+  const teacherNumber = parseTeacherNumber(login);
+  if (teacherNumber !== null) {
+    const account = await prisma.user.findFirst({
+      where: { teacher: { number: teacherNumber } },
+      select: { email: true },
+    });
+    return { email: account?.email ?? teacherLoginEmail(teacherNumber), kind: "teacher" };
   }
   const number = parseStudentNumber(login);
-  return number === null ? null : { email: studentLoginEmail(number), student: true };
+  return number === null ? null : { email: studentLoginEmail(number), kind: "student" };
 }
+
+const wrong: Record<Who["kind"], string> = {
+  staff: "Wrong email or password.",
+  student: "Wrong Student ID or password.",
+  teacher: "Wrong Teacher ID or password.",
+};
+
+const turnedOff: Record<Who["kind"], string> = {
+  staff: "This account has been deactivated. Ask the admin to turn it back on.",
+  student: "Your login has been turned off. Ask at your branch.",
+  teacher: "Your login has been turned off. Ask the admin.",
+};
 
 export async function signIn(formData: FormData): Promise<ActionResult> {
   const parsed = signInSchema.safeParse(formObject(formData));
   if (!parsed.success) return invalid(parsed.error);
-  const who = loginEmail(parsed.data.login);
+  const who = await loginEmail(parsed.data.login);
   if (!who) {
     return failure("Check the highlighted fields.", {
-      login: ["Enter your email, or a Student ID like STU-00042."],
+      login: ["Enter your email, or an ID like STU-00042 or TCH-00007."],
     });
   }
 
@@ -66,14 +93,13 @@ export async function signIn(formData: FormData): Promise<ActionResult> {
     });
   } catch (error) {
     if (error instanceof APIError) {
-      if (error.body?.code === "BANNED_USER") {
-        return failure(
-          who.student
-            ? "Your login has been turned off. Ask at your branch."
-            : "This account has been deactivated. Ask the admin to turn it back on.",
-        );
+      if (error.body?.code === "BANNED_USER") return failure(turnedOff[who.kind]);
+      // Only reached with the right password (see the session hook in
+      // src/lib/auth.ts), so it tells nobody else anything.
+      if (error.body?.code === "temporary_password_expired") {
+        return failure("This temporary password has expired. Ask the admin for a new one.");
       }
-      return failure(who.student ? "Wrong Student ID or password." : "Wrong email or password.");
+      return failure(wrong[who.kind]);
     }
     throw error;
   }

@@ -48,8 +48,8 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           </div>
           <CardTitle className="text-xl">Hormuud Academy</CardTitle>
           <CardDescription>
-            {googleSignInEnabled ? "Staff sign in with Google. " : ""}Students use their
-            Student ID and the password from their branch.
+            {googleSignInEnabled ? "Staff sign in with Google. " : ""}Students and teachers can
+            use their ID and password.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">

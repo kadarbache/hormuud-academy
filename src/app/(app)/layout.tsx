@@ -3,7 +3,9 @@ import { requireSignedIn } from "@/lib/session";
 import { AppShell } from "./app-shell";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const user = await requireSignedIn();
+  // Pages send a teacher still on a temporary password to choose their own;
+  // until then the menu is hidden, since every page would only send them back.
+  const user = await requireSignedIn({ onTemporaryPassword: true });
   const branch =
     user.role === "staff" && user.branchId
       ? await prisma.branch.findUnique({
@@ -32,7 +34,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const missingBranch = user.role === "staff" && !branch;
 
   return (
-    <AppShell user={{ name: user.name, email: user.email, role: user.role, place }}>
+    <AppShell
+      user={{
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        place,
+        locked: user.role === "teacher" && user.mustChangePassword,
+      }}
+    >
       {missingBranch ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
           Your account isn&apos;t linked to a branch yet. Ask the admin to set your branch.

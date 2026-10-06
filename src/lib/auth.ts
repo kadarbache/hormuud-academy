@@ -22,7 +22,9 @@ export const auth = betterAuth({
     enabled: true,
     // Nobody signs up. The admin creates every staff account.
     disableSignUp: true,
-    // Students sign in with a password. Staff and teachers use Google.
+    // Students sign in with a password, and teachers can, with Google or
+    // instead of it. Staff use Google. A teacher's own password is held to
+    // more than this (src/lib/teacher-logins.ts).
     minPasswordLength: 8,
   },
   socialProviders: googleClient
@@ -81,6 +83,52 @@ export const auth = betterAuth({
             throw APIError.from("FORBIDDEN", {
               code: "student_google",
               message: "Students sign in with their Student ID.",
+            });
+          }
+        },
+      },
+    },
+    session: {
+      create: {
+        // A session is made only once the password is checked, so refusing
+        // here never tells a guesser that a temporary password has expired.
+        // It applies to a password sign-in only: a teacher whose temporary
+        // password ran out can still come in with Google.
+        before: async (session, context) => {
+          if (context?.path !== "/sign-in/email") return;
+          const user = await prisma.user.findUnique({
+            where: { id: session.userId },
+            select: { mustChangePassword: true, temporaryPasswordExpires: true },
+          });
+          const expires = user?.mustChangePassword ? user.temporaryPasswordExpires : null;
+          if (expires && expires <= new Date()) {
+            throw APIError.from("FORBIDDEN", {
+              code: "temporary_password_expired",
+              message: "This temporary password has expired.",
+            });
+          }
+        },
+        // Every time a teacher gets in, kept with how and from where.
+        after: async (session, context) => {
+          const action =
+            context?.path === "/sign-in/email"
+              ? "SIGNED_IN_WITH_PASSWORD"
+              : context?.path?.startsWith("/callback/")
+                ? "SIGNED_IN_WITH_GOOGLE"
+                : null;
+          if (!action) return;
+          const user = await prisma.user.findUnique({
+            where: { id: session.userId },
+            select: { teacherId: true },
+          });
+          if (user?.teacherId) {
+            await prisma.teacherLoginEvent.create({
+              data: {
+                teacherId: user.teacherId,
+                action,
+                byId: session.userId,
+                ipAddress: session.ipAddress || null,
+              },
             });
           }
         },

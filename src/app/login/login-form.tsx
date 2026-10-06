@@ -23,7 +23,7 @@ export function LoginForm() {
     <form onSubmit={onSubmit} noValidate>
       <FieldGroup>
         <TextField
-          label="Email or Student ID"
+          label="Email, Student ID or Teacher ID"
           name="login"
           autoComplete="username"
           autoCapitalize="none"
