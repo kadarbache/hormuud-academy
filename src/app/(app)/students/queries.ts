@@ -255,6 +255,39 @@ export async function getStudentProfile(user: StaffUser, id: string) {
   };
 }
 
+/**
+ * The student's portal login and what staff have done to it, newest first, or
+ * null when this user can't manage it: the admin can, and staff at any
+ * branch the student belongs to, the same students they see in their list.
+ */
+export async function getStudentLogin(user: StaffUser, studentId: string) {
+  const student = await prisma.student.findFirst({
+    where: { id: studentId, ...browsableStudents(user) },
+    select: {
+      login: {
+        select: { banned: true, mustChangePassword: true },
+      },
+      loginEvents: {
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        select: {
+          id: true,
+          action: true,
+          createdAt: true,
+          by: { select: { name: true } },
+          branch: { select: { name: true } },
+        },
+      },
+    },
+  });
+  if (!student) return null;
+  const { login, loginEvents } = student;
+  return {
+    login: login && { on: !login.banned, mustChangePassword: login.mustChangePassword },
+    events: loginEvents,
+  };
+}
+
 /** Skills a student can join now: open at an active branch, in an active skill. */
 export async function enrollableBranchSkills(branchId?: string): Promise<BranchSkillOption[]> {
   const rows = await prisma.branchSkill.findMany({

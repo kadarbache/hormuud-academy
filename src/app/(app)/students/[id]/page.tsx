@@ -46,9 +46,10 @@ import {
   enrollStudent,
   setEnrollmentStatus,
 } from "../actions";
-import { enrollableBranchSkills, getStudentProfile } from "../queries";
+import { enrollableBranchSkills, getStudentLogin, getStudentProfile } from "../queries";
 import { ChangeClassTimeDialog } from "./change-class-time-dialog";
 import { EnrollDialog } from "./enroll-dialog";
+import { PortalLogin } from "./portal-login";
 import {
   ChangeFeeDialog,
   RecordMonthlyFeeDialog,
@@ -202,11 +203,12 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
   const isAdmin = user.role === "admin";
   const canEdit = canEditStudent(user, student);
   const today = collegeToday();
-  const [rate, sellingBranches, onShelf, attendance] = await Promise.all([
+  const [rate, sellingBranches, onShelf, attendance, portalLogin] = await Promise.all([
     currentRate(),
     recordableBranches(user),
     sellableBooks(user),
     marksByEnrollment(student.enrollments.map((enrollment) => enrollment.id)),
+    getStudentLogin(user, student.id),
   ]);
   // The admin sees every enrollment, so this is the student's whole record.
   const paidAMonthlyFee = student.enrollments.some((enrollment) =>
@@ -305,7 +307,7 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
               confirm={{
                 title: `Delete ${student.fullName}?`,
                 description:
-                  "Only for duplicates and typing mistakes. The student, every skill record they have and every payment they made go for good, which changes the income already recorded for those days. Only books they bought stay sold, with no student named.",
+                  "Only for duplicates and typing mistakes. The student, every skill record they have, their portal login and every payment they made go for good, which changes the income already recorded for those days. Only books they bought stay sold, with no student named.",
                 confirmLabel: "Delete student",
                 destructive: true,
               }}
@@ -335,6 +337,15 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
           </dl>
         </CardContent>
       </Card>
+
+      {/* Staff who found the student by ID at another branch don't manage their login. */}
+      {portalLogin && (
+        <PortalLogin
+          studentId={student.id}
+          studentNumber={formatStudentNumber(student.number)}
+          data={portalLogin}
+        />
+      )}
 
       <section className="space-y-3">
         <div>
