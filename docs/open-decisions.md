@@ -117,12 +117,11 @@ that a student moved to another class time was listed, Present, on the new
 class time's sheets taken late for days their old class time had already
 marked them, which counted those days twice in their rate. They are now left
 off those days; checked against the Neon test database in a transaction
-that was rolled back. Committed on local `main` (`56598dd` to `798ec27`, then
-this note), not pushed.
+that was rolled back. Live since 5 Oct 2026: production (`ep-square-silence`)
+was backed up and got the `20261005120000_attendance` migration, then `main`
+was pushed (up to `6359e74`), and attendance was checked on the live site.
 The Neon test database (`ep-polished-paper`) got the `books` and `attendance`
-migrations on 5 Oct 2026. Production (`ep-square-silence`) still needs the
-`20261005120000_attendance` migration applied, after a backup, *before* the push, or every class time page and student page
-breaks. Four attendance sheets are in the local database. Two are from
+migrations the same day. Four attendance sheets are in the local database. Two are from
 this testing (Main Branch Computer Basics 4–6 pm, 4 and 5 Oct). The other two
 (Computer Basics at Import Test Branch, 28 Sep and 3 Oct, 21 students each)
 were taken by the admin account soon after, by someone else.
