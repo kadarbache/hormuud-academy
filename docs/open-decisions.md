@@ -109,6 +109,37 @@ open:
 
 ## Still to do (no decision needed)
 
+**Teacher passwords, before they go live.** Built on 6 Oct 2026. `pnpm lint`
+and `pnpm build` pass. Tried the same day with a script against the Neon test
+database, through the real Better Auth setup, on a throwaway login for TCH-00001
+with no Gmail, deleted afterwards: a login with no password refused; a
+password added to it, temporary, ending 48 hours later; a wrong password
+refused and the temporary one let in, with the sign-in recorded; once it had
+expired, the right temporary password refused ("temporary_password_expired")
+with no session made, while a wrong one still said only "wrong"; the
+teacher's own password cleared the temporary flag and replaced the old one; a
+deactivated login refused; a removed password refused. The password rules,
+after the word check was dropped, refuse a short one, `1234567890`, a phone
+number and the Teacher ID, and allow `teacher6160!!`, `Password123!` and
+`hormuud2026`. On the production build, `/api/auth/link-social`
+and `/api/auth/change-password` answered 404, `/password` sent a signed-out
+visitor to the login page, and `TCH-00099` with a made-up password showed
+"Wrong Teacher ID or password". The existing teachers got TCH-00001 to TCH-00006
+in the order they were added.
+
+The auto-mode classifier stopped me signing the browser pane in as the admin,
+so the signed-in screens were left to the user. They got as far as Choose your
+password as TCH-00002 (Demo Teacher 2), which is how the too-strict word check
+was found. Still to run through by hand before it goes live: saving a password
+there, the Password page, Reset password, Remove password, History, and a
+teacher login with no Gmail.
+
+Production (`ep-square-silence`) needs `20261006150000_teacher_passwords`
+applied after a backup, *before* the push: Better Auth reads
+`temporaryPasswordExpires` on every sign-in, and the Staff and Teachers pages
+read each teacher's number. It changes no existing account. The Neon test
+database (`ep-polished-paper`) has it already.
+
 **Student logins, before they go live.** Built on 6 Oct 2026 and tried in the
 browser on a production build against the Neon test database the same day.
 As Main Branch Staff: Create login on STU-00001 showed the temporary password
@@ -410,6 +441,35 @@ import. Reset it in the Neon console right after the import, then update
 changed.
 
 ## Decided
+
+- **Teacher passwords.** Asked on 6 Oct 2026 ("lets make the sign in process
+  of a teacher same as the student sign in. do you think that is secure?").
+  The answer was mostly yes: a password alone is weaker than Google, and a
+  teacher's login can change attendance, which a student's can't, so it gets
+  more care. Built the same day; see "Still to do". (6 Oct 2026)
+  - Google stays. A teacher signs in with Google, with their Teacher ID and a
+    password, or either.
+  - Every teacher gets a Teacher ID, `TCH-00001` upward, numbered in the order
+    they were added. A bare number stays a Student ID, so a Teacher ID always
+    needs its `TCH`.
+  - Gmail is optional for a teacher's login. Without one the login gets a
+    made-up email (`tch-00007@teachers.invalid`) and the password is its only
+    way in.
+  - Only the admin gives, resets or takes away a teacher's password, on Staff
+    accounts. Branch staff can't. A reset logs the teacher out everywhere.
+  - The admin's temporary password stops working after 48 hours. The
+    teacher's own must be at least 10 characters, not only numbers, and
+    without their Teacher ID. A check refusing common words and the teacher's
+    name was built first and dropped the same day, after it refused
+    `teacher6160!!` for Demo Teacher 2: the 5-tries-a-minute limit on
+    sign-in is what stops a guesser.
+  - Every password change and every sign-in, Google or password, is recorded
+    with the address it came from, and the admin sees it under History.
+  - Students keep their rules as they were: no expiry and 8 characters. The
+    common-password check was offered for students too and turned down.
+  - Better Auth's own `/link-social` and `/change-password` are switched off
+    for everyone, since the app never uses them and each gets around its
+    rules.
 
 - **Student logins and the portal.** Asked on 6 Oct 2026 ("now let's work on
   the student signin"). Most of it was talked through on 24 Sep 2026 and
