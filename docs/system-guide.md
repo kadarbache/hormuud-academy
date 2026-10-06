@@ -64,18 +64,19 @@ A monthly fee payment names the **month it pays for**, not just the day the mone
 
 Books follow the skills' pattern. A **book** is on one list for the whole college with a default price, and each branch that sells it gets a **branch book** with its own price and its own **stock**, the copies on its shelf. Selling books is a payment in the Books category with a line per title, and the copies come off that branch's shelf as the sale is recorded. The stock is the one count the system does store, because two people mustn't sell the last copy; every delivery and fixed count is kept beside it, so it can always be checked.
 
-Attendance hangs off the class time. On each day a class time meets, staff take its **attendance sheet**: everyone in it that day, each marked Present, Absent, Late or Excused. The mark belongs to the enrollment, so a student's **attendance rate** for a skill is counted over every sheet they were on: the days they came, Late included, out of the days that count. Excused days count neither way, and so do days nobody took.
+Attendance hangs off the class time. On each day a class time meets, staff or its teacher take its **attendance sheet**: everyone in it that day, each marked Present, Absent, Late or Excused. The mark belongs to the enrollment, so a student's **attendance rate** for a skill is counted over every sheet they were on: the days they came, Late included, out of the days that count. Excused days count neither way, and so do days nobody took.
 
 Fees are set in dollars, but a student can pay in dollars or in Somaliland shillings. The two are never added together: every screen shows dollars and shillings separately, and underneath them what the two are worth together in dollars at today's rate. The admin sets the exchange rate on the Settings page. Each shilling payment keeps the rate it was recorded at, like a receipt, while the totals always use today's.
 
-Two kinds of people log in:
+Three kinds of people log in:
 
 - **Admins** see every branch and set everything up.
 - **Branch staff** work at one branch. They register students, look after those students' skills and take attendance at that branch.
+- **Teachers**, once the admin gives them a login. A teacher sees only the class times they teach: they take today's attendance for them and can read the days before. They also see their own pay, and nothing else.
 
 Nobody signs up on their own. The admin creates every account, and the person signs in with the Google account for that account's email. Passwords from before Google sign-in still work until the switch-over finishes.
 
-Phase 1 was the college itself: branches, skills, teachers, classes, students and enrollments. Phase 2 is the money described above. Phase 3 has begun with attendance, taken by staff for now; teachers will take it themselves once they can sign in. Exams and certificates aren't built yet, and the last section lists everything else that's missing.
+Phase 1 was the college itself: branches, skills, teachers, classes, students and enrollments. Phase 2 is the money described above. Phase 3 has begun with attendance, which staff take at their branch and teachers take for their own class times. Exams and certificates aren't built yet, and the last section lists everything else that's missing.
 
 ## Technology stack
 
@@ -136,7 +137,7 @@ Better Auth handles everything about logging in:
 
 - It checks emails and passwords and stores only a hash of each password, never the password itself.
 - It creates a **session** when someone logs in, stores it in the `session` table, and gives the browser a `better-auth.session_token` cookie. A login lasts 7 days and is extended while the person keeps using the app.
-- The **admin plugin** adds roles (`admin` and `staff`), lets an admin create accounts and set passwords, and **bans** accounts. In this app, "Deactivate" on a staff account is a ban. A ban also ends the person's open sessions.
+- The **admin plugin** adds roles (`admin`, `staff` and `teacher`), lets an admin create accounts and set passwords, and **bans** accounts. In this app, "Deactivate" on a staff account is a ban. A ban also ends the person's open sessions.
 - It **rate-limits** its own `/api/auth` endpoints and keeps the counts in the `rateLimit` table. Its default store is the server's memory, which doesn't work on Vercel, where each copy of the app has its own memory and loses it often. Better Auth only applies these limits in production.
 - The `nextCookies()` plugin lets server actions set the login cookie.
 - Sign-up is switched off (`disableSignUp: true`), for passwords and for Google. The seed script creates the first admin, and after that only admins create accounts.
@@ -148,7 +149,7 @@ A server action calls Better Auth's functions directly, without going through `/
 
 ### Google sign-in
 
-Staff sign in with their Google account instead of a password. Google proves the person owns the email, which is what an invite email would otherwise do, so the app sends no emails and needs no password.
+Staff and teachers sign in with their Google account instead of a password. Google proves the person owns the email, which is what an invite email would otherwise do, so the app sends no emails and needs no password.
 
 What happens when someone presses **Sign in with Google**:
 
@@ -157,7 +158,7 @@ What happens when someone presses **Sign in with Google**:
 3. Google sends the browser to `/api/auth/callback/google`. Better Auth checks the `state`, asks Google who the person is, and looks for a user with that email.
 4. **No user with that email:** refused, because sign-up is off. The browser goes back to `/login?error=signup_disabled`, and the page explains it.
 5. **A user with that email:** on the first Google sign-in, Better Auth adds an `account` row with `providerId = "google"`, which links that Google account to the user. After that it finds the user through the link. It links only when the user's `emailVerified` is true, and every account the admin creates or saves is marked so.
-6. A session is created as usual and the browser goes to `/students`. A deactivated account is refused at this step and sent back to `/login?error=BANNED_USER`.
+6. A session is created as usual and the browser goes to `/`, which sends staff on to `/students` and a teacher to `/attendance`. A deactivated account is refused at this step and sent back to `/login?error=BANNED_USER`.
 
 Google also hands over tokens for its own services. The app never uses them, and `encryptOAuthTokens` keeps them encrypted in the `account` table.
 
@@ -270,7 +271,7 @@ hormuud-academy/
 │   └── demo.ts                  Sample data for trying the app locally
 ├── prisma.config.ts             Where the Prisma CLI finds the schema and the database
 ├── next.config.ts               Next.js settings: React Compiler, 6 MB uploads, Cloudinary images,
-│                                retrying when the connection drops, Serwist
+│                                retrying when the connection drops, the "Admins only" page, Serwist
 ├── public/icons/                The app icons a phone puts on its home screen
 ├── src/
 │   ├── app/                     Every page, by URL
@@ -278,6 +279,11 @@ hormuud-academy/
 │   │   │                        and the service worker
 │   │   ├── manifest.ts          The app's name, icons and colours when it's installed
 │   │   ├── icon.svg, apple-icon.png The graduation cap in browser tabs and on iPhones
+│   │   ├── opengraph-image.tsx  The preview card WhatsApp shows for a link to the app
+│   │   ├── robots.ts            Keeps search engines out
+│   │   ├── not-found.tsx        "Page not found", for an address that matches no page
+│   │   ├── error.tsx            "Something went wrong" when the app can't load at all
+│   │   ├── global-error.tsx     The same, for when even layout.tsx fails
 │   │   ├── sw.ts                The service worker
 │   │   ├── serwist/             Builds sw.ts and serves it at /serwist/sw.js
 │   │   ├── ~offline/            The "You're offline" page
@@ -288,11 +294,17 @@ hormuud-academy/
 │   │       ├── app-sidebar.tsx  The menu
 │   │       ├── actions.ts       Log out
 │   │       ├── page.tsx         "/" sends you on to /students
+│   │       ├── loading.tsx      The spinner while a page loads. More folders have one
+│   │       ├── error.tsx        "Something went wrong loading this page", with Try again
+│   │       ├── not-found.tsx    "Not found", for a record that's gone or at another branch
+│   │       ├── forbidden.tsx    "Admins only", for branch staff on an admin page
 │   │       ├── students/        Student list, registration, student page, editing, and the
 │   │       │                    student picker the money dialogs search with
 │   │       ├── attendance/      The day's class times and whether their attendance is taken,
 │   │       │                    with the sheet's form, its save action, and the queries and
-│   │       │                    rules every attendance page shares
+│   │       │                    rules every attendance page shares. access.ts says who takes
+│   │       │                    which: staff at their branch, a teacher their own class times
+│   │       ├── my-pay/          A teacher's own pay, read-only
 │   │       ├── finance/         The money screens
 │   │       │   ├── page.tsx     The financial dashboard, admins only
 │   │       │   ├── labels.ts    The words for each stored code, shared by every screen
@@ -308,7 +320,8 @@ hormuud-academy/
 │   │       │   ├── owed/        Who still owes a registration fee or a month
 │   │       │   ├── expenses/    Expenses, admins only
 │   │       │   ├── expense-categories/ The list of expense categories, admins only
-│   │       │   ├── teacher-pay/ What each teacher earned and was paid, admins only
+│   │       │   ├── teacher-pay/ What each teacher earned and was paid, admins only.
+│   │       │   │                pay-tables.tsx draws the two lists My pay shows too
 │   │       │   └── budget/      The plan per branch per month, admins only
 │   │       ├── books/           The book list and each branch's shelf. Admins set books and
 │   │       │                    prices; branch staff add copies and fix their branch's count.
@@ -319,9 +332,10 @@ hormuud-academy/
 │   │       ├── class-times/     [id]/ is one class time: its details, its last few days'
 │   │       │                    attendance and every student in it. [id]/attendance/ is its
 │   │       │                    month of attendance, and [id]/attendance/[date]/ one day's
-│   │       │                    sheet. Admins and the branch's own staff
+│   │       │                    sheet. Admins and the branch's own staff, and the class
+│   │       │                    time's teacher for its attendance
 │   │       └── admin/           Setup screens, admins only
-│   │           ├── layout.tsx   Sends anyone who isn't an admin back to /students
+│   │           ├── layout.tsx   Shows "Admins only" to anyone who isn't an admin
 │   │           ├── branches/
 │   │           ├── categories/
 │   │           ├── skills/      The skill list, and [id]/ for one skill's page with its
@@ -355,7 +369,7 @@ Every setup screen has the same three kinds of file. Take `src/app/(app)/admin/b
 
 Every server action follows the same five steps:
 
-1. Check who is asking with `requireUser()` or `requireAdmin()`.
+1. Check who is asking with `requireStaff()` or `requireAdmin()`, or `requireSignedIn()` for the attendance screens a teacher shares with staff.
 2. Check the form with a Zod schema.
 3. Check the business rules, for example that the name isn't taken or the branch is active.
 4. Save with Prisma.
@@ -391,10 +405,29 @@ The student's page imports `recordRegistrationFee` and `recordMonthlyFee` from `
 ### What happens when you open a page
 
 1. The browser asks for `/students`.
-2. `src/app/(app)/layout.tsx` calls `requireUser()` in `src/lib/session.ts`. That asks Better Auth to turn the session cookie into a user. With no valid session, you go to `/login`.
-3. Pages under `/admin` also go through `admin/layout.tsx`, which calls `requireAdmin()` and sends branch staff back to `/students`.
-4. The page reads what it needs through Prisma, filtered by the branch rules in `students/access.ts`.
-5. Next.js builds the HTML on the server and sends it. The interactive parts, like dialogs, start working once the browser loads them.
+2. `src/app/(app)/layout.tsx` calls `requireSignedIn()` in `src/lib/session.ts`. That asks Better Auth to turn the session cookie into a user. With no valid session, you go to `/login`. The layout draws a teacher's sidebar or the staff one.
+3. The sidebar and header are sent as soon as the login is checked, with a spinner where the page goes.
+4. Every staff page calls `requireStaff()` itself, which sends a teacher to their own Attendance page. Pages under `/admin` also go through `admin/layout.tsx`, which calls `requireAdmin()`. Branch staff get the "Admins only" page instead. The money pages that are admins only call it themselves.
+5. The page reads what it needs through Prisma, filtered by the branch rules in `students/access.ts`.
+6. Next.js builds the page's HTML on the server and sends it in place of the spinner. The interactive parts, like dialogs, start working once the browser loads them.
+
+### When a page is loading, missing or broken
+
+Next.js looks for files with special names in each folder of `src/app` and uses them by itself, without any page importing them:
+
+| File | What the person sees, and when |
+|---|---|
+| `loading.tsx` | A spinner where the page goes, from the moment a link is clicked until the page arrives. It fades in after a third of a second, so a quick page doesn't flash it |
+| `error.tsx` | "Something went wrong loading this page" with **Try again**, when a page throws, say because the database didn't answer. Try again asks the server for the page again. The message includes a code, the error's *digest*, which is the same code the server log shows next to the real error. When staff report it, search the Vercel logs for that code |
+| `not-found.tsx` | "Not found", when a page calls `notFound()`: a student, class or book that doesn't exist, or one at a branch the staff member can't see |
+| `forbidden.tsx` | "Admins only", when `requireAdmin()` calls `forbidden()` |
+| `global-error.tsx` | The last resort, if the outer `layout.tsx` itself fails. It has to draw the whole page, `<html>` and all |
+
+The ones inside `(app)/` draw in the main area and keep the sidebar, so the person can go straight somewhere else. `src/app/error.tsx` and `src/app/not-found.tsx` cover what's outside: the login page, the sidebar layout failing (when the database is down), and an address that matches no page at all. Those draw the same centred card as the offline page.
+
+A `loading.tsx` only covers moves between the folders directly inside its own. `(app)/loading.tsx` covers going from Students to Books. Going from the student list to one student stays inside `students/`, so `students/loading.tsx` covers that. That's why every folder holding more than one page has its own one-line `loading.tsx`, and a new folder like that needs one too. Searching and filtering keep the page on screen instead of showing the spinner.
+
+`forbidden()` needs the `authInterrupts` setting in `next.config.ts`, which Next.js still marks as experimental. The page answers with status 200 rather than 403 or 404, because the spinner has already started sending it by the time the page finds out; Next.js marks it `noindex` instead.
 
 ### What happens when you press Save
 
@@ -409,7 +442,7 @@ sequenceDiagram
 
     S->>F: Fills in the form and presses Register student
     F->>A: Sends the form data
-    A->>A: requireUser() checks the session
+    A->>A: requireStaff() checks the session
     A->>A: Zod checks every field
     alt something is wrong
         A-->>F: ok false, with a message for each field
@@ -437,6 +470,8 @@ sequenceDiagram
 | `TextField`, `SelectField` | `src/components/form-fields.tsx` | A labelled input or dropdown with its error message |
 | `SelectInput` | `src/components/select-input.tsx` | The one dropdown every screen uses: the form fields, the students filters and the theme picker. Built on the shadcn `select`. The page draws the list itself, so it gets the app's font and theme, which the browser's own `<select>` list can't. It can't take an empty option value, so a "no filter" choice like "Any skill" needs a real value |
 | `PageHeader`, `ActiveBadge`, `EmptyRow` | `src/components/` | The page title row, the Active/Inactive badge, the "nothing here yet" box |
+| `PageLoading` | `src/components/page-loading.tsx` | The spinner every `loading.tsx` shows |
+| `PageMessage`, `FullPageMessage` | `src/components/` | A message in place of a page: inside the sidebar layout (Not found, Admins only, Something went wrong) or as a card on an empty screen (offline, Page not found) |
 
 ### Installing it as an app
 
@@ -453,14 +488,17 @@ What the service worker keeps on the phone is only the app's own files (scripts,
 
 ### Security and permissions
 
-- Every page and every server action checks the login again. A server action can be called without opening its page, so hiding a button isn't enough: the action itself checks with `requireUser()` or `requireAdmin()`, and then checks the branch rules.
+- Every page and every server action checks the login again. A server action can be called without opening its page, so hiding a button isn't enough: the action itself checks with `requireStaff()`, `requireAdmin()` or `requireSignedIn()`, and then checks the branch rules.
 - The branch rules live in `src/app/(app)/students/access.ts`: `visibleEnrollments`, `browsableStudents`, `canEditStudent` and `canActAtBranch`.
-- Staff sign in with Google, and an unknown Google account is refused. The app never sees a Google password.
+- Roles are strict. `getCurrentUser()` in `src/lib/session.ts` knows three roles, `admin`, `staff` and `teacher`, and an account with any other role gets nothing. `requireStaff()` lets in only the admin and branch staff, and sends a teacher who opens a staff page or calls a staff action to their own Attendance page. So a new staff page is closed to teachers without anyone having to remember it.
+- A teacher's rules live in `src/app/(app)/attendance/access.ts`: `visibleClassTimes` (only the class times they teach) and `canMarkOn` (only today). The pages use them to show the right things, and the save action checks both again.
+- Staff and teachers sign in with Google, and an unknown Google account is refused. The app never sees a Google password.
 - No account can be created except through the admin's create-user. A database hook in `src/lib/auth.ts` refuses every other way, so a sign-in setting that fails to switch sign-up off can't open it.
 - The passwords left from before Google sign-in are stored as hashes. Nobody, including the admin, can read a password back. An admin can only set a new one, and only on an account that still has one.
 - There is no sign-up page.
-- Deactivating an account stops the login and ends every open session straight away.
+- Deactivating an account stops the login and ends every open session straight away. Deactivating a teacher does the same to their login.
 - Setting a new password also ends every open session for that person, because a reset often means someone else knew the old password. An admin who resets their own password stays logged in on the device they're using.
+- `src/app/robots.ts` tells search engines not to list the site. A link pasted into WhatsApp still gets a preview card, the graduation cap and the name from `opengraph-image.tsx`, because the phone sharing it fetches the preview itself. The card never shows anything from inside the app.
 - The login form allows 5 tries per email and 20 tries per computer (IP address) each minute. After that it shows "Too many login attempts" and how many seconds to wait. This stops anyone guessing a password by trying thousands. The Google button has its own limit of 20 a minute per computer.
 
 ### Dates and the time zone
@@ -564,6 +602,7 @@ erDiagram
     ClassTime ||--o{ Enrollment : "seats"
     Skill ||--o{ Enrollment : "is copied onto"
     Branch |o--o{ User : "staff work at"
+    Teacher |o--o| User : "logs in as"
     User ||--o{ Student : "registered"
     User ||--o{ Enrollment : "created"
     User ||--o{ Session : "has"
@@ -781,9 +820,10 @@ erDiagram
         string id PK
         string name
         string email UK
-        string role "admin or staff"
+        string role "admin, staff or teacher"
         boolean banned
         string branchId FK
+        string teacherId FK, UK "a teacher's login"
     }
 ```
 
@@ -877,7 +917,7 @@ A student has no status column. They are Active when at least one of their enrol
 
 **AttendanceEntry** (`attendance_entries`). One student's mark on one sheet: the sheet, the enrollment and the `mark`, which is `PRESENT`, `ABSENT`, `LATE` or `EXCUSED`. It names the enrollment rather than the student, so the marks of a student taking two skills stay apart. The sheet names the class time, so moving the student to another class time later leaves the mark where it was taken. Nothing is added up and stored: an attendance rate is counted from these rows each time a screen shows one.
 
-**User** (`user`). A login account. Better Auth's own columns (name, email, `emailVerified`, `image`), the admin plugin's columns (`role`, `banned`, `banReason`, `banExpires`), and this app's `branchId`. Branch staff have a branch. Admins have none. `emailVerified` is true once the admin has created or saved the account, and Google sign-in needs it.
+**User** (`user`). A login account. Better Auth's own columns (name, email, `emailVerified`, `image`), the admin plugin's columns (`role`, `banned`, `banReason`, `banExpires`), and this app's `branchId` and `teacherId`. Branch staff have a branch. Admins have none. A teacher's login names its teacher in `teacherId` and has no branch, because a teacher's branches are on the teacher. A teacher has at most one login. `emailVerified` is true once the admin has created or saved the account, and Google sign-in needs it.
 
 **Session**, **Account**, **Verification** (`session`, `account`, `verification`). Better Auth's tables. A session is one login on one device. An account row is one way to sign in: `providerId = "google"` links a Google account, and `providerId = "credential"` holds an old password's hash. Verification holds the `state` of each Google sign-in while the person is at Google.
 
@@ -887,14 +927,14 @@ A student has no status column. They are Active when at least one of their enrol
 
 These hold even if a bug slips into the code:
 
-- Unique: branch names, category names, expense category names, skill names, class names within a branch, one branch skill per skill per branch, book titles, one branch book per book per branch, one attendance sheet per class time per day, one mark per student per sheet, student numbers, user emails.
+- Unique: branch names, category names, expense category names, skill names, class names within a branch, one branch skill per skill per branch, book titles, one branch book per book per branch, one attendance sheet per class time per day, one mark per student per sheet, student numbers, user emails, one login per teacher.
 - One active enrollment per student per skill, at any branch. This is a **partial unique index**: it only counts rows whose status is `ACTIVE`, so a student can finish a skill and take it again later.
 - One registration fee per enrollment, and one monthly fee payment per enrollment per fee month. Both are partial unique indexes too, counting only rows of that category. Two clicks on Record payment can't charge a student twice, whatever the code does.
 - One budget per branch per month.
 - A class time starts before it ends, within the day. It has a start, an end and at least one day, or none of them while it waits for the admin. An enrollment's class time belongs to the enrollment's own branch skill: the foreign key names the two together.
 - A dollar payment or expense has no exchange rate and is worth exactly its amount. A shilling one has a rate above zero, and a dollar value within a cent of its shillings at that rate. The same goes for a teacher's share. These are **check constraints**, written by hand in the migrations because Prisma's schema can't describe them. An exchange rate is always above zero.
-- A book's price and a branch's price for it are above zero. A shelf never holds fewer than no copies, which is what stops two people selling the last one. A sale line sells at least one copy at a price above zero, a delivery adds copies, a fixed count changes the count, and neither leaves it below zero. An attendance sheet names who last changed it and when, or neither. Check constraints too.
-- A row can't be deleted while other rows point at it. You can't delete a teacher a class time still uses, for example. The exceptions are deliberate: deleting a student deletes their enrollments, every payment they made and their attendance marks, deleting an enrollment deletes its payments and marks, deleting an attendance sheet deletes its marks, deleting a payment deletes its book sale lines, deleting a budget deletes its lines, deleting a teacher deletes their branch links, and deleting a user deletes their sessions and accounts. The app refuses to delete a teacher who has any money on record, so nobody's earnings vanish by accident. Before deleting a student, the app takes their name off the books they bought, so those sales stay: the copies have left the shelf either way.
+- A book's price and a branch's price for it are above zero. A shelf never holds fewer than no copies, which is what stops two people selling the last one. A sale line sells at least one copy at a price above zero, a delivery adds copies, a fixed count changes the count, and neither leaves it below zero. An attendance sheet names who last changed it and when, or neither. A teacher's login names its teacher, no other account names one, and it has no branch. Check constraints too.
+- A row can't be deleted while other rows point at it. You can't delete a teacher a class time still uses, for example. The exceptions are deliberate: deleting a student deletes their enrollments, every payment they made and their attendance marks, deleting an enrollment deletes its payments and marks, deleting an attendance sheet deletes its marks, deleting a payment deletes its book sale lines, deleting a budget deletes its lines, deleting a teacher deletes their branch links, and deleting a user deletes their sessions and accounts. The app refuses to delete a teacher who has any money on record, so nobody's earnings vanish by accident, or a login, because accounts are never deleted. Before deleting a student, the app takes their name off the books they bought, so those sales stay: the copies have left the shelf either way.
 
 The app adds its own checks on top. Names are compared ignoring upper and lower case, so "main branch" is refused when "Main Branch" exists. The database compares exact text only. The app also keeps everything in one place at a time (`src/lib/clashes.ts`): a class holds one class time at a time, a teacher teaches one at a time at any branch, and a student sits in one at a time. "At the same time" means overlapping hours on a day both meet, so 4–6 pm on Saturdays and 4–6 pm on Sundays can share a room. A class time that's been deactivated still counts while students are in it, because they still come.
 
@@ -916,6 +956,7 @@ The app adds its own checks on top. Names are compared ignoring upper and lower 
 | `20261003120000_class_time_hours` | Gives each class time its own start and end, copied from its shift, and drops the shifts, so classes of different lengths can share an afternoon |
 | `20261005090000_books` | Adds the book list (`books`), each branch's price and copies (`branch_books`), the titles on a sale (`book_sale_lines`) and the deliveries and fixed counts (`stock_changes`), with the checks that keep prices above zero and shelves at zero or more. Books payments from before keep their notes and have no lines |
 | `20261005120000_attendance` | Adds attendance: `attendance_sheets`, one per class time per day with who took it and who last changed it, and `attendance_entries`, one mark per student on a sheet. Nothing already recorded changes |
+| `20261005150000_teacher_logins` | Adds `teacherId` to `user`, so a login can belong to a teacher, at most one per teacher, with the checks that only a teacher's login names one and that it has no branch. Every existing account is left as it was |
 
 ### Looking at the data yourself
 
@@ -966,11 +1007,25 @@ The app adds its own checks on top. Names are compared ignoring upper and lower 
 
 A staff account that has no branch set sees a notice asking them to contact the admin, and can't do anything else.
 
+A teacher's login can do far less:
+
+| Action | Teacher |
+|---|---|
+| See which of their class times meet on a day, and their whole week | Their own class times only |
+| Take attendance, or change a mark | Today's sheet only, for a class time they teach, with any of the four marks |
+| See another day's sheet and a class time's month | Read-only, for their own class times |
+| See their pay: the salary or rate, the fees that earned them a share, what they've been paid | Their own, read-only |
+| Students' pages, money, books, teachers, classes, setup | No. Opening one sends them back to Attendance |
+
+A teacher covering someone else's class for a day can't open it. Staff take that day's sheet.
+
+Where the table says a page is blocked, branch staff who open it anyway, from an old link or by typing the address, see "Admins only" and a button back to Students.
+
 ## Using the system
 
 ### Logging in and out
 
-Go to the app's address. Anyone not logged in lands on the login page. Press **Sign in with Google** and pick the Google account whose email the admin put on your account. A Google account the admin didn't add is refused with "There's no account for that Google address", and a deactivated account shows "This account has been deactivated."
+Go to the app's address. Anyone not logged in lands on the login page. Press **Sign in with Google** and pick the Google account whose email the admin put on your account. Staff land on Students, and a teacher on Attendance. A Google account the admin didn't add is refused with "There's no account for that Google address", and a deactivated account shows "This account has been deactivated."
 
 Until the switch-over finishes, the email and password form is still under the Google button. A wrong password shows "Wrong email or password." After 5 wrong tries in a minute, the form makes you wait before you can try again.
 
@@ -986,11 +1041,14 @@ The installed app logs in the same way and shows the same screens. Without inter
 
 ### The screen layout
 
-- **The sidebar** on the left. Students (**Students**, **Register student** and **Attendance**) is there for everyone. Admins also get Money (**Dashboard**, **Income**, **Fees owed**, **Expenses**, **Expense categories**, **Teacher pay**, **Monthly budget**) and Admin (**Branches**, **Skills**, **Categories**, **Books**, **Teachers**, **Classes**, **Staff accounts**, **Settings**). Branch staff get Your branch instead (**Income**, **Fees owed**, **Books**, **Teachers** and **Classes**), which shows only their own branch; the teachers and classes there can't be changed, and of the books only the copies on the shelf can. The bottom shows your name, your role and your branch.
-- **The header** shows "All branches" for an admin, or your branch's name for branch staff. The button on the left of the header hides and shows the sidebar.
+- **The sidebar** on the left. Students (**Students**, **Register student** and **Attendance**) is there for everyone. Admins also get Money (**Dashboard**, **Income**, **Fees owed**, **Expenses**, **Expense categories**, **Teacher pay**, **Monthly budget**) and Admin (**Branches**, **Skills**, **Categories**, **Books**, **Teachers**, **Classes**, **Staff accounts**, **Settings**). Branch staff get Your branch instead (**Income**, **Fees owed**, **Books**, **Teachers** and **Classes**), which shows only their own branch; the teachers and classes there can't be changed, and of the books only the copies on the shelf can. A teacher gets Teaching instead (**Attendance** and **My pay**) and nothing else. The bottom shows your name, your role and your branch.
+- **The header** shows "All branches" for an admin, your branch's name for branch staff, or a teacher's branches. The button on the left of the header hides and shows the sidebar.
 - **On a phone**, the sidebar folds away. Open it with the button at the top left.
 - **Tables** are wider than a phone, so the last columns sit off the side. Instead of scrolling across, tap a row: a pop-up lists everything in it, one line per column, with that row's buttons at the bottom. Tapping a link inside the row, such as a student's name, still opens that page. The same click works on a computer.
 - After every change, a short message appears at the top of the screen.
+- While a page loads, a spinner turns where it will appear. On a slow connection it can stay a few seconds.
+- If a page fails to load, it says "Something went wrong loading this page", with **Try again** and a code. If Try again doesn't help, send the admin that code: it finds the real error in the logs.
+- A student, class or book that was deleted, or that belongs to another branch, shows "Not found". An address that isn't a page at all shows "Page not found".
 
 ### Setting up the college for the first time
 
@@ -1034,6 +1092,8 @@ Branch staff see this page too, with only their branch's classes and no buttons.
 #### Teachers
 
 Add a teacher with a name, an optional phone, at least one branch, and how they're paid. A fixed salary has a Currency dropdown beside it: the salary is set in that currency, and their pay is always recorded in it. When you edit a teacher, you can't untick a branch where they still have a class time: give that class time another teacher first. You also can't deactivate a teacher who still teaches a class time that's active or has students. The table shows every class time each teacher teaches: the skill, the branch and the hours.
+
+A teacher with a login shows "Logs in as" and the address under their name. Deactivating that teacher also deactivates their login and logs them out, and activating them turns it back on. A teacher with a login can't be deleted: deactivate them instead.
 
 Branch staff see this page too, with only the teachers at their branch, the class times each one teaches there, in which class and at what hours, and no buttons.
 
@@ -1125,10 +1185,11 @@ Branch staff see the Books page too, with only their branch's books: the price, 
 #### Staff accounts
 
 - **Add staff account.** Enter a name, the person's Gmail address, a role and, for branch staff, their branch. There's no password and no email sending: tell the person yourself that they can sign in with Google.
+- **A teacher's login** is made the same way, with the role **Teacher** and the teacher it's for instead of a branch. The Teacher list offers only active teachers who don't have a login yet. The Branch column shows the teacher's branches.
 - **Signs in with** shows Google once the person has signed in with Google, "Google, not signed in yet" before that, and Password for an account left from before Google sign-in.
 - **Edit** changes the name, Gmail address, role or branch. Changing the address logs the person out and removes their Google link, so they sign in again with the Google account for the new address. Saving also gets an older account ready for Google. You can't change your own role, so the college can't be left without an admin.
 - **New password** shows only on accounts that still have a password from before Google sign-in. It sets a new one and logs them out everywhere.
-- **Deactivate** logs the person out everywhere and blocks their login. Their students and records stay. **Turn back on** reverses it. You can't deactivate yourself.
+- **Deactivate** logs the person out everywhere and blocks their login. Their students and records stay. **Turn back on** reverses it. You can't deactivate yourself. A deactivated teacher's login can't be turned back on here: turn the teacher back on under Teachers, and the login comes back with them.
 
 Accounts can't be deleted, because students and enrollments record who created them.
 
@@ -1224,7 +1285,7 @@ The panel's heading counts the months paid, what's been collected in each curren
 
 ### Attendance screens
 
-Staff at a branch and the admin take attendance. Teachers can't sign in yet, so a teacher who keeps the list on paper hands it to the office, and staff type it in. A sheet can be taken for any day the class time met, up to today, so typing in last week's paper works the same as taking today's.
+Staff at a branch and the admin take attendance, and so does a teacher with a login, for the class times they teach. A teacher marks today's sheet only. For any other day the teacher hands the paper to the office, and staff type it in. Staff can take a sheet for any day the class time met, up to today, so typing in last week's paper works the same as taking today's.
 
 #### The day's class times
 
@@ -1252,6 +1313,10 @@ If the list changed while the sheet was open, say a student joined, saving is re
 #### A class time's month
 
 **By month** on the Attendance card shows the whole month as a grid: a row for each student, a column for each day the class time met up to today, and each student's rate for the month at the end. Each mark is a letter, **P**, **A**, **L** or **E**. A dot means that day's sheet wasn't taken, and a dash means the sheet was taken without that student, because they joined later or had already left. The column headings open that day's sheet. Above the grid, every day not taken yet is a button that opens its sheet. The arrows beside the month go back a month and forward again, up to this one. On a phone the grid scrolls sideways with the names staying put.
+
+#### What a teacher sees
+
+A teacher's **Attendance** lists only the class times they teach that meet on the day, without the Teacher column. Under it, **Your class times** lists everything they teach, with the days, hours, class and students, and an **Attendance** button that opens each one's month. **Take attendance** and **Open** work as they do for staff, but only today's sheet can be saved. Another day's sheet opens read-only, saying "You mark today's attendance only. To change this day's, ask the office." A day nobody took has nothing to open, and the month's grid lists the days not taken without buttons. Student names aren't links, because a student's page is for staff. A class time someone else teaches is Not found, even on a day they covered it.
 
 ## The money screens
 
@@ -1315,6 +1380,15 @@ A percentage teacher earns in whatever currency each student paid: a fee paid in
 **Pay** on a row opens the expense dialog with the teacher, the month and the amount already filled in — a percentage teacher's unpaid share, or a fixed teacher's monthly salary. For a percentage teacher owed in both currencies, the box starts at the dollars, and switching the Currency dropdown to SLSH switches it to the shillings. A fixed teacher's currency is their salary's, and the dropdown can't be changed. It saves as an ordinary Teacher salary expense, so it shows up in the month's spending like every other cost. The amount box is checked: a percentage teacher can't be paid more than their unpaid share in the currency being paid, and a fixed teacher can't be paid more than their monthly salary for that month across every payment for it, so a second full salary is refused. A fixed teacher with no salary set can't be paid until one is entered on the Teachers page. Editing a saved salary expense is checked the same way.
 
 Clicking a teacher's name opens their own page: what they've earned in total, what they've been paid, their unpaid share, which branches the earnings came from, the last 100 payments that earned them a share — with the student, the skill, the month, what the student paid and the rate it was worked out at — and every payment the college has made to them.
+
+### My pay
+
+A teacher's own pay, under **My pay** in their sidebar. It shows what the admin sees on that teacher's Teacher pay page, read-only and without the Pay button:
+
+- A percentage teacher sees what they've earned from fees, what they've been paid and their unpaid share, then every fee that earned them a share (the student, the skill, the month and their share) and every payment made to them.
+- A fixed-salary teacher sees their salary, what they've been paid for this month and in total, and every payment made to them.
+
+Nobody else's pay is on it, and student names aren't links.
 
 ### Monthly budget
 
@@ -1400,7 +1474,15 @@ Admins only, and the first thing under Money. Pick a day, a month and optionally
 
 **A skill's price changes.** Edit the skill's registration fee or monthly fee. Students already taking it keep their old fees, and new students get the new ones.
 
-**A teacher leaves.** On each skill page where they teach, press Change on their class times and pick another teacher. Then deactivate the teacher.
+**A teacher leaves.** On each skill page where they teach, press Change on their class times and pick another teacher. Then deactivate the teacher, which also turns off their login and logs them out.
+
+**Giving a teacher a login.** An admin opens Staff accounts, presses Add staff account, picks the role Teacher and the teacher, and types the teacher's Gmail address. Tell them to sign in with Google. They land on their Attendance page.
+
+**A teacher takes today's attendance.** They open Attendance on their phone, press Take attendance on their class time, tap the students who aren't Present and save. The sheet says they took it.
+
+**Someone covers a class for a day.** The teacher covering it tells the office, and staff take that day's sheet. A teacher only sees the class times they teach.
+
+**A teacher needs to fix a day that's over.** They can't change it any more. Staff open that day's sheet and change it.
 
 **Taking today's attendance.** Open Attendance, press Take attendance on the class time, tap the students who aren't Present and save.
 
@@ -1490,7 +1572,7 @@ Most new features follow the same steps:
 3. **Create a migration.** Run `pnpm db:migrate --name what_changed`. This writes the SQL into `prisma/migrations` and applies it to your local database. Read the SQL before committing it.
 4. **Write the reading code.** In the feature's `page.tsx`, or in a `queries.ts` when several pages share it.
 5. **Write the server actions** in `actions.ts`, following the five steps: check the user, check the form with Zod, check the rules, save with Prisma, `refresh()`. Remember the branch rules in `students/access.ts`.
-6. **Build the screen.** A server component `page.tsx` that hands its rows to `DataTable`, and a client `*-dialog.tsx` that uses `FormDialog` for the form.
+6. **Build the screen.** A server component `page.tsx` that hands its rows to `DataTable`, and a client `*-dialog.tsx` that uses `FormDialog` for the form. If the feature's folder holds more than one page, such as a list and an `[id]/` page, give it a `loading.tsx` like the others, or opening a record shows nothing until it arrives (see [When a page is loading, missing or broken](#when-a-page-is-loading-missing-or-broken)).
 7. **Add it to the menu** in `src/app/(app)/app-sidebar.tsx`.
 8. **Check it.** Run `pnpm lint` and `pnpm build`, then try the feature in the browser as an admin and as branch staff.
 9. **Record big decisions.** If the feature involved a hard-to-undo trade-off, add a short decision record to `docs/adr`.
@@ -1507,12 +1589,11 @@ Most new features follow the same steps:
 
 | Future module | What it attaches to | Why that's already ready |
 |---|---|---|
-| Teachers taking attendance | `User`, with a link to `Teacher`, and `src/lib/session.ts` | A sheet already records who took it, and the same marking screen can sit on a teacher's own page. `getCurrentUser` treats every role that isn't `admin` as staff, so roles have to be made strict before a teacher role is added |
 | Exams and results | Enrollment | Results belong to one student in one skill at one branch |
 | Printed receipts | Payment | Every payment already has a receipt number, an amount, a method and a date |
 | Office staff salaries | Expense, with User | Staff salaries are already a category; a `userId` beside `teacherId` would name the person |
 | Reports over longer stretches | Payment and Expense | Both carry a branch and a date, so any grouping is a `groupBy` away |
-| Custom roles and permissions | `src/lib/auth.ts` | Better Auth's access control can define more roles than admin and staff |
+| Custom roles and permissions | `src/lib/auth.ts` | Better Auth's access control can define more roles than admin, staff and teacher. Roles are already strict, so a new one starts with no access until its pages let it in |
 | Importing from the old system | `prisma/import-students.ts`, `students/actions.ts` | Registration already knows how to create a student with enrollments in one transaction, and the one-off import script does the same from a reviewed CSV |
 
 ## What isn't built yet
@@ -1520,7 +1601,7 @@ Most new features follow the same steps:
 Everything here was left out of Phase 1 on purpose, or is a known gap:
 
 - No exams, results or certificates.
-- Attendance is taken by staff, because teachers can't sign in yet. A sheet can only be taken on a day its class time meets, so a lesson made up on another day isn't recorded. Moving a student isn't dated, so a sheet taken late for a past day lists who is in the class time now: someone who moved in since is on it, unless their old class time's sheet already marks them that day, and someone who moved out isn't. A saved sheet keeps everyone it marked. Nothing warns about a student who keeps missing class, and attendance can't be taken offline.
+- A teacher marks only today's sheet, and only for the class times they teach, so a stand-in marks nothing and staff take that day's. A sheet can only be taken on a day its class time meets, so a lesson made up on another day isn't recorded. Moving a student isn't dated, so a sheet taken late for a past day lists who is in the class time now: someone who moved in since is on it, unless their old class time's sheet already marks them that day, and someone who moved out isn't. A saved sheet keeps everyone it marked. Nothing warns about a student who keeps missing class, and attendance can't be taken offline.
 - A fee is settled or it isn't. There are no part payments to add up later, for a registration fee or for a month. Paying less, for a discount or because the student couldn't pay it all, is recorded by lowering the amount, and the fee still counts as settled. The difference isn't kept as a balance, so nothing chases it.
 - No printed receipts or statements. Payments have receipt numbers, but nothing prints them.
 - Removing a payment deletes it rather than writing a reversing entry, so the books show what is true now, not what was once typed. That's the right trade for a college this size, but it means a removed payment leaves no trace.
