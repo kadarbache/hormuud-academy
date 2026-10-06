@@ -87,7 +87,7 @@ A login staff give one student so they can see their own record in the portal. T
 _Avoid_: Student account, student user
 
 **Portal**:
-The student's own side of the app, in the same frame as the staff side but with a menu of its own: their skills, attendance, fees and details, all read-only. A student never sees the staff side, and staff don't use the portal.
+The student's own side of the app, in the same frame as the staff side but with a menu of its own: their skills, attendance, fees and details, all read-only. A student never sees the staff side, and staff don't use the portal. The portal never tells a student they owe anything: it says unpaid.
 _Avoid_: Student app, student dashboard
 
 **Home branch**:
@@ -184,7 +184,7 @@ One fee month of one enrollment, paid. A month is settled or not at all, the sam
 _Avoid_: Instalment, invoice, bill
 
 **Owed**:
-A registration fee above zero, or a fee month the enrollment has reached, with no payment against it. Only ever money a student owes the college, never the other way round. Owed amounts are in US dollars, because that's what fees are set in.
+A registration fee above zero, or a fee month the enrollment has reached, with no payment against it. Only ever money a student owes the college, never the other way round. Owed amounts are in US dollars, because that's what fees are set in. A word for staff only: the portal shows the same money as unpaid fees.
 _Avoid_: Arrears, balance, debt, outstanding
 
 **Expense**:
