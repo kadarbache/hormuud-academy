@@ -45,8 +45,12 @@ One branch skill taught in one class, from a start time to an end time on chosen
 _Avoid_: Shift, group, session, section, batch, slot
 
 **Teacher**:
-A person who teaches skills at one or more branches. Not a staff account.
+A person who teaches skills at one or more branches. Not a staff account, though the admin can give them a teacher login.
 _Avoid_: Instructor, trainer, lecturer
+
+**Teacher login**:
+An account the admin gives one teacher on Staff accounts, signed into with Google like a staff account. It sees only the class times that teacher teaches and their own pay: it takes and changes today's attendance sheet for those class times, reads the other days', and shows their salary or share and what they've been paid. A teacher has at most one, and deactivating the teacher turns it off. Whoever covers a class for a day doesn't mark it; staff do.
+_Avoid_: Teacher account, teacher portal
 
 **Monthly fee**:
 What a branch skill costs per month, set in US dollars. A student can pay it in shillings at the exchange rate. Zero means the skill is free: it has no fee months, so nothing is ever owed for it.
