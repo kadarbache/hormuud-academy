@@ -1,10 +1,12 @@
 "use client";
 
 import { TriangleAlert } from "lucide-react";
-import { PageMessage } from "@/components/page-message";
+import { FullPageMessage } from "@/components/full-page-message";
 import { Button } from "@/components/ui/button";
 
-export default function AppError({
+// Catches what (app)/error.tsx can't: the sidebar layout itself failing, say
+// because the database is down, and the login page.
+export default function RootError({
   error,
   retry,
 }: {
@@ -12,18 +14,17 @@ export default function AppError({
   retry: () => void;
 }) {
   return (
-    <PageMessage
+    <FullPageMessage
       icon={TriangleAlert}
-      title="Something went wrong loading this page"
+      title="Something went wrong"
       action={
-        // Loads the page from the server again, so a dropped database
-        // connection gets a second chance.
-        <Button variant="outline" onClick={retry}>
+        <Button className="w-full" onClick={retry}>
           Try again
         </Button>
       }
     >
-      Try again. If it keeps happening, tell the admin what you were doing
+      Hormuud Academy couldn&apos;t load. Try again in a moment. If it keeps happening, tell the
+      admin
       {/* The digest matches the error in the server logs. */}
       {error.digest ? (
         <>
@@ -33,6 +34,6 @@ export default function AppError({
       ) : (
         "."
       )}
-    </PageMessage>
+    </FullPageMessage>
   );
 }
