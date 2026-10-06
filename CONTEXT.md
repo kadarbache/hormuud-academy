@@ -48,8 +48,12 @@ _Avoid_: Shift, group, session, section, batch, slot
 A person who teaches skills at one or more branches. Not a staff account, though the admin can give them a teacher login.
 _Avoid_: Instructor, trainer, lecturer
 
+**Teacher ID**:
+The number a teacher is known by, from TCH-00001 upward, counted across the whole college and never reused. A teacher signs in with it and a password.
+_Avoid_: Teacher number, staff number
+
 **Teacher login**:
-An account the admin gives one teacher on Staff accounts, signed into with Google like a staff account. It sees only the class times that teacher teaches and their own pay: it takes and changes today's attendance sheet for those class times, reads the other days', and shows their salary or share and what they've been paid. A teacher has at most one, and deactivating the teacher turns it off. Whoever covers a class for a day doesn't mark it; staff do.
+An account the admin gives one teacher on Staff accounts. The teacher signs in with Google, with their Teacher ID and a password, or either way; a Gmail address is optional, and without one the password is their only way in. Only the admin hands out, replaces or takes away the password: a temporary one, shown once, that stops working after 48 hours, and the teacher chooses their own the first time they sign in, at least 10 characters, not only numbers, and without their Teacher ID. Every password change and every sign-in is recorded. It sees only the class times that teacher teaches and their own pay: it takes and changes today's attendance sheet for those class times, reads the other days', and shows their salary or share and what they've been paid. A teacher has at most one, and deactivating the teacher turns it off. Whoever covers a class for a day doesn't mark it; staff do.
 _Avoid_: Teacher account, teacher portal
 
 **Monthly fee**:
