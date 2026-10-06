@@ -4,7 +4,7 @@ Questions we haven't answered yet, and the code work waiting on them. Move a
 decision to "Decided" when it's settled, and write the rule into CONTEXT.md or
 an ADR if it changes how the system behaves.
 
-Last updated 5 October 2026.
+Last updated 6 October 2026.
 
 ## Open
 
@@ -94,7 +94,66 @@ The order, the marks and teacher logins were decided on 5 Oct 2026 (see
 - **Marking offline.** Leaning: online only at first. Keeping marks on the
   phone and sending them later is a project of its own.
 
+### 8. Student portal: what's left
+
+Student logins and the portal were built on 6 Oct 2026 (see "Decided"). Still
+open:
+
+- **Language.** The portal is in English, chosen by default. Somali, or both,
+  would mean writing every portal screen twice.
+- **Exam results.** When exams exist: do students see a result as soon as it's
+  entered, or only once staff publish it?
+- **A forgotten password by WhatsApp.** Today the student goes back to the
+  branch. Once WhatsApp messages exist (future features, section 1), a code by
+  WhatsApp could replace the visit.
+
 ## Still to do (no decision needed)
+
+**Student logins, before they go live.** Built on 6 Oct 2026 and tried in the
+browser on a production build against the Neon test database the same day.
+As Main Branch Staff: Create login on STU-00001 showed the temporary password
+once and the card changed to On, "Still on the temporary password". Signed in
+as the student through the login form: a wrong password refused ("Wrong
+Student ID or password"), then `STU-00001` and the temporary password went
+straight to Choose your password, with every other page (the portal, a
+skill's attendance, Students, Attendance, My pay, Staff accounts) sending
+them there first. The temporary password refused as the new one, a short one
+and two that didn't match refused, then a new one saved. The portal on a
+phone: $105.00 owed, the same as on the student's page, both skills with
+their class time, teacher and dates, Computer Basics at 100% with its three
+days, every month unpaid, the details read-only. Every staff page sent the
+student to the portal, and another student's skill and a made-up one were Not
+found. Reset password ended the student's other session and put them back on
+a temporary password; Turn off logged them out, and signing in with `1` and
+the new password was refused ("Your login has been turned off"); the admin's
+Turn back on was recorded with no branch. abdaal staff opening STU-00001 by
+ID got no Portal login card, and their own Demo Student Three got one. Change
+password with a wrong current password refused, with the right one saved and
+another session logged out while this one stayed. The database refused a
+staff account naming a student, a student login with a branch or without its
+student, and a second login for one student. Linking Google to the student's
+login was refused (`student_google`) and to a staff account allowed. Student
+logins don't show on Staff accounts. Not tried: forcing one of the three
+staff actions at another branch's student, since the buttons aren't there to
+press; the action checks the same rule the card does. The test login and its
+history were deleted afterwards, so the Neon test database has no student
+logins.
+
+The same day the portal moved from one long page into the staff side's
+frame, at the user's asking: the sidebar and header teachers have, with a
+menu of its own (My skills, Attendance, My fees, My details), each its own
+page. Tried on a production build: the menu hidden while the student was on
+the temporary password, each page from the menu with its item lit (Attendance
+also on a skill's day-by-day page), the menu sliding in on a phone with no
+sideways scroll, and staff and teachers keeping their own menus. A test login
+for STU-00001 was made and deleted again; STU-00044's login, made by the
+admin that morning, was left alone.
+
+Production (`ep-square-silence`) needs `20261006090000_student_logins`
+applied after a backup, *before* the push, or every page breaks: Better Auth
+reads `studentId` and `mustChangePassword` on each login. Nothing in it
+changes an existing account. The Neon test database (`ep-polished-paper`)
+has it already.
 
 **Attendance step one, before it goes live.** Built on 5 Oct 2026: the
 Attendance page (the day's class times, taken or not), the sheet for one class
@@ -351,6 +410,32 @@ import. Reset it in the Neon console right after the import, then update
 changed.
 
 ## Decided
+
+- **Student logins and the portal.** Asked on 6 Oct 2026 ("now let's work on
+  the student signin"). Most of it was talked through on 24 Sep 2026 and
+  written up in future features; the rest was decided on 6 Oct. Built the
+  same day; see "Still to do". (6 Oct 2026)
+  - A student signs in with their Student ID and a password. Their login is a
+    Better Auth user with the role `student`, the student it belongs to, and
+    a made-up email (`stu-00042@students.invalid`) built from the ID.
+  - Staff press Create login on the student's page and get a temporary
+    password once. The student must choose their own the first time they
+    sign in: at least 8 characters, and not the temporary one.
+  - A forgotten password goes back to the branch: Reset password gives a new
+    temporary one and logs the student out everywhere. Turn off and Turn back
+    on as well.
+  - One login per student. The admin, and staff at any branch the student
+    belongs to (home branch, or a branch where they take or took a skill),
+    manage it. Every create, reset, turn off and turn on is recorded with who
+    did it, at which branch and when.
+  - Any student with a login can sign in, finished and dropped ones too.
+  - The portal shows their skills, fees, attendance and details, read-only.
+    Fees show every month, paid or unpaid, and owing holds nothing back.
+  - Google stays for staff and teachers only, and is refused for a student's
+    login.
+  - Sessions last 7 days, the same as everyone's. 30 days for students was
+    considered, but Better Auth has one session length for every account.
+  - No parent access. No exam results until exams exist.
 
 - **Teacher logins.** Asked on 5 Oct 2026 ("lets work on the teacher sign in
   and it will be same as the staff. what they can do is attendence only and
