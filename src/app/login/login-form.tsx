@@ -12,7 +12,8 @@ export function LoginForm() {
   const router = useRouter();
   const { pending, fieldErrors, formError, onSubmit } = useFormAction(signIn, {
     onSuccess: () => {
-      // The home page sends staff to Students and a teacher to Attendance.
+      // The home page sends staff to Students, a teacher to Attendance and a
+      // student to the portal.
       router.replace("/");
       router.refresh();
     },
@@ -22,12 +23,13 @@ export function LoginForm() {
     <form onSubmit={onSubmit} noValidate>
       <FieldGroup>
         <TextField
-          label="Email"
-          name="email"
-          type="email"
-          autoComplete="email"
+          label="Email or Student ID"
+          name="login"
+          autoComplete="username"
+          autoCapitalize="none"
+          spellCheck={false}
           required
-          errors={fieldErrors.email}
+          errors={fieldErrors.login}
         />
         <TextField
           label="Password"

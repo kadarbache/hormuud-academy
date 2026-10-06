@@ -22,6 +22,7 @@ export const auth = betterAuth({
     enabled: true,
     // Nobody signs up. The admin creates every staff account.
     disableSignUp: true,
+    // Students sign in with a password. Staff and teachers use Google.
     minPasswordLength: 8,
   },
   socialProviders: googleClient
@@ -47,9 +48,11 @@ export const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
-        // Every account is made by an admin (or the seed) through the admin
-        // plugin's create-user. Refuse any other way Better Auth might create
-        // a user, such as a sign-up that a setting failed to switch off.
+        // Every account is made through the admin plugin's create-user: by
+        // the admin on Staff accounts, by staff giving a student a login
+        // (src/lib/student-logins.ts), or by the seed. Refuse any other way
+        // Better Auth might create a user, such as a sign-up that a setting
+        // failed to switch off.
         // The code makes a refused Google sign-in land on /login with the
         // "no account for that Google address" message.
         before: async (_user, context) => {
@@ -57,6 +60,27 @@ export const auth = betterAuth({
             throw APIError.from("FORBIDDEN", {
               code: "signup_disabled",
               message: "Accounts are created by the admin.",
+            });
+          }
+        },
+      },
+    },
+    account: {
+      create: {
+        // A student signs in with their Student ID and password only. Their
+        // login's email is a made-up address no Google account can have, but
+        // a signed-in student could still ask Better Auth to link a Google
+        // account to it, so that is refused here too.
+        before: async (account) => {
+          if (account.providerId === "credential") return;
+          const user = await prisma.user.findUnique({
+            where: { id: account.userId },
+            select: { role: true },
+          });
+          if (user?.role === "student") {
+            throw APIError.from("FORBIDDEN", {
+              code: "student_google",
+              message: "Students sign in with their Student ID.",
             });
           }
         },
@@ -79,17 +103,20 @@ export const auth = betterAuth({
   },
   user: {
     additionalFields: {
-      // Set by the admin only, never from a sign-in form.
+      // Set by our own code only, never from a sign-in form.
       branchId: { type: "string", required: false, input: false },
       teacherId: { type: "string", required: false, input: false },
+      studentId: { type: "string", required: false, input: false },
+      mustChangePassword: { type: "boolean", required: false, defaultValue: false, input: false },
     },
   },
   plugins: [
     admin({
-      // Admins manage staff accounts. Branch staff and teachers get none of
-      // the admin plugin's permissions; what they may do is checked in our
-      // own code (src/lib/session.ts and each feature's actions).
-      roles: { admin: adminAc, staff: userAc, teacher: userAc },
+      // Admins manage staff accounts. Branch staff, teachers and students
+      // get none of the admin plugin's permissions; what they may do is
+      // checked in our own code (src/lib/session.ts and each feature's
+      // actions).
+      roles: { admin: adminAc, staff: userAc, teacher: userAc, student: userAc },
       defaultRole: "staff",
       adminRoles: ["admin"],
     }),

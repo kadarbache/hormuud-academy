@@ -1,5 +1,5 @@
 import type { Prisma } from "@/generated/prisma/client";
-import type { CurrentUser } from "@/lib/session";
+import type { AppUser } from "@/lib/session";
 
 // Who takes which attendance.
 //
@@ -11,13 +11,13 @@ import type { CurrentUser } from "@/lib/session";
 //   class for a day tells the office, and staff take that day's sheet.
 
 /** The class times whose attendance the user can open. */
-export function visibleClassTimes(user: CurrentUser): Prisma.ClassTimeWhereInput {
+export function visibleClassTimes(user: AppUser): Prisma.ClassTimeWhereInput {
   if (user.role === "admin") return {};
   if (user.role === "teacher") return { teacherId: user.teacherId };
   return { branchSkill: { branchId: user.branchId ?? "" } };
 }
 
 /** Whether the user can save a sheet for this day, in a class time they can open. */
-export function canMarkOn(user: CurrentUser, date: string, today: string) {
+export function canMarkOn(user: AppUser, date: string, today: string) {
   return user.role !== "teacher" || date === today;
 }

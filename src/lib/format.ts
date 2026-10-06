@@ -10,6 +10,12 @@ export function formatStudentNumber(number: number) {
   return `STU-${String(number).padStart(5, "0")}`;
 }
 
+/** "STU-00042", "stu42" or "42" -> 42. Null for anything that isn't a Student ID. */
+export function parseStudentNumber(text: string) {
+  const match = STUDENT_NUMBER.exec(text) ?? SHORT_NUMBER.exec(text);
+  return match ? Number(match[1]) : null;
+}
+
 export type StudentLookup =
   | { kind: "number"; number: number }
   | { kind: "phone"; phone: string }
@@ -23,8 +29,8 @@ export type StudentLookup =
  * is part of a name.
  */
 export function parseStudentLookup(query: string): StudentLookup {
-  const idMatch = STUDENT_NUMBER.exec(query) ?? SHORT_NUMBER.exec(query);
-  if (idMatch) return { kind: "number", number: Number(idMatch[1]) };
+  const number = parseStudentNumber(query);
+  if (number !== null) return { kind: "number", number };
 
   const trimmed = query.trim();
   if (PHONE.test(trimmed)) {

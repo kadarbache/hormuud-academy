@@ -29,6 +29,7 @@ const googleErrors: Record<string, string> = {
     "Your account isn't ready for Google yet. Ask the admin to open it under Staff accounts, check the email and save.",
   access_denied: "Google sign-in was cancelled.",
   too_many_attempts: "Too many login attempts. Wait a minute and try again.",
+  student_google: "Students sign in with their Student ID and password, not Google.",
 };
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
@@ -47,7 +48,8 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           </div>
           <CardTitle className="text-xl">Hormuud Academy</CardTitle>
           <CardDescription>
-            Log in with the account the admin gave you.
+            {googleSignInEnabled ? "Staff sign in with Google. " : ""}Students use their
+            Student ID and the password from their branch.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">

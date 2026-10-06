@@ -21,6 +21,8 @@ export default async function StaffPage() {
   const me = await requireAdmin();
   const [accounts, branches, teachers] = await Promise.all([
     prisma.user.findMany({
+      // Student logins are managed on each student's page.
+      where: { studentId: null },
       orderBy: [{ role: "asc" }, { name: "asc" }],
       include: {
         branch: { select: { name: true } },

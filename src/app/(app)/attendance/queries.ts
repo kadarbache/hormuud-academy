@@ -4,7 +4,7 @@ import { inUse } from "@/lib/clashes";
 import { weekdayOf } from "@/lib/class-times";
 import { addDays, collegeDayStart, fromDbDate, monthEnd, monthStart, toDbDate } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
-import type { CurrentUser } from "@/lib/session";
+import type { AppUser } from "@/lib/session";
 import { visibleClassTimes } from "./access";
 import { classDaysBetween } from "./days";
 import { countMarks, noMarks, type MarkCounts } from "./labels";
@@ -71,7 +71,7 @@ const byName = [
  * there's no such class time or the user can't open it: it's at another
  * branch, or someone else teaches it.
  */
-export async function findClassTime(user: CurrentUser, id: string) {
+export async function findClassTime(user: AppUser, id: string) {
   return prisma.classTime.findFirst({
     where: { id, ...visibleClassTimes(user) },
     include: {
@@ -169,7 +169,7 @@ export async function loadMonth(
  * sheet saved that day, even if it doesn't meet on that day any more. One
  * with nobody in it that day has no sheet to take, so it's left out.
  */
-export async function classTimesOn(user: CurrentUser, day: string) {
+export async function classTimesOn(user: AppUser, day: string) {
   const visible = visibleClassTimes(user);
   const date = toDbDate(day);
 

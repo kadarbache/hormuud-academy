@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { forbidden, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 
-export type Role = "admin" | "staff" | "teacher";
+export type Role = "admin" | "staff" | "teacher" | "student";
 
 type Account = { id: string; name: string; email: string };
 
@@ -21,7 +21,18 @@ export type TeacherUser = Account & {
   teacherId: string;
 };
 
-export type CurrentUser = StaffUser | TeacherUser;
+/** A student's login. It sees that student's own record in the portal, nothing else. */
+export type StudentUser = Account & {
+  role: "student";
+  studentId: string;
+  /** Still on the temporary password staff gave them. */
+  mustChangePassword: boolean;
+};
+
+/** Everyone who uses the staff side of the app: staff and teachers. */
+export type AppUser = StaffUser | TeacherUser;
+
+export type CurrentUser = AppUser | StudentUser;
 
 /**
  * The signed-in user, or null. Cached for the length of one request. An
@@ -32,22 +43,31 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) return null;
 
-  const { id, name, email, role, branchId, teacherId } = session.user;
+  const { id, name, email, role, branchId, teacherId, studentId, mustChangePassword } =
+    session.user;
   if (role === "admin") return { id, name, email, role, branchId: null };
   if (role === "staff") return { id, name, email, role, branchId: branchId ?? null };
   if (role === "teacher" && teacherId) return { id, name, email, role, teacherId };
+  if (role === "student" && studentId) {
+    return { id, name, email, role, studentId, mustChangePassword: Boolean(mustChangePassword) };
+  }
   return null;
 });
 
 /** Where someone lands after logging in, and where a page they can't open sends them. */
 export function homeOf(user: CurrentUser) {
+  if (user.role === "student") return "/portal";
   return user.role === "teacher" ? "/attendance" : "/students";
 }
 
-/** Anyone logged in: staff or a teacher. Each page then shows them their own part. */
-export async function requireSignedIn(): Promise<CurrentUser> {
+/**
+ * Anyone on the staff side: staff or a teacher. Each page then shows them
+ * their own part. A student who opens one goes to the portal instead.
+ */
+export async function requireSignedIn(): Promise<AppUser> {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  if (user.role === "student") redirect(homeOf(user));
   return user;
 }
 
@@ -72,5 +92,20 @@ export async function requireAdmin(): Promise<StaffUser> {
 export async function requireTeacher(): Promise<TeacherUser> {
   const user = await requireSignedIn();
   if (user.role !== "teacher") redirect(homeOf(user));
+  return user;
+}
+
+/**
+ * A student's login. Staff and teachers are sent to their own side. A student
+ * still on a temporary password goes to choose their own first, unless this
+ * is where they choose it.
+ */
+export async function requireStudent(
+  { onTemporaryPassword = false }: { onTemporaryPassword?: boolean } = {},
+): Promise<StudentUser> {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (user.role !== "student") redirect(homeOf(user));
+  if (user.mustChangePassword && !onTemporaryPassword) redirect("/portal/password");
   return user;
 }
