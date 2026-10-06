@@ -22,7 +22,7 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  // Admin plugin. Role is "admin", "staff" or "teacher".
+  // Admin plugin. Role is "admin", "staff", "teacher" or "student".
   role       String?
   banned     Boolean?  @default(false)
   banReason  String?
@@ -38,18 +38,30 @@ model User {
   teacherId String?  @unique
   teacher   Teacher? @relation(fields: [teacherId], references: [id], onDelete: Restrict)
 
+  /// The student a student login belongs to. Set exactly when the role is
+  /// "student", never with a branch. Deleting the student, which is only for
+  /// duplicates and mistakes, deletes their login with them.
+  studentId String?  @unique
+  student   Student? @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  /// Set whenever staff hand a student a temporary password, and cleared
+  /// when the student chooses their own. Until then the portal shows them
+  /// nothing but the page to choose it.
+  mustChangePassword Boolean @default(false)
+
   sessions Session[]
   accounts Account[]
 
-  studentsCreated    Student[]         @relation("StudentCreatedBy")
-  enrollmentsCreated Enrollment[]      @relation("EnrollmentCreatedBy")
-  paymentsRecorded   Payment[]         @relation("PaymentRecordedBy")
-  expensesRecorded   Expense[]         @relation("ExpenseRecordedBy")
-  budgetsSaved       MonthlyBudget[]   @relation("BudgetSavedBy")
-  exchangeRatesSet   ExchangeRate[]    @relation("ExchangeRateSetBy")
-  stockChanges       StockChange[]     @relation("StockChangeRecordedBy")
-  sheetsTaken        AttendanceSheet[] @relation("AttendanceTakenBy")
-  sheetsChanged      AttendanceSheet[] @relation("AttendanceChangedBy")
+  studentsCreated    Student[]           @relation("StudentCreatedBy")
+  enrollmentsCreated Enrollment[]        @relation("EnrollmentCreatedBy")
+  paymentsRecorded   Payment[]           @relation("PaymentRecordedBy")
+  expensesRecorded   Expense[]           @relation("ExpenseRecordedBy")
+  budgetsSaved       MonthlyBudget[]     @relation("BudgetSavedBy")
+  exchangeRatesSet   ExchangeRate[]      @relation("ExchangeRateSetBy")
+  stockChanges       StockChange[]       @relation("StockChangeRecordedBy")
+  sheetsTaken        AttendanceSheet[]   @relation("AttendanceTakenBy")
+  sheetsChanged      AttendanceSheet[]   @relation("AttendanceChangedBy")
+  studentLoginEvents StudentLoginEvent[] @relation("StudentLoginEventBy")
 
   @@unique([email])
   @@index([branchId])
@@ -140,6 +152,8 @@ model Branch {
   payments     Payment[]
   expenses     Expense[]
   budgets      MonthlyBudget[]
+
+  studentLoginEvents StudentLoginEvent[]
 
   @@map("branches")
 }
@@ -345,6 +359,9 @@ model Student {
 
   enrollments Enrollment[]
   payments    Payment[]
+
+  login       User?
+  loginEvents StudentLoginEvent[]
 
   @@index([homeBranchId])
   @@index([phone])
@@ -695,6 +712,35 @@ model BookSaleLine {
   @@id([paymentId, branchBookId])
   @@index([branchBookId])
   @@map("book_sale_lines")
+}
+
+/// What staff did to a student's login.
+enum StudentLoginAction {
+  /// The login was made, with a temporary password.
+  CREATED
+  /// A new temporary password replaced the old one.
+  PASSWORD_RESET
+  TURNED_OFF
+  TURNED_ON
+}
+
+/// Every change staff make to a student's login: what, who, at which branch
+/// and when. Staff at several branches can manage the same login, so this is
+/// how anyone can tell who handed out a password.
+model StudentLoginEvent {
+  id        String             @id @default(cuid())
+  studentId String
+  student   Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  action    StudentLoginAction
+  byId      String
+  by        User               @relation("StudentLoginEventBy", fields: [byId], references: [id])
+  /// The branch the staff member worked at. Null when the admin did it.
+  branchId  String?
+  branch    Branch?            @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  createdAt DateTime           @default(now())
+
+  @@index([studentId, createdAt])
+  @@map("student_login_events")
 }
 
 /// Why copies went onto or came off a shelf, other than by a sale.
