@@ -1,9 +1,6 @@
-import { Separator } from "@/components/ui/separator";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { prisma } from "@/lib/prisma";
 import { requireSignedIn } from "@/lib/session";
-import { AppSidebar } from "./app-sidebar";
+import { AppShell } from "./app-shell";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireSignedIn();
@@ -35,34 +32,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const missingBranch = user.role === "staff" && !branch;
 
   return (
-    <SidebarProvider>
-      <AppSidebar
-        user={{
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          place,
-        }}
-      />
-      <SidebarInset>
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
-          <span className="truncate text-sm text-muted-foreground">{place}</span>
-          <ThemeToggle className="ml-auto" />
-        </header>
-        <main className="flex-1 p-4 md:p-6">
-          <div className="mx-auto w-full max-w-6xl space-y-6">
-            {missingBranch ? (
-              <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-                Your account isn&apos;t linked to a branch yet. Ask the admin to set your branch.
-              </div>
-            ) : (
-              children
-            )}
-          </div>
-        </main>
-      </SidebarInset>
-    </SidebarProvider>
+    <AppShell user={{ name: user.name, email: user.email, role: user.role, place }}>
+      {missingBranch ? (
+        <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+          Your account isn&apos;t linked to a branch yet. Ask the admin to set your branch.
+        </div>
+      ) : (
+        children
+      )}
+    </AppShell>
   );
 }
