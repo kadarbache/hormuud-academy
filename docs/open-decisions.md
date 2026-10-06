@@ -88,17 +88,9 @@ or change:
 
 ### 7. Attendance: what's left to decide
 
-The order and the marks were decided on 5 Oct 2026 (see "Decided"). Still
-open:
+The order, the marks and teacher logins were decided on 5 Oct 2026 (see
+"Decided"). Still open:
 
-- **How teachers sign in.** Staff sign in with Google only, so "the same as
-  staff" means Google, and a teacher without a Google account couldn't. The
-  other way is a phone number and a password, which needs Better Auth's
-  username plugin and a placeholder email. Only needed for step three.
-- **Who can mark Excused.** The teacher on the day, or only staff, who hear
-  the reason from the student or their responsible person.
-- **A stand-in teacher.** Whether whoever covers a class marks its sheet, or
-  staff mark it that day.
 - **Marking offline.** Leaning: online only at first. Keeping marks on the
   phone and sending them later is a project of its own.
 
@@ -135,8 +127,40 @@ this testing (Main Branch Computer Basics 4–6 pm, 4 and 5 Oct). The other two
 (Computer Basics at Import Test Branch, 28 Sep and 3 Oct, 21 students each)
 were taken by the admin account soon after, by someone else.
 
-Step two, strict roles, comes next whenever teacher logins are wanted: see
-number 7 and "Decided".
+**Teacher logins, before they go live.** Built on 5 Oct 2026, with steps two
+and three of the attendance plan together: strict roles, then a `teacher`
+role whose login names one teacher (`User.teacherId`). Tried in the browser
+on a production build against the Neon test database the same day: a login
+made for Demo Teacher 2 on Staff accounts (a missing teacher refused, and a
+second login for the same teacher refused by the server even when forced);
+as that teacher, `/` going to Attendance, every staff page (Students,
+Register, Income, Teachers, Classes, Books, a class time's own page, Staff
+accounts, Finance, Teacher pay) sending them back to Attendance, another
+teacher's class time Not found; today's sheet changed to one Excused, saved
+with "changed by Demo Teacher 2"; Sunday's sheet (not taken) with nothing to
+open, Saturday's (taken by the admin) read-only, and a forced save of it
+refused ("You can only mark today's attendance"); the month's grid with no
+links to student pages; My pay for a fixed teacher and, pointed at hamouda
+for a moment, with a share and a payout listed. Deactivating Demo Teacher 1
+banned their login and ended its session, Turn back on was refused while
+the teacher was off, activating the teacher turned the login back on, and
+deleting a teacher with a login was refused. The database refused a
+teacher login with a branch, one without its teacher, and a staff account
+naming a teacher. Branch staff were checked afterwards: same pages as
+before, My pay sending them to Students.
+
+What it left in the Neon test database: Demo Teacher 2's login
+(`demo.teacher2@example.com`, not signed in), Saturday 3 Oct's sheet for
+Computer Basics 8–9 pm at Main Branch (one Absent), and one Excused mark on
+5 Oct's. Demo Teacher 1's test login was deleted. To try Google sign-in as a
+teacher, edit that login's address to a real Gmail.
+
+Production (`ep-square-silence`) needs `20261005150000_teacher_logins`
+applied after `20261005120000_attendance`, after a backup, *before* the push,
+or every page breaks: Better Auth reads `teacherId` on each login. Nothing in
+it changes an existing account. Committed on local `main` on 6 Oct 2026,
+with the page states (loading, error, not found, Admins only) and the link
+preview card, not pushed.
 
 **Books, before it goes live.** Built and tried in the browser on 5 Oct
 2026: the book list, each branch's price and copies, deliveries and fixed
@@ -327,6 +351,27 @@ import. Reset it in the Neon console right after the import, then update
 changed.
 
 ## Decided
+
+- **Teacher logins.** Asked on 5 Oct 2026 ("lets work on the teacher sign in
+  and it will be same as the staff. what they can do is attendence only and
+  aslo see if there is any data related to them such as their salary").
+  Built the same day; see "Still to do". (5 Oct 2026)
+  - Teachers sign in with Google, the same as staff. A teacher without a
+    Google account can't sign in.
+  - The admin makes the login on Staff accounts, with the role Teacher and
+    the teacher it's for. One login per teacher. Deactivating the teacher
+    turns it off and logs them out; activating them turns it back on.
+  - A teacher sees the class times they teach, takes and changes today's
+    sheet for them with any of the four marks, Excused included, and reads
+    the other days'. Staff correct any day.
+  - Whoever covers a class for a day doesn't mark it. Staff take that day's
+    sheet.
+  - My pay shows their own pay, read-only: everything the admin sees on
+    their Teacher pay page, including each fee that earned them a share
+    with the student's name, but without the Pay button.
+  - Roles are strict: an account is an admin, branch staff or a teacher, and
+    any other role gets nothing. Every staff page sends a teacher back to
+    Attendance.
 
 - **Attendance: staff first, then teachers.** Asked on 5 Oct 2026 ("what will
   it take to add attendance where a teacher can do attendance to his class?").
