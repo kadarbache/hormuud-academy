@@ -8,7 +8,8 @@ import { EmptyRow } from "@/components/status-badge";
 import { formatSlot } from "@/lib/class-times";
 import { addDays, collegeToday, formatDateTime, isIsoDate, monthOf } from "@/lib/dates";
 import { formatStudentNumber } from "@/lib/format";
-import { requireUser } from "@/lib/session";
+import { requireSignedIn } from "@/lib/session";
+import { canMarkOn } from "../../../../attendance/access";
 import { saveAttendanceSheet } from "../../../../attendance/actions";
 import { classDaysBetween, sheetDayProblem } from "../../../../attendance/days";
 import { formatLongDay, formatShortDay } from "../../../../attendance/labels";
@@ -26,11 +27,12 @@ export async function generateMetadata({
  * One class time's attendance on one day: the sheet to take, or the one
  * already taken to correct. Staff at its branch and the admin can open any
  * of its days up to today, so a sheet kept on paper can be typed in later.
+ * Its teacher marks today's, and reads the others.
  */
 export default async function AttendanceSheetPage({
   params,
 }: PageProps<"/class-times/[id]/attendance/[date]">) {
-  const user = await requireUser();
+  const user = await requireSignedIn();
   const { id, date } = await params;
   if (!isIsoDate(date)) notFound();
   const classTime = await findClassTime(user, id);
@@ -39,6 +41,7 @@ export default async function AttendanceSheetPage({
   const today = collegeToday();
   const { sheet, students } = await loadSheet(id, date);
   const problem = sheetDayProblem(classTime, date, today, sheet !== null);
+  const readOnly = !canMarkOn(user, date, today);
   const marks = new Map(sheet?.entries.map((entry) => [entry.enrollmentId, entry.mark]));
   const skillName = classTime.branchSkill.skill.name;
   const here = `/class-times/${id}/attendance`;
@@ -88,14 +91,17 @@ export default async function AttendanceSheetPage({
               <> Changed by {sheet.changedBy.name}, {formatDateTime(sheet.changedAt)}.</>
             )}
           </>
+        ) : readOnly ? (
+          "Not taken."
         ) : (
           "Not taken yet. Everyone starts as Present: mark the students who weren't."
         )}
+        {readOnly && " You mark today's attendance only. To change this day's, ask the office."}
       </p>
 
       {problem ? (
         <EmptyRow message={problem} />
-      ) : students.length === 0 ? (
+      ) : readOnly && !sheet ? null : students.length === 0 ? (
         <EmptyRow message="Nobody was in this class time that day." />
       ) : (
         <SheetForm
@@ -103,6 +109,7 @@ export default async function AttendanceSheetPage({
           key={date}
           action={saveAttendanceSheet.bind(null, id, date)}
           saved={sheet !== null}
+          readOnly={readOnly}
           students={students.map((enrollment) => ({
             enrollmentId: enrollment.id,
             studentNumber: formatStudentNumber(enrollment.student.number),

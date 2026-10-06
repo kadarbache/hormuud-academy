@@ -22,16 +22,20 @@ export type SheetFormStudent = {
  * One day's sheet: a row per student with the four marks to pick from. A new
  * sheet starts with everyone Present, so taking it is tapping the ones who
  * aren't. Built for a phone first, with Save always in reach at the bottom.
+ * Read-only, it shows the marks with nothing to tap.
  */
 export function SheetForm({
   action,
   students,
   saved,
+  readOnly = false,
 }: {
   action: (formData: FormData) => Promise<ActionResult>;
   students: (SheetFormStudent & { mark: AttendanceMark })[];
   /** Whether this day's sheet has been saved before. */
   saved: boolean;
+  /** A teacher reading another day's sheet. */
+  readOnly?: boolean;
 }) {
   // Only what was tapped since the page loaded. Everything else shows the
   // saved mark, or Present, so a student added to the list since still has one.
@@ -46,16 +50,18 @@ export function SheetForm({
         <p className="text-sm text-muted-foreground">
           {students.length} {students.length === 1 ? "student" : "students"}
         </p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() =>
-            setPicked(Object.fromEntries(students.map((student) => [student.enrollmentId, "PRESENT"])))
-          }
-        >
-          Everyone present
-        </Button>
+        {!readOnly && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              setPicked(Object.fromEntries(students.map((student) => [student.enrollmentId, "PRESENT"])))
+            }
+          >
+            Everyone present
+          </Button>
+        )}
       </div>
 
       <ul className="divide-y rounded-lg border">
@@ -79,10 +85,10 @@ export function SheetForm({
                 </div>
               </div>
 
-              <fieldset className="grid grid-cols-4 gap-1 sm:w-88 sm:shrink-0">
+              <fieldset disabled={readOnly} className="grid grid-cols-4 gap-1 sm:w-88 sm:shrink-0">
                 <legend className="sr-only">{student.fullName}</legend>
                 {MARKS.map((option) => (
-                  <label key={option.value} className="cursor-pointer">
+                  <label key={option.value} className={readOnly ? undefined : "cursor-pointer"}>
                     <input
                       type="radio"
                       name={`mark.${student.enrollmentId}`}
@@ -98,7 +104,7 @@ export function SheetForm({
                         "flex h-9 items-center justify-center rounded-md border text-sm font-medium transition-colors peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/50",
                         mark === option.value
                           ? markStyle[option.value]
-                          : "bg-background text-muted-foreground hover:bg-muted",
+                          : cn("bg-background text-muted-foreground", !readOnly && "hover:bg-muted"),
                       )}
                     >
                       {option.label}
@@ -115,10 +121,12 @@ export function SheetForm({
 
       <div className="sticky bottom-0 -mx-4 flex flex-wrap items-center justify-between gap-3 border-t bg-background px-4 py-3 md:-mx-6 md:px-6">
         <p className="text-sm">{formatCounts(counts)}</p>
-        <Button type="submit" disabled={pending}>
-          {pending && <Spinner />}
-          {saved ? "Save changes" : "Save attendance"}
-        </Button>
+        {!readOnly && (
+          <Button type="submit" disabled={pending}>
+            {pending && <Spinner />}
+            {saved ? "Save changes" : "Save attendance"}
+          </Button>
+        )}
       </div>
     </form>
   );

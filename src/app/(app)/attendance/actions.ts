@@ -2,17 +2,18 @@
 
 import { refresh } from "next/cache";
 import type { AttendanceMark } from "@/generated/prisma/client";
-import { canActAtBranch } from "@/lib/access";
 import { failure, isUniqueViolation, success, type ActionResult } from "@/lib/action-result";
 import { collegeToday, isIsoDate, toDbDate } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/session";
+import { requireSignedIn } from "@/lib/session";
+import { canMarkOn, visibleClassTimes } from "./access";
 import { sheetDayProblem } from "./days";
 import { countMarks, formatCounts, formatLongDay, isMark } from "./labels";
 import { onTheSheet } from "./queries";
 
 // Taking attendance. Staff at the class time's branch and the admin take a
-// sheet for any of its days up to today, and correct one already saved.
+// sheet for any of its days up to today, and correct one already saved. The
+// class time's teacher takes and corrects today's. See ./access.ts.
 
 const listChanged = failure(
   "The class list changed while this sheet was open. Reload the page and mark it again.",
@@ -28,27 +29,31 @@ export async function saveAttendanceSheet(
   date: string,
   formData: FormData,
 ): Promise<ActionResult> {
-  const user = await requireUser();
-  const classTime = await prisma.classTime.findUnique({
-    where: { id: classTimeId },
-    select: {
-      startMinute: true,
-      endMinute: true,
-      days: true,
-      branchSkill: { select: { branchId: true } },
-    },
+  const user = await requireSignedIn();
+  const classTime = await prisma.classTime.findFirst({
+    where: { id: classTimeId, ...visibleClassTimes(user) },
+    select: { startMinute: true, endMinute: true, days: true },
   });
-  if (!classTime) return failure("That class time no longer exists.");
-  if (!canActAtBranch(user, classTime.branchSkill.branchId)) {
-    return failure("You can only take attendance at your own branch.");
+  if (!classTime) {
+    return failure(
+      user.role === "admin"
+        ? "That class time no longer exists."
+        : user.role === "teacher"
+          ? "You can only take attendance for the class times you teach."
+          : "You can only take attendance at your own branch.",
+    );
   }
   if (!isIsoDate(date)) return failure("Pick a day.");
+  const today = collegeToday();
+  if (!canMarkOn(user, date, today)) {
+    return failure("You can only mark today's attendance. Ask the office to change another day's.");
+  }
 
   const saved = await prisma.attendanceSheet.findUnique({
     where: { classTimeId_date: { classTimeId, date: toDbDate(date) } },
     include: { entries: { select: { enrollmentId: true, mark: true } } },
   });
-  const problem = sheetDayProblem(classTime, date, collegeToday(), saved !== null);
+  const problem = sheetDayProblem(classTime, date, today, saved !== null);
   if (problem) return failure(problem);
 
   const students = await prisma.enrollment.findMany({

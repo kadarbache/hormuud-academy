@@ -17,7 +17,7 @@ import { formatHours, slotOf } from "@/lib/class-times";
 import { addMonthsToMonth, collegeMonth, collegeToday, formatMonth, isIsoMonth } from "@/lib/dates";
 import { formatStudentNumber } from "@/lib/format";
 import { one } from "@/lib/search-params";
-import { requireUser } from "@/lib/session";
+import { requireSignedIn } from "@/lib/session";
 import { cn } from "@/lib/utils";
 import { meetsOn } from "../../../attendance/days";
 import {
@@ -35,16 +35,27 @@ export const metadata: Metadata = { title: "Attendance" };
 
 const weekdayOnly = new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", weekday: "short" });
 
+function StudentName({ student }: { student: { fullName: string; number: number } }) {
+  return (
+    <>
+      <div className="font-medium">{student.fullName}</div>
+      <div className="text-xs text-muted-foreground">{formatStudentNumber(student.number)}</div>
+    </>
+  );
+}
+
 /**
  * A class time's attendance for one month: a column for each of its days up
  * to today, a row for each student, and each student's rate for the month.
- * A column heading opens that day's sheet.
+ * A column heading opens that day's sheet. Its teacher sees it too, without
+ * the class time's own page or the students' pages behind it.
  */
 export default async function ClassTimeAttendancePage({
   params,
   searchParams,
 }: PageProps<"/class-times/[id]/attendance">) {
-  const user = await requireUser();
+  const user = await requireSignedIn();
+  const isTeacher = user.role === "teacher";
   const { id } = await params;
   const asked = one(await searchParams, "month");
   const classTime = await findClassTime(user, id);
@@ -62,10 +73,17 @@ export default async function ClassTimeAttendancePage({
   return (
     <>
       <Button variant="ghost" size="sm" asChild className="-ml-2">
-        <Link href={`/class-times/${id}`}>
-          <ChevronLeft />
-          {slot ? `${skillName}, ${formatHours(slot)}` : skillName}
-        </Link>
+        {isTeacher ? (
+          <Link href="/attendance">
+            <ChevronLeft />
+            Attendance
+          </Link>
+        ) : (
+          <Link href={`/class-times/${id}`}>
+            <ChevronLeft />
+            {slot ? `${skillName}, ${formatHours(slot)}` : skillName}
+          </Link>
+        )}
       </Button>
 
       <PageHeader
@@ -107,7 +125,12 @@ export default async function ClassTimeAttendancePage({
         <EmptyRow message={`Nobody was in this class time in ${formatMonth(month)}.`} />
       ) : (
         <>
-          {notTaken.length > 0 && (
+          {notTaken.length > 0 && isTeacher ? (
+            // Only the office takes a past day's sheet, so there's nothing to open.
+            <p className="text-sm">
+              Not taken on {notTaken.length} of {days.length} days.
+            </p>
+          ) : notTaken.length > 0 && (
             <div className="space-y-2">
               <p className="text-sm">
                 Not taken yet on {notTaken.length} of {days.length} days:
@@ -152,12 +175,13 @@ export default async function ClassTimeAttendancePage({
                   return (
                     <TableRow key={row.enrollmentId}>
                       <TableCell className="sticky left-0 z-10 bg-background">
-                        <Link href={`/students/${row.student.id}`} className="hover:underline">
-                          <div className="font-medium">{row.student.fullName}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {formatStudentNumber(row.student.number)}
-                          </div>
-                        </Link>
+                        {isTeacher ? (
+                          <StudentName student={row.student} />
+                        ) : (
+                          <Link href={`/students/${row.student.id}`} className="hover:underline">
+                            <StudentName student={row.student} />
+                          </Link>
+                        )}
                       </TableCell>
                       {days.map((day) => {
                         const mark = row.marks.get(day.date);

@@ -1,11 +1,11 @@
 import "server-only";
 import type { AttendanceMark, Prisma } from "@/generated/prisma/client";
-import { canActAtBranch } from "@/lib/access";
 import { inUse } from "@/lib/clashes";
 import { weekdayOf } from "@/lib/class-times";
 import { addDays, collegeDayStart, fromDbDate, monthEnd, monthStart, toDbDate } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
 import type { CurrentUser } from "@/lib/session";
+import { visibleClassTimes } from "./access";
 import { classDaysBetween } from "./days";
 import { countMarks, noMarks, type MarkCounts } from "./labels";
 
@@ -68,11 +68,12 @@ const byName = [
 
 /**
  * A class time with what its attendance pages show about it, or null when
- * there's no such class time or it's at another branch.
+ * there's no such class time or the user can't open it: it's at another
+ * branch, or someone else teaches it.
  */
 export async function findClassTime(user: CurrentUser, id: string) {
-  const classTime = await prisma.classTime.findUnique({
-    where: { id },
+  return prisma.classTime.findFirst({
+    where: { id, ...visibleClassTimes(user) },
     include: {
       classroom: { select: { id: true, name: true } },
       teacher: { select: { name: true } },
@@ -85,8 +86,6 @@ export async function findClassTime(user: CurrentUser, id: string) {
       },
     },
   });
-  if (!classTime || !canActAtBranch(user, classTime.branchSkill.branchId)) return null;
-  return classTime;
 }
 
 /** One day's sheet as saved, if it is, and everyone who belongs on it, A to Z. */
@@ -164,21 +163,20 @@ export async function loadMonth(
 }
 
 /**
- * The class times meeting on a day that this user takes attendance for, in
+ * The class times meeting on a day whose attendance this user can open, in
  * clock order, with that day's sheet if it's taken. Deactivated class times
  * are here while students still come to them. So is any class time with a
  * sheet saved that day, even if it doesn't meet on that day any more. One
  * with nobody in it that day has no sheet to take, so it's left out.
  */
 export async function classTimesOn(user: CurrentUser, day: string) {
-  const branch: Prisma.ClassTimeWhereInput =
-    user.role === "admin" ? {} : { branchSkill: { branchId: user.branchId ?? "" } };
+  const visible = visibleClassTimes(user);
   const date = toDbDate(day);
 
   const [classTimes, untimed] = await Promise.all([
     prisma.classTime.findMany({
       where: {
-        ...branch,
+        ...visible,
         OR: [
           { AND: [inUse, { startMinute: { not: null } }, { days: { has: weekdayOf(day) } }] },
           { attendanceSheets: { some: { date } } },
@@ -215,7 +213,7 @@ export async function classTimesOn(user: CurrentUser, day: string) {
     }),
     // Students come to these, but with no days set there's no sheet to take.
     prisma.classTime.count({
-      where: { ...branch, startMinute: null, enrollments: { some: { status: "ACTIVE" } } },
+      where: { ...visible, startMinute: null, enrollments: { some: { status: "ACTIVE" } } },
     }),
   ]);
 
@@ -244,4 +242,22 @@ export async function marksByEnrollment(enrollmentIds: string[]) {
     counts.set(group.enrollmentId, forEnrollment);
   }
   return counts;
+}
+
+/** Every class time a teacher teaches now, with how many students are in each. */
+export async function classTimesTaughtBy(teacherId: string) {
+  return prisma.classTime.findMany({
+    where: { teacherId, ...inUse },
+    orderBy: [{ startMinute: "asc" }, { endMinute: "asc" }],
+    include: {
+      classroom: { select: { name: true } },
+      branchSkill: {
+        select: {
+          skill: { select: { name: true } },
+          branch: { select: { name: true } },
+        },
+      },
+      _count: { select: { enrollments: { where: { status: "ACTIVE" } } } },
+    },
+  });
 }
