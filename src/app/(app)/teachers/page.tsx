@@ -11,7 +11,7 @@ import { currentRate } from "@/lib/exchange-rate";
 import { formatMoney } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import { salaryTypeLabels } from "../finance/labels";
 import { TeacherDialog } from "./teacher-dialog";
 import { createTeacher, deleteTeacher, setTeacherActive, updateTeacher } from "./actions";
@@ -19,7 +19,7 @@ import { createTeacher, deleteTeacher, setTeacherActive, updateTeacher } from ".
 export const metadata: Metadata = { title: "Teachers" };
 
 export default async function TeachersPage() {
-  const user = await requireUser();
+  const user = await requireStaff();
   const isAdmin = user.role === "admin";
   // Branch staff see the teachers who work at their branch and the skills
   // they run there, read-only. Changes stay with the admin, and the actions
@@ -46,6 +46,7 @@ export default async function TeachersPage() {
           },
           orderBy: { startMinute: "asc" },
         },
+        login: { select: { email: true } },
       },
     }),
     isAdmin ? prisma.branch.findMany({ orderBy: { name: "asc" } }) : [],
@@ -119,6 +120,10 @@ export default async function TeachersPage() {
                     <div className="font-medium">{teacher.name}</div>
                     {teacher.phone && (
                       <div className="text-xs text-muted-foreground">{formatPhone(teacher.phone)}</div>
+                    )}
+                    {/* Made on Staff accounts, with the role Teacher. */}
+                    {isAdmin && teacher.login && (
+                      <div className="text-xs text-muted-foreground">Logs in as {teacher.login.email}</div>
                     )}
                   </>
                 ),

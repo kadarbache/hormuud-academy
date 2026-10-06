@@ -1,7 +1,9 @@
 "use server";
 
+import { headers } from "next/headers";
 import { refresh } from "next/cache";
 import { z } from "zod";
+import { auth } from "@/lib/auth";
 import { inUse } from "@/lib/clashes";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
@@ -169,18 +171,51 @@ export async function setTeacherActive(id: string, active: boolean): Promise<Act
     }
   }
 
-  const teacher = await prisma.teacher.update({ where: { id }, data: { active } });
+  const teacher = await prisma.teacher.update({
+    where: { id },
+    data: { active },
+    select: { name: true, login: { select: { id: true } } },
+  });
+
+  // Their login goes off and on with them, the way a staff account is
+  // deactivated: banned, which also logs it out everywhere.
+  if (teacher.login) {
+    const requestHeaders = await headers();
+    if (active) {
+      await auth.api.unbanUser({ body: { userId: teacher.login.id }, headers: requestHeaders });
+    } else {
+      await auth.api.banUser({
+        body: { userId: teacher.login.id, banReason: "Teacher deactivated by an admin" },
+        headers: requestHeaders,
+      });
+    }
+  }
+
   refresh();
-  return success(active ? `${teacher.name} is active again.` : `${teacher.name} deactivated.`);
+  if (active) {
+    return success(
+      teacher.login ? `${teacher.name} is active again and can log in.` : `${teacher.name} is active again.`,
+    );
+  }
+  return success(
+    teacher.login ? `${teacher.name} deactivated and logged out.` : `${teacher.name} deactivated.`,
+  );
 }
 
 export async function deleteTeacher(id: string): Promise<ActionResult> {
   await requireAdmin();
   const teacher = await prisma.teacher.findUnique({
     where: { id },
-    include: { _count: { select: { classTimes: true, payments: true, payouts: true } } },
+    include: {
+      _count: { select: { classTimes: true, payments: true, payouts: true } },
+      login: { select: { id: true } },
+    },
   });
   if (!teacher) return failure("That teacher no longer exists.");
+  // Accounts are never deleted, only deactivated, so neither is a teacher with one.
+  if (teacher.login) {
+    return failure("This teacher has a login under Staff accounts. Deactivate them instead.");
+  }
   if (teacher._count.classTimes > 0) {
     return failure("This teacher is set on a class time. Deactivate them instead.");
   }

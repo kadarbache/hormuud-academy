@@ -30,8 +30,9 @@ const accountSchema = z
       .trim()
       .toLowerCase()
       .pipe(z.email("Enter a valid email address.")),
-    role: z.enum(["admin", "staff"], { error: "Pick a role." }),
+    role: z.enum(["admin", "staff", "teacher"], { error: "Pick a role." }),
     branchId: z.string().optional(),
+    teacherId: z.string().optional(),
   })
   .superRefine((value, ctx) => {
     if (value.role === "staff" && !value.branchId) {
@@ -41,27 +42,64 @@ const accountSchema = z
         message: "Pick the branch this person works at.",
       });
     }
+    if (value.role === "teacher" && !value.teacherId) {
+      ctx.addIssue({ code: "custom", path: ["teacherId"], message: "Pick the teacher this login is for." });
+    }
   });
+
+type Account = z.infer<typeof accountSchema>;
 
 const emailTaken = failure("Check the highlighted fields.", {
   email: ["There's already an account with this email."],
 });
 
-async function checkBranch(role: "admin" | "staff", branchId?: string) {
-  if (role === "admin") return null;
-  const branch = await prisma.branch.findUnique({ where: { id: branchId } });
-  return branch?.active
-    ? null
-    : failure("Check the highlighted fields.", { branchId: ["Pick an active branch."] });
+/**
+ * Whether the branch or teacher the account is for can have it: an active
+ * branch for branch staff, and for a teacher, an active teacher with no other
+ * login. `accountId` is the account being edited, which may already have it.
+ */
+async function checkPlace({ role, branchId, teacherId }: Account, accountId?: string) {
+  if (role === "staff") {
+    const branch = await prisma.branch.findUnique({ where: { id: branchId } });
+    return branch?.active
+      ? null
+      : failure("Check the highlighted fields.", { branchId: ["Pick an active branch."] });
+  }
+  if (role === "teacher") {
+    const teacher = await prisma.teacher.findUnique({
+      where: { id: teacherId },
+      select: { active: true, login: { select: { id: true, email: true } } },
+    });
+    // An account keeps the teacher it's for, even one deactivated since, so
+    // its name and address can still be corrected.
+    const keepsItsTeacher = accountId !== undefined && teacher?.login?.id === accountId;
+    if (!teacher || (!teacher.active && !keepsItsTeacher)) {
+      return failure("Check the highlighted fields.", { teacherId: ["Pick an active teacher."] });
+    }
+    if (teacher.login && teacher.login.id !== accountId) {
+      return failure("Check the highlighted fields.", {
+        teacherId: [`This teacher already logs in as ${teacher.login.email}.`],
+      });
+    }
+  }
+  return null;
+}
+
+/** Only branch staff have a branch, and only a teacher's login names a teacher. */
+function placeOf({ role, branchId, teacherId }: Account) {
+  return {
+    branchId: role === "staff" ? branchId : null,
+    teacherId: role === "teacher" ? teacherId : null,
+  };
 }
 
 export async function createStaffAccount(formData: FormData): Promise<ActionResult> {
   await requireAdmin();
   const parsed = accountSchema.safeParse(formObject(formData));
   if (!parsed.success) return invalid(parsed.error);
-  const { name, email, role, branchId } = parsed.data;
-  const branchProblem = await checkBranch(role, branchId);
-  if (branchProblem) return branchProblem;
+  const { name, email, role } = parsed.data;
+  const placeProblem = await checkPlace(parsed.data);
+  if (placeProblem) return placeProblem;
 
   try {
     // No password: the person signs in with the Google account that has this
@@ -73,7 +111,7 @@ export async function createStaffAccount(formData: FormData): Promise<ActionResu
         email,
         role,
         // Admins work across all branches, so they never have one.
-        data: { branchId: role === "staff" ? branchId : null, emailVerified: true },
+        data: { ...placeOf(parsed.data), emailVerified: true },
       },
       headers: await headers(),
     });
@@ -92,14 +130,14 @@ export async function updateStaffAccount(id: string, formData: FormData): Promis
   const admin = await requireAdmin();
   const parsed = accountSchema.safeParse(formObject(formData));
   if (!parsed.success) return invalid(parsed.error);
-  const { name, email, role, branchId } = parsed.data;
+  const { name, email, role } = parsed.data;
 
   // An admin who demotes themselves could leave the college with no admin.
   if (id === admin.id && role !== "admin") {
     return failure("You can't take away your own admin role. Ask another admin.");
   }
-  const branchProblem = await checkBranch(role, branchId);
-  if (branchProblem) return branchProblem;
+  const placeProblem = await checkPlace(parsed.data, id);
+  if (placeProblem) return placeProblem;
 
   const before = await prisma.user.findUniqueOrThrow({ where: { id }, select: { email: true } });
   const emailChanged = before.email !== email;
@@ -108,7 +146,7 @@ export async function updateStaffAccount(id: string, formData: FormData): Promis
       where: { id },
       // Saving confirms the email, the same as creating the account does.
       // Accounts made before Google sign-in get ready for it this way.
-      data: { name, email, emailVerified: true, role, branchId: role === "staff" ? branchId : null },
+      data: { name, email, emailVerified: true, role, ...placeOf(parsed.data) },
     });
   } catch (error) {
     if (isUniqueViolation(error)) return emailTaken;
@@ -168,6 +206,17 @@ export async function resetStaffPassword(id: string, formData: FormData): Promis
 export async function setStaffActive(id: string, active: boolean): Promise<ActionResult> {
   const admin = await requireAdmin();
   if (id === admin.id) return failure("You can't deactivate your own account.");
+
+  // A deactivated teacher's login stays off: it goes back on with the teacher.
+  if (active) {
+    const account = await prisma.user.findUnique({
+      where: { id },
+      select: { teacher: { select: { name: true, active: true } } },
+    });
+    if (account?.teacher && !account.teacher.active) {
+      return failure(`${account.teacher.name} is deactivated. Turn them back on under Teachers first.`);
+    }
+  }
 
   const requestHeaders = await headers();
   if (active) {

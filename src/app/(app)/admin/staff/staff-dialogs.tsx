@@ -5,26 +5,44 @@ import { FormDialog } from "@/components/form-dialog";
 import { SelectField, TextField, type Option } from "@/components/form-fields";
 import type { ActionResult } from "@/lib/action-result";
 
+type Role = "admin" | "staff" | "teacher";
+
 const roleOptions: Option[] = [
   { value: "staff", label: "Branch staff" },
+  { value: "teacher", label: "Teacher" },
   { value: "admin", label: "Admin" },
 ];
+
+const roleDescriptions: Record<Role, string> = {
+  admin: "Admins see every branch and manage skills, teachers, classes and accounts.",
+  staff: "Branch staff register and enroll students at their own branch.",
+  teacher: "A teacher takes today's attendance for the class times they teach and sees their own pay. Nothing else.",
+};
 
 export function StaffAccountDialog({
   action,
   branches,
+  teachers,
   account,
   isSelf = false,
   trigger,
 }: {
   action: (formData: FormData) => Promise<ActionResult>;
   branches: Option[];
+  /** Active teachers with no login yet, and the one this account is for. */
+  teachers: Option[];
   /** Missing when creating a new account. */
-  account?: { name: string; email: string; role: "admin" | "staff"; branchId: string | null };
+  account?: {
+    name: string;
+    email: string;
+    role: Role;
+    branchId: string | null;
+    teacherId: string | null;
+  };
   isSelf?: boolean;
   trigger: React.ReactNode;
 }) {
-  const [role, setRole] = useState(account?.role ?? "staff");
+  const [role, setRole] = useState<Role>(account?.role ?? "staff");
 
   return (
     <FormDialog
@@ -60,15 +78,9 @@ export function StaffAccountDialog({
             name="role"
             options={roleOptions}
             value={role}
-            onValueChange={(value) => setRole(value as "admin" | "staff")}
+            onValueChange={(value) => setRole(value as Role)}
             disabled={isSelf}
-            description={
-              isSelf
-                ? "You can't change your own role."
-                : role === "admin"
-                  ? "Admins see every branch and manage skills, teachers, classes and accounts."
-                  : "Branch staff register and enroll students at their own branch."
-            }
+            description={isSelf ? "You can't change your own role." : roleDescriptions[role]}
             errors={errors.role}
           />
           {/* A disabled select isn't submitted, so send the role another way. */}
@@ -81,6 +93,17 @@ export function StaffAccountDialog({
               placeholder="Pick a branch"
               defaultValue={account?.branchId ?? ""}
               errors={errors.branchId}
+            />
+          )}
+          {role === "teacher" && (
+            <SelectField
+              label="Teacher"
+              name="teacherId"
+              options={teachers}
+              placeholder={teachers.length > 0 ? "Pick a teacher" : "Every active teacher has a login"}
+              defaultValue={account?.teacherId ?? ""}
+              description="They see this teacher's class times and pay."
+              errors={errors.teacherId}
             />
           )}
         </>
