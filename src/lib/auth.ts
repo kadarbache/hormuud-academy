@@ -18,6 +18,14 @@ export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: "postgresql" }),
   secret: process.env.BETTER_AUTH_SECRET,
   baseURL: process.env.BETTER_AUTH_URL,
+  // The app never calls these, and each is a way around its own rules:
+  // - /link-social would let a signed-in student or teacher add any Google
+  //   account to their login. Someone who learned a teacher's password could
+  //   add their own and keep getting in after the admin resets it. A Google
+  //   account is linked only on its first sign-in, by the email the admin set.
+  // - /change-password would let a student or teacher pick a password their
+  //   password page refuses, without its record of the change.
+  disabledPaths: ["/link-social", "/change-password"],
   emailAndPassword: {
     enabled: true,
     // Nobody signs up. The admin creates every staff account.
