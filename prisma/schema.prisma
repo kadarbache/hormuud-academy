@@ -22,7 +22,7 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  // Admin plugin. Role is "admin" or "staff".
+  // Admin plugin. Role is "admin", "staff" or "teacher".
   role       String?
   banned     Boolean?  @default(false)
   banReason  String?
@@ -31,6 +31,12 @@ model User {
   // Branch staff work at exactly one branch. Admins have none and see every branch.
   branchId String?
   branch   Branch? @relation(fields: [branchId], references: [id])
+
+  /// The teacher a teacher login belongs to. Set exactly when the role is
+  /// "teacher", never with a branch: a teacher's branches are on the
+  /// teacher. The database refuses anything else.
+  teacherId String?  @unique
+  teacher   Teacher? @relation(fields: [teacherId], references: [id], onDelete: Restrict)
 
   sessions Session[]
   accounts Account[]
@@ -237,6 +243,9 @@ model ClassTime {
   @@map("class_times")
 }
 
+/// Someone who teaches. Not a staff account, though the admin can give a
+/// teacher a login of their own to take their class times' attendance and
+/// see their pay.
 model Teacher {
   id             String     @id @default(cuid())
   name           String
@@ -262,6 +271,8 @@ model Teacher {
   classTimes ClassTime[]
   payments   Payment[]
   payouts    Expense[]
+  /// Their login, if the admin gave them one.
+  login      User?
 
   @@map("teachers")
 }
