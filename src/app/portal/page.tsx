@@ -10,7 +10,7 @@ import { requireStudent } from "@/lib/session";
 import { attendanceRate, formatCounts, formatRate } from "../(app)/attendance/labels";
 import { marksByEnrollment } from "../(app)/attendance/queries";
 import { feeSchedule } from "../(app)/students/fee-schedule";
-import { Detail, OwedNotice, SkillStatus } from "./parts";
+import { Detail, SkillStatus, UnpaidNotice } from "./parts";
 import { getPortalFees, getPortalSkills } from "./queries";
 
 export const metadata: Metadata = { title: "My skills" };
@@ -29,7 +29,7 @@ export default async function MySkillsPage() {
     <>
       <PageHeader title="My skills" description="Every skill you take or took, at every branch." />
 
-      {Number(owedAltogether) > 0 && <OwedNotice amount={owedAltogether} linkToFees />}
+      {Number(owedAltogether) > 0 && <UnpaidNotice amount={owedAltogether} linkToFees />}
 
       {skills.length === 0 ? (
         <EmptyRow message="You aren't taking any skills yet." />

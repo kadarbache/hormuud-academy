@@ -8,13 +8,13 @@ import { formatMoney } from "@/lib/format";
 import { toCents } from "@/lib/money";
 import { requireStudent } from "@/lib/session";
 import { feeSchedule } from "../../(app)/students/fee-schedule";
-import { OwedNotice, warning } from "../parts";
+import { UnpaidNotice, warning } from "../parts";
 import { getPortalFees } from "../queries";
 
 export const metadata: Metadata = { title: "My fees" };
 
 /**
- * Each skill's registration fee and every month it owes a fee for, paid or
+ * Each skill's registration fee and every month it has a fee for, paid or
  * not. The same months and total staff see on the student's page: both come
  * from feeSchedule.
  */
@@ -31,10 +31,10 @@ export default async function MyFeesPage() {
       />
 
       {Number(owedAltogether) > 0 ? (
-        <OwedNotice amount={owedAltogether} />
+        <UnpaidNotice amount={owedAltogether} />
       ) : (
         enrollments.length > 0 && (
-          <p className="rounded-lg border bg-card p-4 text-sm">You don&apos;t owe anything.</p>
+          <p className="rounded-lg border bg-card p-4 text-sm">You have no unpaid fees.</p>
         )
       )}
 
@@ -95,7 +95,7 @@ export default async function MyFeesPage() {
                         )}
                       </div>
                       {months.length === 0 ? (
-                        <p className="text-muted-foreground">Nothing is owed until it starts.</p>
+                        <p className="text-muted-foreground">Nothing to pay until it starts.</p>
                       ) : (
                         <div className="flex flex-wrap gap-2">
                           {months.map(({ month, payment }) =>
