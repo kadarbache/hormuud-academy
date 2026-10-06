@@ -78,6 +78,14 @@ _Avoid_: Learner, trainee
 The number a student is known by, from STU-00001 upward, counted across the whole college and never reused.
 _Avoid_: Registration number, admission number
 
+**Student login**:
+A login staff give one student so they can see their own record in the portal. The student signs in with their Student ID and a password. Staff hand over a temporary password, shown once, and the student chooses their own the first time they sign in. The admin, and staff at any branch the student belongs to, create it, give it a new temporary password and turn it off and on, and every one of those changes is recorded. A student has at most one, and keeps it after finishing or dropping their skills.
+_Avoid_: Student account, student user
+
+**Portal**:
+The student's own side of the app, in the same frame as the staff side but with a menu of its own: their skills, attendance, fees and details, all read-only. A student never sees the staff side, and staff don't use the portal.
+_Avoid_: Student app, student dashboard
+
 **Home branch**:
 The branch where a student registered. The student can still take skills at any branch.
 _Avoid_: Owning branch
