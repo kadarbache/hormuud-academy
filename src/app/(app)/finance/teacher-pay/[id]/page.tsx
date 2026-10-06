@@ -2,13 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { DataTable } from "@/components/data-table";
 import { EmptyRow } from "@/components/status-badge";
-import { collegeMonth, collegeToday, formatDate, formatMonth, fromDbMonth } from "@/lib/dates";
+import { collegeMonth, collegeToday } from "@/lib/dates";
 import { currentRate } from "@/lib/exchange-rate";
-import { formatBoth, formatMoney, formatStudentNumber } from "@/lib/format";
+import { formatBoth, formatMoney } from "@/lib/format";
 import { ZERO_TOTAL } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
@@ -16,9 +14,10 @@ import { expenseCategoryOptions, listExpenseCategories } from "../../expense-cat
 import { createExpense } from "../../expenses/actions";
 import { ExpenseDialog } from "../../expenses/expense-dialog";
 import { branchChoices, teacherChoices } from "../../expenses/queries";
-import { Amount, Breakdown, StatCard, StatRow } from "../../figures";
-import { paymentMethodLabels, salaryTypeLabels, TEACHER_SALARY_ID } from "../../labels";
+import { Breakdown, StatCard, StatRow } from "../../figures";
+import { salaryTypeLabels, TEACHER_SALARY_ID } from "../../labels";
 import { payDefaults } from "../pay";
+import { PayoutsTable, SharePaymentsTable } from "../pay-tables";
 import { getTeacherPay } from "../queries";
 
 export async function generateMetadata({
@@ -154,67 +153,7 @@ export default async function TeacherPayDetailPage({
             }
           />
         ) : (
-          <DataTable
-            columns={[
-              { label: "Date" },
-              { label: "Student" },
-              { label: "Skill" },
-              { label: "Month" },
-              { label: "Branch" },
-              { label: "Student paid", className: "text-right tabular-nums" },
-              { label: "Their share", className: "text-right tabular-nums" },
-            ]}
-            rows={payments.map((payment) => ({
-              key: payment.id,
-              title: formatMoney(payment.teacherShare?.toString() ?? "0", payment.currency),
-              description: `Their share of ${formatMoney(payment.amount.toString(), payment.currency)} on ${formatDate(payment.paidOn)}`,
-              cells: {
-                Date: formatDate(payment.paidOn),
-                Student: (
-                  <>
-                    {payment.student ? (
-                      <Link
-                        href={`/students/${payment.student.id}`}
-                        className="font-medium hover:underline"
-                      >
-                        {payment.student.fullName}
-                      </Link>
-                    ) : (
-                      <span className="text-muted-foreground">No student</span>
-                    )}
-                    {payment.student && (
-                      <div className="font-mono text-xs text-muted-foreground">
-                        {formatStudentNumber(payment.student.number)}
-                      </div>
-                    )}
-                  </>
-                ),
-                Skill: payment.enrollment?.skill.name ?? "—",
-                Month: payment.forMonth ? formatMonth(fromDbMonth(payment.forMonth)) : "—",
-                Branch: payment.branch.name,
-                "Student paid": (
-                  <Amount
-                    amount={payment.amount}
-                    currency={payment.currency}
-                    exchangeRate={payment.exchangeRate}
-                    usdValue={payment.usdValue}
-                  />
-                ),
-                "Their share": (
-                  <>
-                    <span>
-                      {formatMoney(payment.teacherShare?.toString() ?? "0", payment.currency)}
-                    </span>
-                    {payment.teacherSharePercent && (
-                      <div className="text-xs text-muted-foreground">
-                        at {payment.teacherSharePercent.toString()}%
-                      </div>
-                    )}
-                  </>
-                ),
-              },
-            }))}
-          />
+          <SharePaymentsTable payments={payments} shareLabel="Their share" linkStudents />
         )}
       </section>
 
@@ -224,47 +163,7 @@ export default async function TeacherPayDetailPage({
         {payouts.length === 0 ? (
           <EmptyRow message="Nothing has been paid to this teacher yet." />
         ) : (
-          <DataTable
-            columns={[
-              { label: "Paid on" },
-              { label: "Covers" },
-              { label: "Branch" },
-              { label: "Paid by" },
-              { label: "Amount", className: "text-right tabular-nums" },
-              { label: "Recorded by", className: "text-muted-foreground" },
-            ]}
-            rows={payouts.map((payout) => ({
-              key: payout.id,
-              title: formatMoney(payout.amount.toString(), payout.currency),
-              description: `Paid on ${formatDate(payout.spentOn)}`,
-              cells: {
-                "Paid on": formatDate(payout.spentOn),
-                Covers: (
-                  <>
-                    {payout.forMonth ? (
-                      <Badge variant="secondary">{formatMonth(fromDbMonth(payout.forMonth))}</Badge>
-                    ) : (
-                      <span className="text-muted-foreground">Not said</span>
-                    )}
-                    {payout.note && (
-                      <div className="text-xs text-muted-foreground">{payout.note}</div>
-                    )}
-                  </>
-                ),
-                Branch: payout.branch.name,
-                "Paid by": paymentMethodLabels[payout.method],
-                Amount: (
-                  <Amount
-                    amount={payout.amount}
-                    currency={payout.currency}
-                    exchangeRate={payout.exchangeRate}
-                    usdValue={payout.usdValue}
-                  />
-                ),
-                "Recorded by": payout.recordedBy.name,
-              },
-            }))}
-          />
+          <PayoutsTable payouts={payouts} showRecordedBy />
         )}
       </section>
     </>
