@@ -67,18 +67,40 @@ export async function getPortalDetails(studentId: string) {
   return { student, isActive: activeSkills > 0 };
 }
 
-/** One of the student's own skills, with every day they were marked in it, newest first. */
+/** The hours and room a day's mark was taken in. */
+const sheetPlace = {
+  startMinute: true,
+  endMinute: true,
+  days: true,
+  classroom: { select: { name: true } },
+} satisfies Prisma.ClassTimeSelect;
+
+/**
+ * One of the student's own skills, with every day they were marked in it,
+ * newest first, and what's needed to find the class days nobody marked them:
+ * the class time they're in, when they joined and stopped, and the first
+ * sheet ever taken there.
+ */
 export function getPortalAttendance(studentId: string, enrollmentId: string) {
   return prisma.enrollment.findFirst({
     where: { id: enrollmentId, studentId },
     select: {
+      startDate: true,
+      status: true,
+      statusChangedAt: true,
       skill: { select: { name: true } },
       branchSkill: { select: { branch: { select: { name: true } } } },
+      classTime: {
+        select: {
+          ...sheetPlace,
+          attendanceSheets: { orderBy: { date: "asc" }, take: 1, select: { date: true } },
+        },
+      },
       attendance: {
         orderBy: { sheet: { date: "desc" } },
         select: {
           mark: true,
-          sheet: { select: { date: true } },
+          sheet: { select: { date: true, classTime: { select: sheetPlace } } },
         },
       },
     },
