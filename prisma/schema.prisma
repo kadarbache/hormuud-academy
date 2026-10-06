@@ -44,10 +44,15 @@ model User {
   studentId String?  @unique
   student   Student? @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
-  /// Set whenever staff hand a student a temporary password, and cleared
-  /// when the student chooses their own. Until then the portal shows them
+  /// Set whenever staff hand a student or a teacher a temporary password, and
+  /// cleared when they choose their own. Until then the app shows them
   /// nothing but the page to choose it.
   mustChangePassword Boolean @default(false)
+
+  /// When a teacher's temporary password stops working, 48 hours after the
+  /// admin gives it, unless they've chosen their own by then. Null for
+  /// everyone else: a student's temporary password doesn't expire.
+  temporaryPasswordExpires DateTime?
 
   sessions Session[]
   accounts Account[]
@@ -62,6 +67,7 @@ model User {
   sheetsTaken        AttendanceSheet[]   @relation("AttendanceTakenBy")
   sheetsChanged      AttendanceSheet[]   @relation("AttendanceChangedBy")
   studentLoginEvents StudentLoginEvent[] @relation("StudentLoginEventBy")
+  teacherLoginEvents TeacherLoginEvent[] @relation("TeacherLoginEventBy")
 
   @@unique([email])
   @@index([branchId])
@@ -262,6 +268,9 @@ model ClassTime {
 /// see their pay.
 model Teacher {
   id             String     @id @default(cuid())
+  /// Shown as TCH-00001, the Teacher ID a teacher signs in with. One
+  /// sequence for the whole college.
+  number         Int        @unique @default(autoincrement())
   name           String
   /// Digits only, in WhatsApp's form: see Student.phone.
   phone          String?
@@ -286,7 +295,8 @@ model Teacher {
   payments   Payment[]
   payouts    Expense[]
   /// Their login, if the admin gave them one.
-  login      User?
+  login       User?
+  loginEvents TeacherLoginEvent[]
 
   @@map("teachers")
 }
@@ -741,6 +751,40 @@ model StudentLoginEvent {
 
   @@index([studentId, createdAt])
   @@map("student_login_events")
+}
+
+/// What happened to a teacher's password, and each time they signed in.
+enum TeacherLoginAction {
+  /// The admin gave a first password, a temporary one.
+  PASSWORD_GIVEN
+  /// The admin replaced it with a new temporary one.
+  PASSWORD_RESET
+  /// The admin took it away: the teacher signs in with Google only.
+  PASSWORD_REMOVED
+  /// The teacher chose their own.
+  PASSWORD_CHANGED
+  SIGNED_IN_WITH_PASSWORD
+  SIGNED_IN_WITH_GOOGLE
+}
+
+/// A teacher's login can change attendance, so every password change and
+/// every sign-in is kept: what, who, from where and when. A changed sheet
+/// can then be traced to how its teacher got in.
+model TeacherLoginEvent {
+  id        String             @id @default(cuid())
+  teacherId String
+  teacher   Teacher            @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  action    TeacherLoginAction
+  /// The admin, or the teacher's own login for a sign-in or a password
+  /// they chose.
+  byId      String
+  by        User               @relation("TeacherLoginEventBy", fields: [byId], references: [id])
+  /// The address a sign-in came from. Null for the admin's changes.
+  ipAddress String?
+  createdAt DateTime           @default(now())
+
+  @@index([teacherId, createdAt])
+  @@map("teacher_login_events")
 }
 
 /// Why copies went onto or came off a shelf, other than by a sale.
