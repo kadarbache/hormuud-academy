@@ -72,10 +72,10 @@ Four kinds of people log in:
 
 - **Admins** see every branch and set everything up.
 - **Branch staff** work at one branch. They register students, look after those students' skills and take attendance at that branch.
-- **Teachers**, once the admin gives them a login. A teacher sees only the class times they teach: they take today's attendance for them and can read the days before. They also see their own pay, and nothing else.
+- **Teachers**, once the admin gives them a login. A teacher sees only the class times they teach: they take today's attendance for them and can read the days before. They also see their own pay, and nothing else. They sign in with Google, or with their Teacher ID and a password from the admin.
 - **Students**, once staff give them a login. A student sees only their own record, on a page of its own called the portal: their skills, their fees and their attendance. They can't change anything but their password.
 
-Nobody signs up on their own. The admin creates every staff and teacher account, and the person signs in with the Google account for that account's email. Passwords from before Google sign-in still work until the switch-over finishes. Students are different: staff give them a login on their page, and they sign in with their Student ID and a password.
+Nobody signs up on their own. The admin creates every staff and teacher account, and the person signs in with the Google account for that account's email. Passwords from before Google sign-in still work until the switch-over finishes. A teacher can also sign in with their Teacher ID, like `TCH-00007`, and a password the admin gives them, and a teacher without a Google account signs in that way only. Students are different: staff give them a login on their page, and they sign in with their Student ID and a password.
 
 Phase 1 was the college itself: branches, skills, teachers, classes, students and enrollments. Phase 2 is the money described above. Phase 3 has begun with attendance, which staff take at their branch and teachers take for their own class times, and with the student portal. Exams and certificates aren't built yet, and the last section lists everything else that's missing.
 
@@ -90,7 +90,7 @@ Phase 1 was the college itself: branches, skills, teachers, classes, students an
 | Components | shadcn/ui on Radix UI | Buttons, dialogs, tables, the sidebar, form fields |
 | Database | PostgreSQL | Stores everything. Neon in production, `prisma dev` on your computer |
 | Database access | Prisma 7 | Describes the tables, changes the database safely, runs typed queries |
-| Login | Better Auth 1.7 | Google sign-in, sessions, roles, deactivating accounts, and the old passwords until they're removed |
+| Login | Better Auth 1.7 | Google sign-in, students' and teachers' passwords, sessions, roles, deactivating accounts, and the old staff passwords until they're removed |
 | Validation | Zod 4 | Checks every form on the server before anything is saved |
 | Photos | Cloudinary | Stores student photos |
 | Hosting | Vercel | Runs the app on the internet |
@@ -142,7 +142,9 @@ Better Auth handles everything about logging in:
 - It **rate-limits** its own `/api/auth` endpoints and keeps the counts in the `rateLimit` table. Its default store is the server's memory, which doesn't work on Vercel, where each copy of the app has its own memory and loses it often. Better Auth only applies these limits in production.
 - The `nextCookies()` plugin lets server actions set the login cookie.
 - Sign-up is switched off (`disableSignUp: true`), for passwords and for Google. The seed script creates the first admin, and after that only admins create accounts.
-- It signs staff in with **Google** (`socialProviders.google`), described below. Students sign in with a password, which is why email and password sign-in stays on.
+- It signs staff in with **Google** (`socialProviders.google`), described below. Students sign in with a password, and teachers can, which is why email and password sign-in stays on.
+- Two of its endpoints are switched off (`disabledPaths`), because the app never calls them and each is a way around its own rules. `/api/auth/link-social` would let anyone signed in add a Google account of their choice to their login; someone who learned a teacher's password could add their own and keep getting in after the admin reset it. `/api/auth/change-password` would let a student or teacher choose a password their password page refuses, without the record of the change. Both answer 404. A Google account is linked only at its first sign-in, by the email the admin set.
+- Two **session hooks** run each time anyone signs in. Before the session is made, a password sign-in on a teacher's temporary password that has run out is refused (`temporary_password_expired`). The hook runs only once the password has been checked, so the message never tells a guesser anything. After the session is made, a teacher's sign-in is written to `teacher_login_events`, with whether it was Google or a password and the address it came from.
 
 The configuration is in `src/lib/auth.ts`. Better Auth's web endpoints are served at `/api/auth/...` by `src/app/api/auth/[...all]/route.ts`. The screens don't call them directly, because the login and logout forms use server actions. The one endpoint used from outside is `/api/auth/callback/google`, where Google sends people back.
 
@@ -150,7 +152,7 @@ A server action calls Better Auth's functions directly, without going through `/
 
 ### Google sign-in
 
-Staff and teachers sign in with their Google account instead of a password. Google proves the person owns the email, which is what an invite email would otherwise do, so the app sends no emails and needs no password.
+Staff sign in with their Google account instead of a password, and so can teachers who have one. Google proves the person owns the email, which is what an invite email would otherwise do, so the app sends no emails and needs no password.
 
 What happens when someone presses **Sign in with Google**:
 
@@ -188,7 +190,29 @@ How a student gets in:
 
 A student who forgets their password goes back to the branch, and staff press **Reset password**: a new temporary password, shown once, the old one stops working and the student is logged out on every phone. **Turn off** bans the login and logs them out; **Turn back on** lifts it. Each of these is a row in `student_login_events`, with who did it and at which branch, and the last five show on the student's page.
 
-The code is in `src/lib/student-logins.ts` (the email, the temporary password, setting a password and ending sessions), `src/app/(app)/students/login-actions.ts` (the three staff actions and who may use them) and `src/app/portal/` (the student's side).
+The code is in `src/lib/student-logins.ts` (the email and making the login), `src/lib/passwords.ts` (the temporary password, setting a password and ending sessions, shared with teachers), `src/app/(app)/students/login-actions.ts` (the three staff actions and who may use them) and `src/app/portal/` (the student's side).
+
+### Teacher logins and passwords
+
+The admin makes a teacher's login on Staff accounts, with the role Teacher. It can get in two ways, and has one or both:
+
+- **Google**, when the admin enters the teacher's Gmail address, exactly as for staff.
+- **Their Teacher ID and a password.** Every teacher has a Teacher ID, like `TCH-00007`, counted from `TCH-00001` across the whole college (the `number` column on `teachers`). The login form turns `TCH-00007` or `tch7` into the email on that teacher's login and signs in with it. A bare number is always a Student ID, so a Teacher ID needs its `TCH`.
+
+Gmail is optional for a teacher. With none, the login gets a made-up email built from the Teacher ID, `tch-00007@teachers.invalid`, the same idea as a student's, and is never shown; such a teacher can only get in with a password.
+
+Only the admin hands out a teacher's password, and it's held to more than a student's because a teacher can change attendance:
+
+1. The admin presses **Give password** on the teacher's row (or **Reset password** if they have one). The app makes a temporary password the same way as for a student, shows it once, and keeps only its hash. It stops working **48 hours** later (`temporaryPasswordExpires` on the login) if the teacher hasn't used it to choose their own. A reset also logs the teacher out everywhere, since someone else may know the old password.
+2. The teacher signs in with their Teacher ID and that password. Like a student, every page sends them to **Choose your password** (`/password`) first, with the menu hidden.
+3. Their own password must be at least **10 characters**, and `teacherPasswordProblem()` in `src/lib/teacher-logins.ts` refuses only two more things: only numbers (often a phone number or a date) and their Teacher ID inside it. Common words are allowed, so `teacher6160!!` is fine: sign-in allows 5 tries a minute per account, and that limit is what stops a guesser. (A stricter check that refused common words and the teacher's name was tried first and dropped on 6 Oct 2026, because it refused passwords like that one.)
+4. From then on, **Password** in their menu changes it. It asks for the current one and logs out their other devices.
+
+**Remove password** takes it away from a teacher who also has Google, leaving Google only, and logs them out everywhere. A teacher with no Gmail keeps theirs, since it's their only way in; deactivating is how to stop them.
+
+Every password given, reset, removed or chosen, and every sign-in with Google or a password, is a row in `teacher_login_events`, with who did it, when, and for a sign-in the IP address it came from. **History** on the teacher's row on Staff accounts shows the last 30. If an attendance sheet changed in a way that looks wrong, this shows when and how its teacher got in.
+
+The code is in `src/lib/teacher-logins.ts` (the made-up email, the 48 hours, the password rules, the record), `src/app/(app)/admin/staff/teacher-password-actions.ts` (the admin's Give, Reset and Remove) and `src/app/(app)/password/` (the teacher's own page).
 
 ### Zod
 
@@ -332,6 +356,7 @@ hormuud-academy/
 │   │       │                    rules every attendance page shares. access.ts says who takes
 │   │       │                    which: staff at their branch, a teacher their own class times
 │   │       ├── my-pay/          A teacher's own pay, read-only
+│   │       ├── password/        A teacher choosing or changing their own password
 │   │       ├── finance/         The money screens
 │   │       │   ├── page.tsx     The financial dashboard, admins only
 │   │       │   ├── labels.ts    The words for each stored code, shared by every screen
@@ -367,17 +392,20 @@ hormuud-academy/
 │   │           ├── categories/
 │   │           ├── skills/      The skill list, and [id]/ for one skill's page with its
 │   │           │                class times
-│   │           ├── staff/
+│   │           ├── staff/       Staff accounts, and a teacher's password and sign-in history
 │   │           └── settings/    The exchange rate and its history
 │   ├── components/
 │   │   ├── ui/                  shadcn/ui components
-│   │   └── *.tsx                Shared pieces: DataTable, FormDialog, ActionButton, fields, badges
+│   │   └── *.tsx                Shared pieces: DataTable, FormDialog, ActionButton, fields, badges,
+│   │                            the password form and the show-a-password-once button
 │   ├── hooks/                   useFormAction and useIsMobile
 │   ├── lib/                     auth, session, prisma, access, dates, money, exchange-rate,
 │   │                            teacher-share, format, validation, search-params, cloudinary,
 │   │                            rate-limit, class-times (hours and days), clashes (nothing
-│   │                            in two places at once), student-logins (a student's made-up
-│   │                            email, temporary passwords)
+│   │                            in two places at once), passwords (temporary passwords,
+│   │                            setting and checking one), student-logins (a student's
+│   │                            made-up email), teacher-logins (a teacher's made-up email,
+│   │                            password rules and sign-in record)
 │   └── generated/prisma/        The generated Prisma client (not in git)
 ├── docs/                        This guide and the decision records
 ├── CONTEXT.md                   The glossary
@@ -519,17 +547,18 @@ What the service worker keeps on the phone is only the app's own files (scripts,
 - Every page and every server action checks the login again. A server action can be called without opening its page, so hiding a button isn't enough: the action itself checks with `requireStaff()`, `requireAdmin()` or `requireSignedIn()`, and then checks the branch rules.
 - The branch rules live in `src/app/(app)/students/access.ts`: `visibleEnrollments`, `browsableStudents`, `canEditStudent` and `canActAtBranch`.
 - Roles are strict. `getCurrentUser()` in `src/lib/session.ts` knows four roles, `admin`, `staff`, `teacher` and `student`, and an account with any other role gets nothing. `requireStaff()` lets in only the admin and branch staff, and sends a teacher who opens a staff page or calls a staff action to their own Attendance page. `requireSignedIn()`, which every staff-side page and action goes through, sends a student to the portal. So a new staff page is closed to teachers and students without anyone having to remember it.
-- The portal's pages call `requireStudent()`, which lets in only a student's login, and read everything for the student the login names. A skill's attendance page checks the skill is theirs, so changing the address shows "Not found". A student still on a temporary password is sent to choose their own before any other page opens.
+- The portal's pages call `requireStudent()`, which lets in only a student's login, and read everything for the student the login names. A skill's attendance page checks the skill is theirs, so changing the address shows "Not found". A student still on a temporary password is sent to choose their own before any other page opens. `requireSignedIn()` does the same for a teacher on a temporary password, sending them to `/password`.
 - A teacher's rules live in `src/app/(app)/attendance/access.ts`: `visibleClassTimes` (only the class times they teach) and `canMarkOn` (only today). The pages use them to show the right things, and the save action checks both again.
-- Staff and teachers sign in with Google, and an unknown Google account is refused. The app never sees a Google password. A student's login can't be linked to Google.
+- Staff sign in with Google, and an unknown Google account is refused. The app never sees a Google password. A student's login can't be linked to Google, and nobody can link a second Google account to their login (`/api/auth/link-social` is off).
+- A teacher can sign in with Google, with their Teacher ID and a password, or either. Their password is held to more than a student's because they change attendance: the admin's temporary one works for 48 hours, their own must be at least 10 characters, not only numbers and without their Teacher ID, and every sign-in and password change is recorded with the address it came from. See [Teacher logins and passwords](#teacher-logins-and-passwords).
 - No account can be created except through the admin plugin's create-user. A database hook in `src/lib/auth.ts` refuses every other way, so a sign-in setting that fails to switch sign-up off can't open it. Staff giving a student a login use it too, called from the server without the staff member's session, once the app has checked they may manage that student.
 - The passwords left from before Google sign-in are stored as hashes. Nobody, including the admin, can read a password back. An admin can only set a new one, and only on an account that still has one.
 - There is no sign-up page.
 - Deactivating an account stops the login and ends every open session straight away. Deactivating a teacher does the same to their login.
 - Setting a new password also ends every open session for that person, because a reset often means someone else knew the old password. An admin who resets their own password stays logged in on the device they're using.
 - `src/app/robots.ts` tells search engines not to list the site. A link pasted into WhatsApp still gets a preview card, the graduation cap and the name from `opengraph-image.tsx`, because the phone sharing it fetches the preview itself. The card never shows anything from inside the app.
-- A student's temporary password is shown once, to the staff member who made it, and only its hash is kept. Staff can't read a student's password either, only give them a new temporary one, which logs the student out everywhere. Every login made, password reset, and login turned off or on is recorded with who did it and at which branch.
-- The login form allows 5 tries per account (an email, or a Student ID) and 60 tries per computer (IP address) each minute. After that it shows "Too many login attempts" and how many seconds to wait. This stops anyone guessing a password by trying thousands. The per-computer limit is high because a whole class signing in on the branch Wi-Fi shares one IP address; the per-account limit is what stops a guesser. The Google button has its own limit of 20 a minute per computer, and a student changing their password gets 5 tries a minute at their current one.
+- A student's temporary password is shown once, to the staff member who made it, and only its hash is kept. Staff can't read a student's password either, only give them a new temporary one, which logs the student out everywhere. Every login made, password reset, and login turned off or on is recorded with who did it and at which branch. A teacher's temporary password works the same way, but only the admin hands it out.
+- The login form allows 5 tries per account (an email, a Student ID or a Teacher ID) and 60 tries per computer (IP address) each minute. After that it shows "Too many login attempts" and how many seconds to wait. This stops anyone guessing a password by trying thousands. The per-computer limit is high because a whole class signing in on the branch Wi-Fi shares one IP address; the per-account limit is what stops a guesser. The Google button has its own limit of 20 a minute per computer, and a student or teacher changing their password gets 5 tries a minute at their current one.
 
 ### Dates and the time zone
 
@@ -636,6 +665,8 @@ erDiagram
     Student |o--o| User : "logs in as"
     Student ||--o{ StudentLoginEvent : "has its login changed by"
     User ||--o{ StudentLoginEvent : "made"
+    Teacher ||--o{ TeacherLoginEvent : "has its sign-ins and password changes in"
+    User ||--o{ TeacherLoginEvent : "made"
     User ||--o{ Student : "registered"
     User ||--o{ Enrollment : "created"
     User ||--o{ Session : "has"
@@ -704,6 +735,7 @@ erDiagram
     }
     Teacher {
         string id PK
+        int number UK "shown as TCH-00001"
         string name
         string phone
         boolean active
@@ -859,6 +891,7 @@ erDiagram
         string teacherId FK, UK "a teacher's login"
         string studentId FK, UK "a student's login"
         boolean mustChangePassword "still on a temporary password"
+        datetime temporaryPasswordExpires "when a teacher's stops working"
     }
     StudentLoginEvent {
         string id PK
@@ -866,6 +899,13 @@ erDiagram
         enum action "CREATED, PASSWORD_RESET, TURNED_OFF or TURNED_ON"
         string byId FK
         string branchId FK "empty for the admin"
+    }
+    TeacherLoginEvent {
+        string id PK
+        string teacherId FK
+        enum action "a password change, or a sign-in with Google or a password"
+        string byId FK
+        string ipAddress "where a sign-in came from"
     }
 ```
 
@@ -887,7 +927,7 @@ The code uses the model names on the left. The actual table names in Postgres ar
 
 **ClassTime** (`class_times`). One branch skill taught in one class, from a start time to an end time on chosen days, by one teacher: "Graphic Design, Computer Lab, 6–8 pm, Sat Mon Wed, Demo Teacher 2". `startMinute` and `endMinute` are minutes after midnight (4 pm is 960), and `days` is a list of weekdays, from `SATURDAY` to `FRIDAY`. Each class time sets its own hours, so a two-hour class and a one-hour class can share an afternoon. A branch skill can have several class times, and every enrollment is in one. The hours and days are empty only on the class times the `class_times` migration made from the branch skills already set up, until the admin sets them. An inactive class time takes no new students, but the ones already in it stay.
 
-**Teacher** (`teachers`). A person who teaches. Name, phone, `active`, and how they're paid: `salaryType` is `FIXED` with a `fixedSalary` each month in its `salaryCurrency` (dollars or shillings), or `PERCENTAGE` with a `percentageRate` such as 30 for 30%. Never both — the form clears the one that doesn't apply. A percentage teacher earns in whatever currency each student pays, so their `salaryCurrency` means nothing. A teacher is not a login account.
+**Teacher** (`teachers`). A person who teaches. Their `number`, shown as the Teacher ID `TCH-00001` and counted across the whole college like a Student ID, their name, phone, `active`, and how they're paid: `salaryType` is `FIXED` with a `fixedSalary` each month in its `salaryCurrency` (dollars or shillings), or `PERCENTAGE` with a `percentageRate` such as 30 for 30%. Never both — the form clears the one that doesn't apply. A percentage teacher earns in whatever currency each student pays, so their `salaryCurrency` means nothing. A teacher is not a login account.
 
 **TeacherBranch** (`teacher_branches`). A link table: one row for each branch a teacher works at. It lets one teacher work at several branches without being entered twice.
 
@@ -959,9 +999,11 @@ A student has no status column. They are Active when at least one of their enrol
 
 **AttendanceEntry** (`attendance_entries`). One student's mark on one sheet: the sheet, the enrollment and the `mark`, which is `PRESENT`, `ABSENT`, `LATE` or `EXCUSED`. It names the enrollment rather than the student, so the marks of a student taking two skills stay apart. The sheet names the class time, so moving the student to another class time later leaves the mark where it was taken. Nothing is added up and stored: an attendance rate is counted from these rows each time a screen shows one.
 
-**User** (`user`). A login account. Better Auth's own columns (name, email, `emailVerified`, `image`), the admin plugin's columns (`role`, `banned`, `banReason`, `banExpires`), and this app's `branchId`, `teacherId`, `studentId` and `mustChangePassword`. Branch staff have a branch. Admins have none. A teacher's login names its teacher in `teacherId` and has no branch, because a teacher's branches are on the teacher. A teacher has at most one login. A student's login names its student in `studentId`, has no branch, and has the made-up email `stu-00042@students.invalid`; a student has at most one. `mustChangePassword` is true while a student is still on a temporary password from staff. `emailVerified` is true once the admin has created or saved a staff account, and Google sign-in needs it.
+**User** (`user`). A login account. Better Auth's own columns (name, email, `emailVerified`, `image`), the admin plugin's columns (`role`, `banned`, `banReason`, `banExpires`), and this app's `branchId`, `teacherId`, `studentId`, `mustChangePassword` and `temporaryPasswordExpires`. Branch staff have a branch. Admins have none. A teacher's login names its teacher in `teacherId` and has no branch, because a teacher's branches are on the teacher. A teacher has at most one login, with their Gmail or, without one, the made-up email `tch-00007@teachers.invalid`. A student's login names its student in `studentId`, has no branch, and has the made-up email `stu-00042@students.invalid`; a student has at most one. `mustChangePassword` is true while a student or teacher is still on a temporary password, and `temporaryPasswordExpires` is when a teacher's stops working; a student's has none. `emailVerified` is true once the admin has created or saved a staff account, and Google sign-in needs it.
 
 **StudentLoginEvent** (`student_login_events`). Every change staff made to a student's login: the student, the `action` (`CREATED`, `PASSWORD_RESET`, `TURNED_OFF` or `TURNED_ON`), who did it (`byId`), the branch they work at (`branchId`, empty for the admin) and when. Staff at several branches can manage the same login, so this is how anyone can tell who handed out a password. The student's own password changes aren't here.
+
+**TeacherLoginEvent** (`teacher_login_events`). Every change to a teacher's password and every time they signed in: the teacher, the `action` (`PASSWORD_GIVEN`, `PASSWORD_RESET` or `PASSWORD_REMOVED` by the admin, `PASSWORD_CHANGED` by the teacher, `SIGNED_IN_WITH_PASSWORD` or `SIGNED_IN_WITH_GOOGLE`), who did it (`byId`: the admin, or the teacher's own login), the `ipAddress` of a sign-in, and when. Unlike a student's, the teacher's own changes and sign-ins are here, because a teacher's login can change attendance.
 
 **Session**, **Account**, **Verification** (`session`, `account`, `verification`). Better Auth's tables. A session is one login on one device. An account row is one way to sign in: `providerId = "google"` links a Google account, and `providerId = "credential"` holds an old password's hash. Verification holds the `state` of each Google sign-in while the person is at Google.
 
@@ -1002,6 +1044,7 @@ The app adds its own checks on top. Names are compared ignoring upper and lower 
 | `20261005120000_attendance` | Adds attendance: `attendance_sheets`, one per class time per day with who took it and who last changed it, and `attendance_entries`, one mark per student on a sheet. Nothing already recorded changes |
 | `20261005150000_teacher_logins` | Adds `teacherId` to `user`, so a login can belong to a teacher, at most one per teacher, with the checks that only a teacher's login names one and that it has no branch. Every existing account is left as it was |
 | `20261006090000_student_logins` | Adds `studentId` and `mustChangePassword` to `user`, so a login can belong to a student, at most one per student, with the checks that only a student's login names one and that it has no branch. Adds `student_login_events`. Every existing account is left as it was |
+| `20261006150000_teacher_passwords` | Gives every teacher a `number`, their Teacher ID, numbering the existing ones in the order they were added. Adds `temporaryPasswordExpires` to `user` and `teacher_login_events`. Every existing account is left as it was |
 
 ### Looking at the data yourself
 
@@ -1048,6 +1091,7 @@ The app adds its own checks on top. Names are compared ignoring upper and lower 
 | Branches, skills, categories | Yes | No, those pages aren't in their menu and are blocked |
 | Expense categories | Yes | No, the page is blocked |
 | Staff accounts | Yes | No |
+| Give a teacher a password, reset it or take it away, and see their sign-ins | Yes | No |
 | Record money in shillings | Yes | Yes, wherever they can record dollars |
 | Set the exchange rate (Settings) | Yes | No, the page is blocked |
 
@@ -1061,6 +1105,7 @@ A teacher's login can do far less:
 | Take attendance, or change a mark | Today's sheet only, for a class time they teach, with any of the four marks |
 | See another day's sheet and a class time's month | Read-only, for their own class times |
 | See their pay: the salary or rate, the fees that earned them a share, what they've been paid | Their own, read-only |
+| Change their password | Yes, giving the current one, if the admin gave them one |
 | Students' pages, money, books, teachers, classes, setup | No. Opening one sends them back to Attendance |
 
 A teacher covering someone else's class for a day can't open it. Staff take that day's sheet.
@@ -1087,6 +1132,8 @@ Go to the app's address. Anyone not logged in lands on the login page. Press **S
 Until the switch-over finishes, the email and password form is still under the Google button. A wrong password shows "Wrong email or password." After 5 wrong tries in a minute, the form makes you wait before you can try again.
 
 A student types their Student ID in the same box, as `STU-00042`, `stu42` or `42`, with their password, and lands on the portal. The eye at the end of a password box shows what was typed, and pressing it again hides it; the boxes for choosing a password have it too. The first time, with the temporary password from staff, they choose their own password before anything else. A wrong one shows "Wrong Student ID or password", and a login staff turned off shows "Your login has been turned off. Ask at your branch."
+
+A teacher can press **Sign in with Google**, or type their Teacher ID in the same box, as `TCH-00007` or `tch7`, with the password from the admin, and lands on Attendance. The first time, they choose their own password before anything else; the admin's stops working after 48 hours, and then the form says "This temporary password has expired. Ask the admin for a new one." A wrong one shows "Wrong Teacher ID or password", and a deactivated login "Your login has been turned off. Ask the admin."
 
 To log out, use **Log out** at the bottom of the sidebar, or at the top right of the portal.
 
@@ -1119,7 +1166,7 @@ Log in as the admin and do these in order, because each step needs the one befor
 4. **Teachers.** Add each teacher and tick the branches they work at.
 5. **Skills.** Add each skill with its category, duration, registration fee and monthly fee. After saving, the app opens the skill's page.
 6. **On each skill's page**, press **Add to a branch** for every branch that teaches it, then **Add class time** under that branch: the hours, the days, a class and a teacher. A skill no branch teaches can't be taken by anyone, and neither can a branch skill with no class time.
-7. **Staff accounts.** Create an account for each person at each branch with their Gmail address, and tell them to sign in with Google.
+7. **Staff accounts.** Create an account for each person at each branch with their Gmail address, and tell them to sign in with Google. A teacher with no Google account gets a login with the Gmail left blank, and then a password from **Give password**.
 8. **Settings.** Set the exchange rate, so staff can take shillings.
 9. **Books**, if the college sells any. Add each book with its default price, then on its page **Add to a branch** for every branch that sells it, and **Add copies** for what's on that branch's shelf. Staff at the branch can add copies themselves from then on.
 
@@ -1152,7 +1199,7 @@ Branch staff see this page too, with only their branch's classes and no buttons.
 
 Add a teacher with a name, an optional phone, at least one branch, and how they're paid. A fixed salary has a Currency dropdown beside it: the salary is set in that currency, and their pay is always recorded in it. When you edit a teacher, you can't untick a branch where they still have a class time: give that class time another teacher first. You also can't deactivate a teacher who still teaches a class time that's active or has students. The table shows every class time each teacher teaches: the skill, the branch and the hours.
 
-A teacher with a login shows "Logs in as" and the address under their name. Deactivating that teacher also deactivates their login and logs them out, and activating them turns it back on. A teacher with a login can't be deleted: deactivate them instead.
+Each teacher's Teacher ID, like `TCH-00003`, shows under their name, before the phone. A teacher with a login shows "Logs in as" and the address under that, or "Logs in with Teacher ID" when the login has no Gmail. Deactivating that teacher also deactivates their login and logs them out, and activating them turns it back on. A teacher with a login can't be deleted: deactivate them instead.
 
 Branch staff see this page too, with only the teachers at their branch, the class times each one teaches there, in which class and at what hours, and no buttons.
 
@@ -1244,10 +1291,13 @@ Branch staff see the Books page too, with only their branch's books: the price, 
 #### Staff accounts
 
 - **Add staff account.** Enter a name, the person's Gmail address, a role and, for branch staff, their branch. There's no password and no email sending: tell the person yourself that they can sign in with Google.
-- **A teacher's login** is made the same way, with the role **Teacher** and the teacher it's for instead of a branch. The Teacher list offers only active teachers who don't have a login yet. The Branch column shows the teacher's branches.
-- **Signs in with** shows Google once the person has signed in with Google, "Google, not signed in yet" before that, and Password for an account left from before Google sign-in.
+- **A teacher's login** is made the same way, with the role **Teacher** and the teacher it's for instead of a branch. The Teacher list offers only active teachers who don't have a login yet, each with their Teacher ID. The Gmail address is optional for a teacher: leave it blank for one with no Google account, then press **Give password** on their row. The Role column shows the Teacher ID and the Branch column the teacher's branches.
+- **Signs in with** shows Google once the person has signed in with Google, "Google, not signed in yet" before that, and Password for an account left from before Google sign-in. For a teacher it shows Google and "Teacher ID and password" on separate lines, "Temporary password until" a date and time while they're still on the admin's, "Temporary password, expired" once it's run out, and "No way in yet" for a teacher with no Gmail and no password.
+- **Give password** (or **Reset password** once they have one), on a teacher's row, asks first, then shows a temporary password once, with a button to copy it. Give it to the teacher with their Teacher ID. It works for 48 hours, and they choose their own the first time they sign in. A reset also logs them out everywhere.
+- **Remove password**, on a teacher with a Gmail and a password, leaves them signing in with Google only and logs them out everywhere. A teacher with no Gmail keeps theirs, since it's their only way in.
+- **History**, on a teacher's row, lists their last 30 sign-ins and password changes, newest first: Google or password, who changed it, when, and the address a sign-in came from.
 - **Edit** changes the name, Gmail address, role or branch. Changing the address logs the person out and removes their Google link, so they sign in again with the Google account for the new address. Saving also gets an older account ready for Google. You can't change your own role, so the college can't be left without an admin.
-- **New password** shows only on accounts that still have a password from before Google sign-in. It sets a new one and logs them out everywhere.
+- **New password** shows only on staff and admin accounts that still have a password from before Google sign-in. It sets a new one and logs them out everywhere.
 - **Deactivate** logs the person out everywhere and blocks their login. Their students and records stay. **Turn back on** reverses it. You can't deactivate yourself. A deactivated teacher's login can't be turned back on here: turn the teacher back on under Teachers, and the login comes back with them.
 
 Accounts can't be deleted, because students and enrollments record who created them.
@@ -1384,6 +1434,8 @@ If the list changed while the sheet was open, say a student joined, saving is re
 #### What a teacher sees
 
 A teacher's **Attendance** lists only the class times they teach that meet on the day, without the Teacher column. Under it, **Your class times** lists everything they teach, with the days, hours, class and students, and an **Attendance** button that opens each one's month. **Take attendance** and **Open** work as they do for staff, but only today's sheet can be saved. Another day's sheet opens read-only, saying "You mark today's attendance only. To change this day's, ask the office." A day nobody took has nothing to open, and the month's grid lists the days not taken without buttons. Student names aren't links, because a student's page is for staff. A class time someone else teaches is Not found, even on a day they covered it.
+
+**Password**, in a teacher's menu, changes the password they sign in with along with their Teacher ID. It asks for the current one and logs out their other phones and computers. A teacher who only uses Google sees that they have no password there and can ask the admin for one. A teacher still on the admin's temporary password sees no menu, only **Choose your password**, until they've chosen one: at least 10 characters, not only numbers, and without their Teacher ID.
 
 ### The student portal
 
