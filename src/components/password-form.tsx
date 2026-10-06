@@ -6,13 +6,28 @@ import { FieldGroup } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
 import { FormError, PasswordField } from "@/components/form-fields";
 import { useFormAction } from "@/hooks/use-form-action";
-import { changePassword } from "./actions";
+import type { ActionResult } from "@/lib/action-result";
 
-export function PasswordForm({ askCurrent }: { askCurrent: boolean }) {
+/**
+ * Choosing your own password: a student in the portal, or a teacher. On a
+ * temporary password the current one isn't asked for, since they just signed
+ * in with it. Saving goes on to `home`.
+ */
+export function PasswordForm({
+  action,
+  askCurrent,
+  minLength,
+  home,
+}: {
+  action: (formData: FormData) => Promise<ActionResult>;
+  askCurrent: boolean;
+  minLength: number;
+  home: string;
+}) {
   const router = useRouter();
-  const { pending, fieldErrors, formError, onSubmit } = useFormAction(changePassword, {
+  const { pending, fieldErrors, formError, onSubmit } = useFormAction(action, {
     onSuccess: () => {
-      router.replace("/portal");
+      router.replace(home);
       router.refresh();
     },
   });
@@ -33,7 +48,7 @@ export function PasswordForm({ askCurrent }: { askCurrent: boolean }) {
           label="New password"
           name="newPassword"
           autoComplete="new-password"
-          description="At least 8 characters."
+          description={`At least ${minLength} characters.`}
           required
           errors={fieldErrors.newPassword}
         />

@@ -1,11 +1,11 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ActionButton } from "@/components/action-button";
+import { IssuePasswordButton } from "@/components/issue-password-button";
 import type { StudentLoginAction } from "@/generated/prisma/client";
 import { formatDateTime } from "@/lib/dates";
 import { createLogin, resetLoginPassword, setLoginActive } from "../login-actions";
 import type { getStudentLogin } from "../queries";
-import { IssuePasswordButton } from "./student-login";
 
 const actionLabel: Record<StudentLoginAction, string> = {
   CREATED: "Login created",
@@ -58,7 +58,8 @@ export function PortalLogin({
           {!login ? (
             <IssuePasswordButton
               action={createLogin.bind(null, studentId)}
-              studentNumber={studentNumber}
+              who="student"
+              loginId={studentNumber}
               label="Create login"
               title={`Create a login for ${studentNumber}?`}
               description="You'll see a temporary password once. Give it to the student; they choose their own the first time they sign in."
@@ -68,7 +69,8 @@ export function PortalLogin({
             <>
               <IssuePasswordButton
                 action={resetLoginPassword.bind(null, studentId)}
-                studentNumber={studentNumber}
+                who="student"
+                loginId={studentNumber}
                 label="Reset password"
                 variant="outline"
                 title="Give the student a new password?"

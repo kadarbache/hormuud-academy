@@ -5,14 +5,10 @@ import { APIError } from "better-auth/api";
 import type { StudentLoginAction } from "@/generated/prisma/client";
 import { failure, isUniqueViolation, success, type ActionResult } from "@/lib/action-result";
 import { formatStudentNumber } from "@/lib/format";
+import { endSessions, setPassword, temporaryPassword } from "@/lib/passwords";
 import { prisma } from "@/lib/prisma";
 import { requireStaff, type StaffUser } from "@/lib/session";
-import {
-  createStudentLogin,
-  endSessions,
-  setStudentPassword,
-  temporaryPassword,
-} from "@/lib/student-logins";
+import { createStudentLogin } from "@/lib/student-logins";
 import { browsableStudents } from "./access";
 
 // A student's login to the portal. The admin, and staff at any branch the
@@ -82,7 +78,7 @@ export async function resetLoginPassword(
   if (student.login.banned) return failure("This login is turned off. Turn it back on first.");
 
   const password = temporaryPassword();
-  await setStudentPassword(student.login.id, password, { temporary: true });
+  await setPassword(student.login.id, password, { temporary: true });
   await endSessions(student.login.id);
   await record(user, student.id, "PASSWORD_RESET");
 

@@ -19,13 +19,16 @@ import { Spinner } from "@/components/ui/spinner";
 import type { ActionResult } from "@/lib/action-result";
 
 /**
- * Create login and Reset password. Both ask first, then show the temporary
- * password once, for staff to read out or write down. Closing the dialog is
- * the last anyone sees of it: only its hash is kept.
+ * Hands out a temporary password: a student's login on their page, a
+ * teacher's on Staff accounts. Asks first, then shows the password once, for
+ * staff to read out or write down. Closing the dialog is the last anyone sees
+ * of it: only its hash is kept.
  */
 export function IssuePasswordButton({
   action,
-  studentNumber,
+  who,
+  loginId,
+  expiresNote,
   label,
   title,
   description,
@@ -33,7 +36,11 @@ export function IssuePasswordButton({
   variant = "default",
 }: {
   action: () => Promise<ActionResult<{ password: string }>>;
-  studentNumber: string;
+  who: "student" | "teacher";
+  /** What they sign in with: STU-00042 or TCH-00007. */
+  loginId: string;
+  /** How long the password works, when it doesn't forever. */
+  expiresNote?: string;
   label: string;
   title: string;
   description: React.ReactNode;
@@ -88,11 +95,11 @@ export function IssuePasswordButton({
         {password ? (
           <>
             <AlertDialogHeader>
-              <AlertDialogTitle>Give the student this password</AlertDialogTitle>
+              <AlertDialogTitle>Give the {who} this password</AlertDialogTitle>
               <AlertDialogDescription>
                 It won&apos;t be shown again. They sign in with{" "}
-                <span className="font-mono text-foreground">{studentNumber}</span> and this
-                password, then choose their own.
+                <span className="font-mono text-foreground">{loginId}</span> and this password,
+                then choose their own.{expiresNote && ` ${expiresNote}`}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <div className="flex items-center justify-between gap-2 rounded-lg border bg-muted/40 px-4 py-3">

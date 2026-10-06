@@ -3,8 +3,9 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PasswordForm } from "@/components/password-form";
 import { requireStudent } from "@/lib/session";
-import { PasswordForm } from "./password-form";
+import { changePassword } from "./actions";
 
 export const metadata: Metadata = { title: "Password" };
 
@@ -32,7 +33,7 @@ export default async function PortalPasswordPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <PasswordForm askCurrent={!first} />
+          <PasswordForm action={changePassword} askCurrent={!first} minLength={8} home="/portal" />
         </CardContent>
       </Card>
     </>

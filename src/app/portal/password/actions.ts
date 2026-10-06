@@ -4,9 +4,9 @@ import { headers } from "next/headers";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { failure, invalid, success, type ActionResult } from "@/lib/action-result";
+import { endSessions, isPassword, setPassword } from "@/lib/passwords";
 import { consumeRateLimit } from "@/lib/rate-limit";
 import { requireStudent } from "@/lib/session";
-import { endSessions, isStudentPassword, setStudentPassword } from "@/lib/student-logins";
 import { formObject } from "@/lib/validation";
 
 // Wrong current passwords count against the login, like sign-in attempts, so
@@ -44,13 +44,13 @@ export async function changePassword(formData: FormData): Promise<ActionResult> 
   }
 
   if (!user.mustChangePassword) {
-    if (!currentPassword || !(await isStudentPassword(user.id, currentPassword))) {
+    if (!currentPassword || !(await isPassword(user.id, currentPassword))) {
       return failure("Check the highlighted fields.", {
         currentPassword: ["That isn't your password now."],
       });
     }
   }
-  if (await isStudentPassword(user.id, newPassword)) {
+  if (await isPassword(user.id, newPassword)) {
     return failure("Check the highlighted fields.", {
       newPassword: [
         user.mustChangePassword
@@ -60,7 +60,7 @@ export async function changePassword(formData: FormData): Promise<ActionResult> 
     });
   }
 
-  await setStudentPassword(user.id, newPassword, { temporary: false });
+  await setPassword(user.id, newPassword, { temporary: false });
   const session = await auth.api.getSession({ headers: await headers() });
   await endSessions(user.id, { except: session?.session.id });
 
