@@ -21,6 +21,7 @@ import {
   Tag,
   Tags,
   UserPlus,
+  UserRound,
   Users,
   Wallet,
 } from "lucide-react";
@@ -155,6 +156,24 @@ const teacherItems: NavItem[] = [
   { href: "/my-pay", label: "My pay", icon: HandCoins, match: under("/my-pay") },
 ];
 
+// A student's login: their own record, read-only, in the portal.
+const portalItems: NavItem[] = [
+  { href: "/portal", label: "My skills", icon: BookOpen, match: (pathname) => pathname === "/portal" },
+  {
+    href: "/portal/attendance",
+    label: "Attendance",
+    icon: ClipboardCheck,
+    match: under("/portal/attendance"),
+  },
+  { href: "/portal/fees", label: "My fees", icon: Wallet, match: under("/portal/fees") },
+  {
+    href: "/portal/details",
+    label: "My details",
+    icon: UserRound,
+    match: (pathname) => under("/portal/details")(pathname) || under("/portal/password")(pathname),
+  },
+];
+
 const adminItems: NavItem[] = [
   { href: "/admin/branches", label: "Branches", icon: Building2, match: under("/admin/branches") },
   { href: "/admin/skills", label: "Skills", icon: BookOpen, match: under("/admin/skills") },
@@ -190,8 +209,13 @@ function NavMenu({ items, pathname }: { items: NavItem[]; pathname: string }) {
 export function AppSidebar({
   user,
 }: {
-  /** `place` is where they work: all branches, their branch, or a teacher's branches. */
-  user: { name: string; email: string; role: Role; place: string };
+  /**
+   * `place` is where they work or study: all branches, their branch, a
+   * teacher's branches or a student's home branch. `locked` hides the menu
+   * from a student who must choose a password first, since every page would
+   * only send them back.
+   */
+  user: { name: string; email: string; role: Role; place: string; locked?: boolean };
 }) {
   const pathname = usePathname();
 
@@ -207,7 +231,16 @@ export function AppSidebar({
       </SidebarHeader>
 
       <SidebarContent>
-        {user.role === "teacher" ? (
+        {user.role === "student" ? (
+          !user.locked && (
+            <SidebarGroup>
+              <SidebarGroupLabel>Your studies</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <NavMenu items={portalItems} pathname={pathname} />
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )
+        ) : user.role === "teacher" ? (
           <SidebarGroup>
             <SidebarGroupLabel>Teaching</SidebarGroupLabel>
             <SidebarGroupContent>
@@ -223,7 +256,7 @@ export function AppSidebar({
           </SidebarGroup>
         )}
 
-        {user.role === "teacher" ? null : user.role === "admin" ? (
+        {user.role === "teacher" || user.role === "student" ? null : user.role === "admin" ? (
           <>
             <SidebarGroup>
               <SidebarGroupLabel>Money</SidebarGroupLabel>
@@ -257,7 +290,9 @@ export function AppSidebar({
               ? "Admin, all branches"
               : user.role === "teacher"
                 ? `Teacher, ${user.place}`
-                : `Staff, ${user.place}`}
+                : user.role === "student"
+                  ? `Student, ${user.place}`
+                  : `Staff, ${user.place}`}
           </p>
         </div>
         <SidebarMenu>
