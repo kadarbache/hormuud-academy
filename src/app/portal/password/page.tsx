@@ -14,7 +14,8 @@ export default async function PortalPasswordPage() {
   const first = user.mustChangePassword;
 
   return (
-    <>
+    // The back link sits over the card's left edge, so both are centered together.
+    <div className="mx-auto w-full max-w-md space-y-6">
       {!first && (
         <Button variant="ghost" size="sm" asChild className="-ml-2">
           <Link href="/portal/details">
@@ -23,7 +24,7 @@ export default async function PortalPasswordPage() {
           </Link>
         </Button>
       )}
-      <Card className="max-w-md">
+      <Card>
         <CardHeader>
           <CardTitle>{first ? "Choose your password" : "Change password"}</CardTitle>
           <CardDescription>
@@ -36,6 +37,6 @@ export default async function PortalPasswordPage() {
           <PasswordForm action={changePassword} askCurrent={!first} minLength={8} home="/portal" />
         </CardContent>
       </Card>
-    </>
+    </div>
   );
 }
