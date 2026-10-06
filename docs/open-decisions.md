@@ -157,9 +157,10 @@ teacher, edit that login's address to a real Gmail.
 Production (`ep-square-silence`) needs `20261005150000_teacher_logins`
 applied after `20261005120000_attendance`, after a backup, *before* the push,
 or every page breaks: Better Auth reads `teacherId` on each login. Nothing in
-it changes an existing account. Committed on local `main` on 6 Oct 2026,
-with the page states (loading, error, not found, Admins only) and the link
-preview card, not pushed.
+it changes an existing account. Live since 6 Oct 2026: the migration was
+applied to `ep-square-silence`, then `main` was pushed (up to `612f6ed`) with
+the page states (loading, error, not found, Admins only) and the link
+preview card. Not yet tried by a real teacher on the live site.
 
 **Books, before it goes live.** Built and tried in the browser on 5 Oct
 2026: the book list, each branch's price and copies, deliveries and fixed
