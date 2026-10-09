@@ -30,7 +30,7 @@ const RECENT_DAYS = 6;
 const FILTERS = [
   { value: "active", label: "Active", status: "ACTIVE" },
   { value: "finished", label: "Finished", status: "FINISHED" },
-  { value: "dropped", label: "Dropped", status: "DROPPED" },
+  { value: "deactivated", label: "Deactivated", status: "DROPPED" },
   { value: "all", label: "All", status: null },
 ] as const satisfies readonly { value: string; label: string; status: EnrollmentStatus | null }[];
 
@@ -39,7 +39,7 @@ function StatusBadge({ status }: { status: EnrollmentStatus }) {
   if (status === "FINISHED") return <Badge variant="secondary">Finished</Badge>;
   return (
     <Badge variant="outline" className="text-muted-foreground">
-      Dropped
+      Deactivated
     </Badge>
   );
 }

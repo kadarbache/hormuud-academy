@@ -13,7 +13,7 @@ export function SkillStatus({ status }: { status: "ACTIVE" | "FINISHED" | "DROPP
   if (status === "FINISHED") return <Badge variant="secondary">Finished</Badge>;
   return (
     <Badge variant="outline" className="text-muted-foreground">
-      Dropped
+      Deactivated
     </Badge>
   );
 }

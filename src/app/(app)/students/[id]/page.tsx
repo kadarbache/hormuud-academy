@@ -62,7 +62,7 @@ export async function generateMetadata({ params }: PageProps<"/students/[id]">):
   return { title: student?.fullName ?? "Student" };
 }
 
-const statusLabel = { ACTIVE: "Active", FINISHED: "Finished", DROPPED: "Dropped" } as const;
+const statusLabel = { ACTIVE: "Active", FINISHED: "Finished", DROPPED: "Deactivated" } as const;
 
 const warning = "border-warning-border bg-warning text-warning-foreground";
 
@@ -82,7 +82,7 @@ function EnrollmentStatus({ status }: { status: keyof typeof statusLabel }) {
   if (status === "FINISHED") return <Badge variant="secondary">Finished</Badge>;
   return (
     <Badge variant="outline" className="text-muted-foreground">
-      Dropped
+      Deactivated
     </Badge>
   );
 }
@@ -299,7 +299,7 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
               disabled={paidAMonthlyFee}
               title={
                 paidAMonthlyFee
-                  ? "This student has paid monthly fees, so they can't be deleted. Drop their skills instead and they show as Inactive."
+                  ? "This student has paid monthly fees, so they can't be deleted. Deactivate their skills instead and they show as Inactive."
                   : undefined
               }
               action={deleteStudent.bind(null, student.id)}
@@ -460,14 +460,14 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
                             className="text-destructive"
                             action={setEnrollmentStatus.bind(null, enrollment.id, "DROPPED")}
                             confirm={{
-                              title: `Drop ${enrollment.skill.name}?`,
+                              title: `Deactivate ${enrollment.skill.name}?`,
                               description:
                                 "Use this when the student stopped coming before finishing. You can set it active again later.",
-                              confirmLabel: "Drop skill",
+                              confirmLabel: "Deactivate",
                               destructive: true,
                             }}
                           >
-                            Drop
+                            Deactivate
                           </ActionButton>
                         </>
                       ) : (

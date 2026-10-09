@@ -529,7 +529,7 @@ export async function setEnrollmentStatus(
   const slot = slotOf(enrollment.classTime);
   if (status === "ACTIVE" && slot) {
     const clash = await studentClash([enrollment.studentId], slot, { id: enrollmentId });
-    if (clash) return failure(`${clash} Finish, drop or move that skill first.`);
+    if (clash) return failure(`${clash} Finish, deactivate or move that skill first.`);
     // A deactivated class time with nobody left in it let go of its class and
     // teacher, and another class time may have taken them since.
     if (!enrollment.classTime.active) {
@@ -550,14 +550,14 @@ export async function setEnrollmentStatus(
   } catch (error) {
     if (isUniqueViolation(error)) {
       return failure(
-        `The student is already taking ${enrollment.skill.name} again. Finish or drop that one first.`,
+        `The student is already taking ${enrollment.skill.name} again. Finish or deactivate that one first.`,
       );
     }
     throw error;
   }
 
   refresh();
-  const done = { ACTIVE: "is active again", FINISHED: "marked finished", DROPPED: "marked dropped" };
+  const done = { ACTIVE: "is active again", FINISHED: "marked finished", DROPPED: "deactivated" };
   return success(`${enrollment.skill.name} ${done[status]}.`);
 }
 
@@ -619,7 +619,7 @@ export async function deleteStudent(id: string): Promise<ActionResult> {
   const monthsPaid = await prisma.payment.count({ where: { studentId: id, category: "MONTHLY_FEE" } });
   if (monthsPaid > 0) {
     return failure(
-      `${formatStudentNumber(student.number)} has paid monthly fees, so they can't be deleted. Drop their skills instead and they show as Inactive.`,
+      `${formatStudentNumber(student.number)} has paid monthly fees, so they can't be deleted. Deactivate their skills instead and they show as Inactive.`,
     );
   }
 
