@@ -249,7 +249,7 @@ it here and it is recorded on the registration date.
 
 - What it is: their details, their skills, and every month of every skill
 - Grey box: that month is paid. Yellow box: still owed
-- You decide here: mark finished, drop, or set active again
+- You decide here: mark finished, deactivate, or set active again
 - The end date never finishes a skill by itself
 
 Notes: This page is where most daily work happens. The end date is a guide
@@ -280,7 +280,7 @@ end-of-day count: cash, ZAAD, eDahab and bank across the top.
 - What it is: everyone who still owes, biggest debt first
 - Registration fees and unpaid months, per student, per skill
 - A month only counts once it has started
-- A dropped skill is not chased
+- A deactivated skill is not chased
 
 Notes: Nothing here is stored. It is worked out from the enrollments and their
 payments every time the page opens, so it is never stale.

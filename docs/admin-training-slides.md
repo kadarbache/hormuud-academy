@@ -616,11 +616,11 @@ students on either bar applies that filter in one click.
 
 - A student is Active if they have at least one Active skill anywhere
 - Nobody sets this by hand
-- Drop or finish their last skill and they become Inactive by themselves
+- Finish or deactivate their last skill and they become Inactive by themselves
 - Add a skill and they are Active again
 
 Notes: There is no on/off switch on a student, on purpose. The way to take
-somebody out of their classes is to drop the skill, which leaves a record of
+somebody out of their classes is to deactivate the skill, which leaves a record of
 why.
 
 ---
@@ -709,14 +709,14 @@ look at their own student's page before you carry on.
 ## Slide 53. The skills table
 
 - Branch, teacher, class, start and end dates, both fees, status
-- Status is Active, Finished or Dropped
+- Status is Active, Finished or Deactivated
 - Mark finished when they complete it
-- Drop when they stop coming before finishing
+- Deactivate when they stop coming before finishing
 - Set active undoes a mistake
 
 ![Add skill](training/student-add-skill.png)
 
-Notes: Drop and Set active both ask for confirmation. Set active is refused if
+Notes: Deactivate and Set active both ask for confirmation. Set active is refused if
 the student is already taking that skill again, which stops two live
 enrollments for the same thing.
 
@@ -767,7 +767,7 @@ payment first, which Part 5 covers.
 
 ![Crop to the Monthly fees panel at the bottom](training/student-page.png)
 
-Notes: Nobody owes for a month that hasn't happened, and a student who dropped
+Notes: Nobody owes for a month that hasn't happened, and a skill deactivated
 in March is not chased for April. The panel heading counts the months paid,
 what has come in and what is still out.
 
@@ -780,7 +780,7 @@ what has come in and what is still out.
 - It changes income already recorded for those days
 - It is refused outright for a student who has paid a monthly fee
 
-Notes: The right way to take a student out of their classes is to drop their
+Notes: The right way to take a student out of their classes is to deactivate their
 skills. They show as Inactive and the history stays. Deleting is refused after
 a monthly fee because the money is in the books and a percentage teacher may
 already have been paid a share of it.
@@ -944,7 +944,7 @@ teacher's salary expense first, then the payment, then record the salary again.
 
 ![Fees owed](training/fees-owed.png)
 
-Notes: A month only counts once it has started, and a dropped skill stops being
+Notes: A month only counts once it has started, and a deactivated skill stops being
 chased. Nothing here is stored. It is worked out from the enrollments and their
 payments each time the page opens.
 
@@ -1281,7 +1281,7 @@ students carry on, and nobody new can join there.
 
 - A branch closes for good
 
-Notes: Answer, in order: finish or drop its students' skills, deactivate its
+Notes: Answer, in order: finish its students' skills or deactivate them, deactivate its
 skills on each skill page, deactivate its staff accounts, then deactivate the
 branch. The history stays. Nothing is deleted.
 
