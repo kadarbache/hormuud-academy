@@ -651,6 +651,12 @@ changed.
 - **Deleting a student.** Never once they've paid a monthly fee. To take them
   out of their classes, drop their skills and they show as Inactive. (21 Sep
   2026)
+- **No "Dropped" on the screens.** The college doesn't drop anyone, so a skill
+  the student stopped coming to is **Deactivated**, set with **Deactivate** and
+  undone with **Set active**, the same words the app uses for branches,
+  teachers and the rest. The database still stores it as `DROPPED`, the way
+  Class is `Classroom` in the code, so no migration was needed. It said
+  "Inactive" from 7 Oct until 9 Oct 2026.
 - **The `financials` branch** was merged into local `main` on 21 Sep 2026 (a
   fast-forward, both at `76fa2e8`). Nothing is pushed. Going live still needs a
   production backup, then `pnpm db:deploy`, then the push, because the build
