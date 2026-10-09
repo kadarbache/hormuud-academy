@@ -83,7 +83,7 @@ The number a student is known by, from STU-00001 upward, counted across the whol
 _Avoid_: Registration number, admission number
 
 **Student login**:
-A login staff give one student so they can see their own record in the portal. The student signs in with their Student ID and a password. Staff hand over a temporary password, shown once, and the student chooses their own the first time they sign in. The admin, and staff at any branch the student belongs to, create it, give it a new temporary password and turn it off and on, and every one of those changes is recorded. A student has at most one, and keeps it after finishing or dropping their skills.
+A login staff give one student so they can see their own record in the portal. The student signs in with their Student ID and a password. Staff hand over a temporary password, shown once, and the student chooses their own the first time they sign in. The admin, and staff at any branch the student belongs to, create it, give it a new temporary password and turn it off and on, and every one of those changes is recorded. A student has at most one, and keeps it after their skills are finished or deactivated.
 _Avoid_: Student account, student user
 
 **Portal**:
@@ -107,15 +107,15 @@ Adding a new student to the college, along with the first skills they take. Happ
 _Avoid_: Admission, sign-up
 
 **Enrollment**:
-One student taking one branch skill in one of its class times, from a start date, keeping the monthly fee and registration fee from the day they joined; moving to another class time changes neither. Its status is Active, Finished or Dropped.
+One student taking one branch skill in one of its class times, from a start date, keeping the monthly fee and registration fee from the day they joined; moving to another class time changes neither. Its status is Active, Finished or Deactivated.
 _Avoid_: Registration, subscription
 
 **Finished**:
 The student completed the skill.
 
-**Dropped**:
-The student stopped coming before completing the skill.
-_Avoid_: Cancelled, withdrawn
+**Deactivated** (an enrollment):
+The student stopped coming before completing the skill. Staff press **Deactivate**, and **Set active** undoes it. The code stores it as `DROPPED`; the screens never say dropped. Not the same as an Inactive student: a student with one Deactivated skill and one Active skill is still Active.
+_Avoid_: Dropped, Inactive, cancelled, withdrawn
 
 **End date**:
 An enrollment's start date plus the branch skill's duration, as it was on the day the student joined. A guide for staff; it never finishes an enrollment by itself.
@@ -125,10 +125,10 @@ An Active enrollment whose end date has gone by, waiting for staff to mark it Fi
 _Avoid_: Overdue, expired
 
 **Active student**:
-A student with at least one Active enrollment, at any branch. Every other student is an Inactive student. Nobody sets this by hand: to take a student out of their classes, drop their skills. A student who has paid even one monthly fee can never be deleted, so dropping is the only way out; deleting is for duplicates and typing mistakes.
+A student with at least one Active enrollment, at any branch. Every other student is an Inactive student. Nobody sets this by hand: to take a student out of their classes, deactivate their skills. A student who has paid even one monthly fee can never be deleted, so that is the only way out; deleting is for duplicates and typing mistakes.
 
 **Deactivate**:
-Take a branch, category, expense category, skill, branch skill, teacher, class, class time or staff account out of new use while keeping its history. Deleting is only for records nothing uses yet.
+Take a branch, category, expense category, skill, branch skill, teacher, class, class time or staff account out of new use while keeping its history. Deleting is only for records nothing uses yet. A student's enrollment can be deactivated too: see **Deactivated**.
 _Avoid_: Archive, disable
 
 ### Attendance
