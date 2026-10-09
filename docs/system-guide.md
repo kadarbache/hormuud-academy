@@ -957,7 +957,7 @@ A student has no status column. They are Active when at least one of their enrol
 | `startDate`, `endDate` | The end date is start plus the skill's duration. It's a guide only |
 | `monthlyFee` | The skill's monthly fee on the day the student joined |
 | `registrationFee` | The skill's registration fee on the day the student joined, unless the admin lowered or waived it since. 0 means nothing to pay. Whether it was *paid* is a row in `payments`, not a column here |
-| `status` | `ACTIVE`, `FINISHED` or `DROPPED` |
+| `status` | `ACTIVE`, `FINISHED` or `DROPPED`. The screens call `DROPPED` Deactivated |
 | `statusChangedAt` | When the status last changed |
 | `createdById` | The staff account that added it |
 
@@ -1059,7 +1059,7 @@ The app adds its own checks on top. Names are compared ignoring upper and lower 
 | Open a student's page | Yes | Yes, but they only see the skills at their own branch |
 | Register a student | At any branch | At their own branch only |
 | Add a skill to a student | At any branch | At their own branch only |
-| Mark finished, drop, set active again | At any branch | Only for skills at their branch |
+| Mark finished, deactivate, set active again | At any branch | Only for skills at their branch |
 | Move a student to another class time | At any branch | Only for skills at their branch |
 | See who is in a class time | Every class time | Their own branch's class times |
 | Take attendance, or correct a sheet already taken | Any class time, on any of its days up to today | Their own branch's class times, on any of their days up to today |
@@ -1232,7 +1232,7 @@ Each class time row shows its time, days, class, teacher and how many students i
 
 Everyone studying one skill at one time is on one page. Open it from the **Students** button on a class time's row on the skill's page, or from the student count on a box in a class's week. Branch staff reach it from the week, and only for their own branch's class times: another branch's gives Not found, the same as a class there does.
 
-The top card says what the class time is: the skill, the branch, the class, the teacher, the hours and days, how many students are in it now (and how many have ever joined, when that's more), the length of the course and the two fees, with "Free" for a monthly fee of zero. Under it is the list of students, A to Z, each with their phone and the responsible person's phone, the day they joined, their end date, whether the registration fee is paid, and Active, Finished or Dropped. An Active student past their end date gets a yellow **Past end date** badge, and an unpaid fee shows its amount. A student's name opens their page. The list opens on the **Active** students; **Finished**, **Dropped** and **All** beside the heading switch it, each with its count.
+The top card says what the class time is: the skill, the branch, the class, the teacher, the hours and days, how many students are in it now (and how many have ever joined, when that's more), the length of the course and the two fees, with "Free" for a monthly fee of zero. Under it is the list of students, A to Z, each with their phone and the responsible person's phone, the day they joined, their end date, whether the registration fee is paid, and Active, Finished or Deactivated. An Active student past their end date gets a yellow **Past end date** badge, and an unpaid fee shows its amount. A student's name opens their page. The list opens on the **Active** students; **Finished**, **Dropped** and **All** beside the heading switch it, each with its count.
 
 Between the two is the **Attendance** card: the last six days the class time met, oldest first, with a tick on each day whose attendance was taken and "not taken" on the others. Today's button is filled in until it's taken. Each opens that day's sheet, and **By month** opens [the month's grid](#a-class-times-month). A class time that says "Time not set" takes no attendance, and the card says so.
 
@@ -1353,7 +1353,7 @@ The top shows the photo, name, student ID and Active or Inactive. The buttons ar
 - **Edit details**, for an admin or staff at the student's home branch.
 - **Add skill.** Pick a skill, its class time if it has more than one, and a start date. The dialog shows the fees, roughly when the skill will end and, for a skill with one class time, when and where it is. A skill with no class time yet isn't in the list; the dialog names it underneath. The app refuses a class time that clashes with another skill the student takes now, at any branch. When the skill has a registration fee, tick **Registration fee paid** if the student paid now and say how: it's recorded as paid today. Branch staff only see their branch's skills, and skills the student already has Active don't appear. The button is greyed out when there's nothing left to add.
 - **Sell books**, the same dialog as on the Income screen with this student already filled in. It's greyed out when no branch you can sell at has copies of anything.
-- **Delete**, for admins only. Use it only for duplicates and typing mistakes: it removes the student, every skill record they have and every payment they made, for good, which changes the income already recorded for those days. Books they bought are the exception: those sales stay, with no student named, because the copies have left the shelf either way. It's greyed out for a student who has paid even one monthly fee, and the app refuses it too. The money is already in the books, and a percentage teacher may have been paid a share of it. To take that student out of their classes, drop their skills instead: they show as Inactive and their history stays.
+- **Delete**, for admins only. Use it only for duplicates and typing mistakes: it removes the student, every skill record they have and every payment they made, for good, which changes the income already recorded for those days. Books they bought are the exception: those sales stay, with no student named, because the copies have left the shelf either way. It's greyed out for a student who has paid even one monthly fee, and the app refuses it too. The money is already in the books, and a percentage teacher may have been paid a share of it. To take that student out of their classes, deactivate their skills instead: they show as Inactive and their history stays.
 
 **Details** shows sex, phones, home branch, registration date, and who registered the student and when.
 
@@ -1384,12 +1384,12 @@ The other buttons on each row are:
 
 - **Change class time** moves the student to another of the skill's class times, say from the evening to the morning. It shows only on an Active skill that has another class time taking students. Fees, dates and payments stay exactly as they are. A teacher paid by percentage earns from the fees paid after the move, so the new class time's teacher earns from then on and the old one keeps what they already earned. The app refuses a class time that clashes with another skill the student takes.
 - **Mark finished** when the student completed the skill.
-- **Drop**, after confirming, when the student stopped coming before finishing.
-- **Set active**, after confirming, to undo a Finished or Dropped by mistake. It's refused if the student is already taking that skill again, or if its class time now clashes with a skill they took up since. If the class time was deactivated and its class or teacher has gone to another class time since, it's refused too: add the skill again in another class time instead.
+- **Deactivate**, after confirming, when the student stopped coming before finishing.
+- **Set active**, after confirming, to undo a Finished or Deactivated by mistake. It's refused if the student is already taking that skill again, or if its class time now clashes with a skill they took up since. If the class time was deactivated and its class or teacher has gone to another class time since, it's refused too: add the skill again in another class time instead.
 
-When the last Active skill is finished or dropped, the student becomes Inactive by themselves. Adding a new skill makes them Active again.
+When the last Active skill is finished or deactivated, the student becomes Inactive by themselves. Adding a new skill makes them Active again.
 
-**Monthly fees** is below the Skills table, one panel per skill. Each panel has a box per month, from the month the student joined up to this one, stopping at the skill's last month or the month the student dropped it. A skill that lasts four months has four boxes, so a student who joins on 19 April owes April to July, not August: the end date, 19 August, falls in the month after the last one taught. Nobody owes for a month that hasn't happened.
+**Monthly fees** is below the Skills table, one panel per skill. Each panel has a box per month, from the month the student joined up to this one, stopping at the skill's last month or the month it was deactivated. A skill that lasts four months has four boxes, so a student who joins on 19 April owes April to July, not August: the end date, 19 August, falls in the month after the last one taught. Nobody owes for a month that hasn't happened.
 
 - A **grey box** is a month that's been paid. It shows the amount in the currency it was paid in, and hovering over it says when it was paid, how, and who recorded it.
 - A **yellow box** is a month still owed. Staff at the skill's branch click it to record that month: the amount starts at the fee the student joined at and can be lowered for a discount, then pick the day and the method. Pick **SLSH** in the Currency dropdown and the amount switches to the fee at today's rate, with what it comes to in dollars underneath. Whatever is recorded settles that month, and no balance is kept.
@@ -1416,7 +1416,7 @@ The sheet has a row for each student, A to Z, with four buttons: **Present**, **
 
 Saving records who took the sheet and when, and the page says so above the list. Open a saved sheet to correct it: change the marks and press **Save changes**, and the page adds who changed it and when. Saving without changing anything says "Nothing changed" and records nothing. The arrows beside the date go to the class time's day before and after, for going through a week of paper sheets in a row.
 
-Who is on the sheet: everyone in the class time that day, meaning they had started by then and were still Active, or only finished or dropped after it. A saved sheet keeps everyone it marked, even after they move to another class time or finish. A student moved in since, who is already marked that day on their old class time's sheet, isn't listed, so a day taken late doesn't count them twice.
+Who is on the sheet: everyone in the class time that day, meaning they had started by then and were still Active, or only finished or were deactivated after it. A saved sheet keeps everyone it marked, even after they move to another class time or finish. A student moved in since, who is already marked that day on their old class time's sheet, isn't listed, so a day taken late doesn't count them twice.
 
 The app refuses a sheet for:
 
@@ -1476,7 +1476,7 @@ Everyone who still owes the college money, the biggest debt first. Staff see the
 
 The three figures at the top are what's owed altogether and how many students that is, then how much of it is registration fees and how much is monthly fees, with the number of unpaid months. Each row names the student, their phone, and for every skill what they're behind on: the registration fee if it's unpaid, and the unpaid months with the fee per month. More than three months are shortened to "and 2 more". The student's name opens their page, where the months can be recorded.
 
-A month only counts once it has started, and a student who dropped a skill in March isn't chased for April. Nothing here is stored: it's worked out from the enrollments and their payments each time the screen opens.
+A month only counts once it has started, and a skill deactivated in March isn't chased for April. Nothing here is stored: it's worked out from the enrollments and their payments each time the screen opens.
 
 What's owed is in dollars, because that's what fees are set in. A month paid in shillings is paid like any other.
 
@@ -1598,7 +1598,7 @@ Admins only, and the first thing under Money. Pick a day, a month and optionally
 
 **A student finishes a skill.** Mark finished on their page.
 
-**A student stops coming.** Drop on their page.
+**A student stops coming.** Deactivate on their page.
 
 **A skill is past its end date.** The end date doesn't finish anything by itself, because students sometimes need an extra month. Click Show those students in the yellow bar, open each student, and Mark finished (or leave it Active if they're still coming).
 
@@ -1644,7 +1644,7 @@ Admins only, and the first thing under Money. Pick a day, a month and optionally
 
 **A branch stops teaching a skill.** On the skill's page, deactivate that branch's row. Current students continue, and nobody new can join there.
 
-**A branch closes.** Finish or drop its students' skills, deactivate its skills on each skill page, deactivate its staff accounts, then deactivate the branch. The history stays.
+**A branch closes.** Finish its students' skills or deactivate them, deactivate its skills on each skill page, deactivate its staff accounts, then deactivate the branch. The history stays.
 
 **A staff member can't get into their Google account.** Google's own account recovery is the first stop. If the account is gone for good, an admin edits their staff account and puts in a new Gmail address. An account left from before Google sign-in can still get a new password under New password.
 
@@ -1652,7 +1652,7 @@ Admins only, and the first thing under Money. Pick a day, a month and optionally
 
 **A staff member moves to another branch.** An admin edits their account and changes the branch.
 
-**A student moves to another branch for good.** An admin edits the student and changes the home branch. Their current skills stay at the old branch, so finish or drop those there and add the new ones at the new branch.
+**A student moves to another branch for good.** An admin edits the student and changes the home branch. Their current skills stay at the old branch, so finish those there or deactivate them, and add the new ones at the new branch.
 
 ## Running and deploying
 
