@@ -87,7 +87,7 @@ A login staff give one student so they can see their own record in the portal. T
 _Avoid_: Student account, student user
 
 **Portal**:
-The student's own side of the app, in the same frame as the staff side but with a menu of its own: their skills, attendance, fees and details, all read-only. A student never sees the staff side, and staff don't use the portal. The portal never tells a student they owe anything: it says unpaid.
+The student's own side of the app, in the same frame as the staff side but with a menu of its own: their skills, attendance and details, all read-only. Their fees are built too but switched off for now, so a student sees nothing about them. A student never sees the staff side, and staff don't use the portal. The portal never tells a student they owe anything: it says unpaid.
 _Avoid_: Student app, student dashboard
 
 **Home branch**:
