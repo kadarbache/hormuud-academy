@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
@@ -8,6 +9,7 @@ import { formatMoney } from "@/lib/format";
 import { toCents } from "@/lib/money";
 import { requireStudent } from "@/lib/session";
 import { feeSchedule } from "../../(app)/students/fee-schedule";
+import { PORTAL_SHOWS_FEES } from "../fees-switch";
 import { UnpaidNotice, warning } from "../parts";
 import { getPortalFees } from "../queries";
 
@@ -20,6 +22,8 @@ export const metadata: Metadata = { title: "My fees" };
  */
 export default async function MyFeesPage() {
   const user = await requireStudent();
+  // Switched off: the address is Not found, as if the page weren't here.
+  if (!PORTAL_SHOWS_FEES) notFound();
   const enrollments = await getPortalFees(user.studentId);
   const { rows, owedAltogether } = feeSchedule(enrollments, collegeToday());
 

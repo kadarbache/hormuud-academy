@@ -10,6 +10,7 @@ import { requireStudent } from "@/lib/session";
 import { attendanceRate, formatCounts, formatRate } from "../(app)/attendance/labels";
 import { marksByEnrollment } from "../(app)/attendance/queries";
 import { feeSchedule } from "../(app)/students/fee-schedule";
+import { PORTAL_SHOWS_FEES } from "./fees-switch";
 import { Detail, SkillStatus, UnpaidNotice } from "./parts";
 import { getPortalFees, getPortalSkills } from "./queries";
 
@@ -20,7 +21,8 @@ export default async function MySkillsPage() {
   const user = await requireStudent();
   const [skills, fees] = await Promise.all([
     getPortalSkills(user.studentId),
-    getPortalFees(user.studentId),
+    // With fees switched off there's nothing to add up, so no unpaid notice.
+    PORTAL_SHOWS_FEES ? getPortalFees(user.studentId) : [],
   ]);
   const attendance = await marksByEnrollment(skills.map((skill) => skill.id));
   const { owedAltogether } = feeSchedule(fees, collegeToday());

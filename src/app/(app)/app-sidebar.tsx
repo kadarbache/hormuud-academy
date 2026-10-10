@@ -39,6 +39,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import type { Role } from "@/lib/session";
+import { PORTAL_SHOWS_FEES } from "../portal/fees-switch";
 import { signOut } from "./actions";
 
 type NavItem = {
@@ -166,7 +167,9 @@ const portalItems: NavItem[] = [
     icon: ClipboardCheck,
     match: under("/portal/attendance"),
   },
-  { href: "/portal/fees", label: "My fees", icon: Wallet, match: under("/portal/fees") },
+  ...(PORTAL_SHOWS_FEES
+    ? [{ href: "/portal/fees", label: "My fees", icon: Wallet, match: under("/portal/fees") }]
+    : []),
   {
     href: "/portal/details",
     label: "My details",
