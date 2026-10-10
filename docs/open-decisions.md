@@ -106,6 +106,11 @@ open:
 - **A forgotten password by WhatsApp.** Today the student goes back to the
   branch. Once WhatsApp messages exist (future features, section 1), a code by
   WhatsApp could replace the visit.
+- **When students see their fees again.** Switched off on 10 Oct 2026, at
+  your asking: My fees is out of the student's menu, the unpaid notice on My
+  skills is hidden, and `/portal/fees` says Not found. Nothing was deleted.
+  Setting `PORTAL_SHOWS_FEES` to `true` in `src/app/portal/fees-switch.ts`
+  brings all three back. Yours to say when.
 
 ## Still to do (no decision needed)
 
