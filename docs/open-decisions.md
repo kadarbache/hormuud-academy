@@ -4,7 +4,7 @@ Questions we haven't answered yet, and the code work waiting on them. Move a
 decision to "Decided" when it's settled, and write the rule into CONTEXT.md or
 an ADR if it changes how the system behaves.
 
-Last updated 6 October 2026.
+Last updated 18 October 2026.
 
 ## Open
 
@@ -113,6 +113,35 @@ open:
   brings all three back. Yours to say when.
 
 ## Still to do (no decision needed)
+
+**Class times without classes, before they go live.** Built on 18 Oct 2026.
+`pnpm lint` and `pnpm build` pass. Tried in the browser by the user the same
+day on the test database: the names on the skill's page, a 2 at the same hours
+with the same teacher, and moving a student into it with Change class time.
+
+Going live:
+
+- Commit first, so the push is ready.
+- Apply `20261018120000_class_times_without_classes` to production
+  (`ep-square-silence`) after a backup, then push straight away. Unlike the
+  earlier migrations this one takes columns away: the live site's old code
+  reads the class, so its class time, attendance and student pages fail from
+  the migration until the new code is deployed, about a minute. Do it when
+  nobody is taking attendance. It deletes the list of classes, and the class
+  each class time was in, for good, so the backup is the only way back. It
+  names every class time 1, 2, 3 and on for each branch skill, by start time.
+  Students, attendance and fees don't change. The Neon test database has it
+  already.
+- Push main.
+- On the live site, for each of the four Computer Basics hours (5 to 9 pm,
+  the Technology skills branch): add a second class time at the same hour, on
+  the same days, with Suhayb Faysal, then move about half its students to it
+  with Change class time. The migration numbers inactive class times too, so
+  look at the names the four got before adding; the app suggests the next
+  free number for each new one, and any short name works.
+- `pnpm db:import-students` finds a Computer Basics class time by the hour it
+  starts, so once two share an hour it stops with "More than one Computer
+  Basics class time starts at". It was a one-off for September's list.
 
 **Teacher passwords, before they go live.** Built on 6 Oct 2026. `pnpm lint`
 and `pnpm build` pass. Tried the same day with a script against the Neon test
@@ -446,6 +475,33 @@ import. Reset it in the Neon console right after the import, then update
 changed.
 
 ## Decided
+
+- **Class times without classes.** Asked on 18 Oct 2026. Some skills have
+  about 20 students at one hour, taught as two halves by the same teacher: one
+  half learns the theory in a room while the other practises in the Computer
+  lab, and they swap the next day. Keeping track of which half was in which
+  room made attendance hard. Decided the same day: the app stops keeping
+  classes at all ("we gonna remove the classes from now on ... we only gonna
+  record the time of the skill and the teacher etc not the class"). Built the
+  same day; see "Still to do". (18 Oct 2026)
+  - Tried first, the same day, and dropped before anything was committed or
+    went live: one "split class time" with Group A and Group B and a sheet
+    per group ("forget about the A and B"); then two class times that swap
+    classes, first with the room worked out day by day and then without it.
+  - Classes are deleted, with the class each class time was in: the Classes
+    page, the class in the class time dialog, and the check that a room holds
+    one class time at a time. Asked whether to remove them fully or hide them
+    and keep the data; the user picked remove fully.
+  - Every class time has a name, like 1, shown after the skill as Computer
+    Basics 1, and no two class times of a branch skill share one. The ones
+    already there are numbered by start time. Asked whether every class time
+    needs one or only those at the same hours; the user picked every one.
+  - One teacher can take class times of the same branch skill at exactly the
+    same hours and days, so the two halves are two class times with one
+    teacher. Any other overlap is still refused. Asked with three options
+    (same skill only, always allowed, never); the user picked same skill only.
+  - Branch staff had a week per class on the Classes page. Nothing replaces it
+    yet: they reach a class time's page from Attendance.
 
 - **Teacher passwords.** Asked on 6 Oct 2026 ("lets make the sign in process
   of a teacher same as the student sign in. do you think that is secure?").
