@@ -2,7 +2,7 @@
 
 This guide explains the whole system: the technology it's built on, every library it uses, how the code is organised, how the database tables connect, and every screen and action you can use. Read it top to bottom once. After that, use the contents list to jump back to the part you need.
 
-The words in this guide have exact meanings. A "class" is a room, not a group of students, and an "enrollment" is one student taking one skill. [CONTEXT.md](../CONTEXT.md) defines every term, and [docs/adr](adr) records the main decisions the rest of the design depends on.
+The words in this guide have exact meanings. A "class time" is one skill taught at set hours by one teacher (the app doesn't keep rooms), and an "enrollment" is one student taking one skill. [CONTEXT.md](../CONTEXT.md) defines every term, and [docs/adr](adr) records the main decisions the rest of the design depends on.
 
 ## Contents
 
@@ -25,7 +25,7 @@ Hormuud Academy is one college with several branches. The system keeps track of:
 
 - the branches
 - the skills the college teaches, like Graphic Design or Tailoring, in one list for the whole college
-- when, where and by whom each skill is taught at each branch: its class times, each in a class (room), from a start time to an end time on chosen days, with a teacher
+- when and by whom each skill is taught at each branch: its class times, each with a short name like Computer Basics 1, from a start time to an end time on chosen days, with a teacher
 - the students, and which skills each student is taking
 - who came to each class time on each day it meets
 - the registration fee a student pays for each skill they start, and whether it's paid
@@ -44,12 +44,12 @@ Skill            Graphic Design, defaults: 4 months,          (one for the whole
 │                $15 to register, $30 a month
 └─ Branch skill  Graphic Design at Main Branch,               (one per branch that teaches it)
    │             4 months, $15 to register, $30 a month
-   └─ Class time 6–8 pm, Sat Mon Wed, Computer Lab,           (one or more per branch skill)
+   └─ Class time Graphic Design 1, 6–8 pm, Sat Mon Wed,       (one or more per branch skill)
       │          Demo Teacher 2
       └─ Enrollment STU-00003 started on 19 Aug 2026, Active  (one per student taking it)
 ```
 
-A skill is defined once. Each branch that teaches it gets a **branch skill**, which says how long it runs there and what it costs. Branches are in different cities, so a small town can charge $5 a month for what costs $10 in the capital. The skill's own fees and duration are only the defaults a new branch starts from. Each branch skill has one or more **class times**, which say when, where and by whom it's taught: a class (room), the hours like 4–6 pm, the days of the week, and a teacher. Each class time sets its own hours, so a room can hold a two-hour class and a one-hour class in the same afternoon, and a popular skill can run in the morning and again in the evening. When a student starts a skill, the system creates an **enrollment** that links the student to that branch skill, in one of its class times. The enrollment keeps the branch skill's two fees and its end date from that day. A student taking three skills has three enrollments, and three registration fees, and the skills can be at different branches.
+A skill is defined once. Each branch that teaches it gets a **branch skill**, which says how long it runs there and what it costs. Branches are in different cities, so a small town can charge $5 a month for what costs $10 in the capital. The skill's own fees and duration are only the defaults a new branch starts from. Each branch skill has one or more **class times**, which say when and by whom it's taught: a short name like 1, the hours like 4–6 pm, the days of the week, and a teacher. Each class time sets its own hours, so a popular skill can run in the morning and again in the evening, and about 20 students at one hour can be taught as two halves by the same teacher: Computer Basics 1 in the Computer lab and Computer Basics 2 in a theory room. The app doesn't keep rooms: the teacher and the students know where to go. When a student starts a skill, the system creates an **enrollment** that links the student to that branch skill, in one of its class times. The enrollment keeps the branch skill's two fees and its end date from that day. A student taking three skills has three enrollments, and three registration fees, and the skills can be at different branches.
 
 Money hangs off that same chain. Every amount in is a **payment**, and every payment says what it was for, which branch took it, how it was paid and in which currency:
 
@@ -380,8 +380,6 @@ hormuud-academy/
 │   │       │                    prices; branch staff add copies and fix their branch's count.
 │   │       │                    [id]/ is one book: its branches and what happened to its copies
 │   │       ├── teachers/        Admins manage them; branch staff see their branch's
-│   │       ├── classes/         Admins manage them; branch staff see their branch's.
-│   │       │                    [id]/ is one class's week
 │   │       ├── class-times/     [id]/ is one class time: its details, its last few days'
 │   │       │                    attendance and every student in it. [id]/attendance/ is its
 │   │       │                    month of attendance, and [id]/attendance/[date]/ one day's
@@ -476,7 +474,7 @@ Next.js looks for files with special names in each folder of `src/app` and uses 
 |---|---|
 | `loading.tsx` | A spinner where the page goes, from the moment a link is clicked until the page arrives. It fades in after a third of a second, so a quick page doesn't flash it |
 | `error.tsx` | "Something went wrong loading this page" with **Try again**, when a page throws, say because the database didn't answer. Try again asks the server for the page again. The message includes a code, the error's *digest*, which is the same code the server log shows next to the real error. When staff report it, search the Vercel logs for that code |
-| `not-found.tsx` | "Not found", when a page calls `notFound()`: a student, class or book that doesn't exist, or one at a branch the staff member can't see |
+| `not-found.tsx` | "Not found", when a page calls `notFound()`: a student, class time or book that doesn't exist, or one at a branch the staff member can't see |
 | `forbidden.tsx` | "Admins only", when `requireAdmin()` calls `forbidden()` |
 | `global-error.tsx` | The last resort, if the outer `layout.tsx` itself fails. It has to draw the whole page, `<html>` and all |
 
@@ -645,15 +643,12 @@ A phone search ignores the country code and the trunk zero and matches the end o
 
 ```mermaid
 erDiagram
-    Branch ||--o{ Classroom : "has"
-
     Branch ||--o{ TeacherBranch : "employs"
     Teacher ||--o{ TeacherBranch : "works at"
     Category ||--o{ Skill : "groups"
     Skill ||--o{ BranchSkill : "is taught as"
     Branch ||--o{ BranchSkill : "teaches"
     BranchSkill ||--o{ ClassTime : "runs at"
-    Classroom ||--o{ ClassTime : "hosts"
 
     Teacher ||--o{ ClassTime : "teaches"
     Branch ||--o{ Student : "is home branch of"
@@ -718,16 +713,10 @@ erDiagram
         decimal monthlyFee
         boolean active
     }
-    Classroom {
-        string id PK
-        string branchId FK
-        string name "unique within a branch"
-        boolean active
-    }
     ClassTime {
         string id PK
         string branchSkillId FK
-        string classroomId FK
+        string name "like 1, unique within the branch skill"
         int startMinute "minutes after midnight"
         int endMinute "both empty until the admin sets them"
         enum days "a list of weekdays"
@@ -912,27 +901,25 @@ erDiagram
 
 GitHub draws this diagram. In VS Code you need a Mermaid preview extension. PK is the primary key (the row's id), FK a foreign key (a column pointing at another table), and UK a unique column.
 
-Read the lines like this: `Branch ||--o{ Classroom` means one branch has zero or more classes, and each class belongs to exactly one branch. `Branch |o--o{ User` means a user belongs to zero or one branch, because admins have none. In the same way, `Teacher |o--o{ Payment` means a payment names zero or one teacher: none unless the teacher of the student's class time is paid by percentage.
+Read the lines like this: `Branch ||--o{ BranchSkill` means one branch has zero or more branch skills, and each branch skill belongs to exactly one branch. `Branch |o--o{ User` means a user belongs to zero or one branch, because admins have none. In the same way, `Teacher |o--o{ Payment` means a payment names zero or one teacher: none unless the teacher of the student's class time is paid by percentage.
 
 ### The tables one by one
 
 The code uses the model names on the left. The actual table names in Postgres are in brackets.
 
-**Branch** (`branches`). One location of the college. Name (unique), phone, address, and `active`. Classes, teachers, branch skills, staff and students all point at a branch.
+**Branch** (`branches`). One location of the college. Name (unique), phone, address, and `active`. Teachers, branch skills, staff and students all point at a branch.
 
 **Category** (`categories`). A group of skills, like Technology Skills or Hand Skills. Name (unique) and `active`. The seed script creates those two.
 
 **Skill** (`skills`). One entry in the college-wide catalog. Name (unique), category, `durationMonths` (1 to 60), `registrationFee` and `monthlyFee` in dollars (a registration fee of 0 means none), and `active`. The duration and fees are defaults: they're copied onto a branch skill when the skill is added to a branch, and changing them later touches no branch that has it already.
 
-**Classroom** (`classrooms`). A room at a branch, like Room 3. The screens call it a "Class". Each class belongs to one branch, and names are unique within a branch. The code says Classroom so nobody mistakes it for a group of students.
-
-**ClassTime** (`class_times`). One branch skill taught in one class, from a start time to an end time on chosen days, by one teacher: "Graphic Design, Computer Lab, 6–8 pm, Sat Mon Wed, Demo Teacher 2". `startMinute` and `endMinute` are minutes after midnight (4 pm is 960), and `days` is a list of weekdays, from `SATURDAY` to `FRIDAY`. Each class time sets its own hours, so a two-hour class and a one-hour class can share an afternoon. A branch skill can have several class times, and every enrollment is in one. The hours and days are empty only on the class times the `class_times` migration made from the branch skills already set up, until the admin sets them. An inactive class time takes no new students, but the ones already in it stay.
+**ClassTime** (`class_times`). One branch skill under a short `name`, from a start time to an end time on chosen days, by one teacher: "Graphic Design 1, 6–8 pm, Sat Mon Wed, Demo Teacher 2". The name tells it apart from the skill's other class times at the branch, and the screens show it after the skill. It has no room: the app doesn't keep them. `startMinute` and `endMinute` are minutes after midnight (4 pm is 960), and `days` is a list of weekdays, from `SATURDAY` to `FRIDAY`. Each class time sets its own hours, so a two-hour class and a one-hour class can share an afternoon. A branch skill can have several class times, and every enrollment is in one. The hours and days are empty only on the class times the `class_times` migration made from the branch skills already set up, until the admin sets them. An inactive class time takes no new students, but the ones already in it stay.
 
 **Teacher** (`teachers`). A person who teaches. Their `number`, shown as the Teacher ID `TCH-00001` and counted across the whole college like a Student ID, their name, phone, `active`, and how they're paid: `salaryType` is `FIXED` with a `fixedSalary` each month in its `salaryCurrency` (dollars or shillings), or `PERCENTAGE` with a `percentageRate` such as 30 for 30%. Never both — the form clears the one that doesn't apply. A percentage teacher earns in whatever currency each student pays, so their `salaryCurrency` means nothing. A teacher is not a login account.
 
 **TeacherBranch** (`teacher_branches`). A link table: one row for each branch a teacher works at. It lets one teacher work at several branches without being entered twice.
 
-**BranchSkill** (`branch_skills`). A skill as taught at one branch: which skill, which branch, the `durationMonths`, `registrationFee` and `monthlyFee` that branch charges, and `active`. There is at most one per skill per branch (a unique rule on skill plus branch). This is what students enroll in. Who teaches it, where and when is on its class times, so the fees stay the same whichever class time a student picks.
+**BranchSkill** (`branch_skills`). A skill as taught at one branch: which skill, which branch, the `durationMonths`, `registrationFee` and `monthlyFee` that branch charges, and `active`. There is at most one per skill per branch (a unique rule on skill plus branch). This is what students enroll in. Who teaches it and when is on its class times, so the fees stay the same whichever class time a student picks.
 
 **Student** (`students`):
 
@@ -1014,16 +1001,16 @@ A student has no status column. They are Active when at least one of their enrol
 
 These hold even if a bug slips into the code:
 
-- Unique: branch names, category names, expense category names, skill names, class names within a branch, one branch skill per skill per branch, book titles, one branch book per book per branch, one attendance sheet per class time per day, one mark per student per sheet, student numbers, user emails, one login per teacher, one login per student.
+- Unique: branch names, category names, expense category names, skill names, class time names within a branch skill, one branch skill per skill per branch, book titles, one branch book per book per branch, one attendance sheet per class time per day, one mark per student per sheet, student numbers, user emails, one login per teacher, one login per student.
 - One active enrollment per student per skill, at any branch. This is a **partial unique index**: it only counts rows whose status is `ACTIVE`, so a student can finish a skill and take it again later.
 - One registration fee per enrollment, and one monthly fee payment per enrollment per fee month. Both are partial unique indexes too, counting only rows of that category. Two clicks on Record payment can't charge a student twice, whatever the code does.
 - One budget per branch per month.
-- A class time starts before it ends, within the day. It has a start, an end and at least one day, or none of them while it waits for the admin. An enrollment's class time belongs to the enrollment's own branch skill: the foreign key names the two together.
+- A class time starts before it ends, within the day. It has a start, an end and at least one day, or none of them while it waits for the admin. An enrollment's class time belongs to the enrollment's own branch skill: the foreign key names the two together. A class time's name is never blank, and no two class times of a branch skill share one.
 - A dollar payment or expense has no exchange rate and is worth exactly its amount. A shilling one has a rate above zero, and a dollar value within a cent of its shillings at that rate. The same goes for a teacher's share. These are **check constraints**, written by hand in the migrations because Prisma's schema can't describe them. An exchange rate is always above zero.
 - A book's price and a branch's price for it are above zero. A shelf never holds fewer than no copies, which is what stops two people selling the last one. A sale line sells at least one copy at a price above zero, a delivery adds copies, a fixed count changes the count, and neither leaves it below zero. An attendance sheet names who last changed it and when, or neither. A teacher's login names its teacher, no other account names one, and it has no branch. The same goes for a student's login and its student. Check constraints too.
 - A row can't be deleted while other rows point at it. You can't delete a teacher a class time still uses, for example. The exceptions are deliberate: deleting a student deletes their enrollments, every payment they made, their attendance marks, and their login with its history, deleting an enrollment deletes its payments and marks, deleting an attendance sheet deletes its marks, deleting a payment deletes its book sale lines, deleting a budget deletes its lines, deleting a teacher deletes their branch links, and deleting a user deletes their sessions and accounts. The app refuses to delete a teacher who has any money on record, so nobody's earnings vanish by accident, or a login, because accounts are never deleted. Before deleting a student, the app takes their name off the books they bought, so those sales stay: the copies have left the shelf either way.
 
-The app adds its own checks on top. Names are compared ignoring upper and lower case, so "main branch" is refused when "Main Branch" exists. The database compares exact text only. The app also keeps everything in one place at a time (`src/lib/clashes.ts`): a class holds one class time at a time, a teacher teaches one at a time at any branch, and a student sits in one at a time. "At the same time" means overlapping hours on a day both meet, so 4–6 pm on Saturdays and 4–6 pm on Sundays can share a room. A class time that's been deactivated still counts while students are in it, because they still come.
+The app adds its own checks on top. Names are compared ignoring upper and lower case, so "main branch" is refused when "Main Branch" exists. The database compares exact text only. The app also refuses two class times of a branch skill whose names differ only in capitals, like "a" and "A". It keeps everyone in one place at a time (`src/lib/clashes.ts`): a teacher teaches one class time at a time at any branch, and a student sits in one at a time. The exception is students at one hour taught as two halves: one teacher can take class times of the same branch skill at exactly the same hours and days, like Computer Basics 1 and 2. "At the same time" means overlapping hours on a day both meet, so 4–6 pm on Saturdays and 4–6 pm on Sundays don't clash. A class time that's been deactivated still counts while students are in it, because they still come.
 
 ### Migrations so far
 
@@ -1046,6 +1033,7 @@ The app adds its own checks on top. Names are compared ignoring upper and lower 
 | `20261005150000_teacher_logins` | Adds `teacherId` to `user`, so a login can belong to a teacher, at most one per teacher, with the checks that only a teacher's login names one and that it has no branch. Every existing account is left as it was |
 | `20261006090000_student_logins` | Adds `studentId` and `mustChangePassword` to `user`, so a login can belong to a student, at most one per student, with the checks that only a student's login names one and that it has no branch. Adds `student_login_events`. Every existing account is left as it was |
 | `20261006150000_teacher_passwords` | Gives every teacher a `number`, their Teacher ID, numbering the existing ones in the order they were added. Adds `temporaryPasswordExpires` to `user` and `teacher_login_events`. Every existing account is left as it was |
+| `20261018120000_class_times_without_classes` | Takes classes out of the app: drops `classroomId` from `class_times`, and the `classrooms` table with it. Gives every class time a `name`, never blank and unique within its branch skill: the ones already there are named 1, 2, 3 and on for each branch skill, in the order they start. Students, attendance and fees don't change |
 
 ### Looking at the data yourself
 
@@ -1086,8 +1074,8 @@ The app adds its own checks on top. Names are compared ignoring upper and lower 
 | Give a student a portal login, a new temporary password, or turn it off and on | Any student | Students in their list: registered at their branch, or taking or having taken a skill there |
 | Move a student to another home branch | Yes | No |
 | Delete a student | Yes | No |
-| See teachers and classes | Every branch's | Their own branch's, read-only |
-| Add or change teachers and classes | Yes | No |
+| See teachers | Every branch's | Their own branch's, read-only |
+| Add or change teachers | Yes | No |
 | Add or change a skill's class times | Yes | No |
 | Branches, skills, categories | Yes | No, those pages aren't in their menu and are blocked |
 | Expense categories | Yes | No, the page is blocked |
@@ -1107,15 +1095,15 @@ A teacher's login can do far less:
 | See another day's sheet and a class time's month | Read-only, for their own class times |
 | See their pay: the salary or rate, the fees that earned them a share, what they've been paid | Their own, read-only |
 | Change their password | Yes, giving the current one, if the admin gave them one |
-| Students' pages, money, books, teachers, classes, setup | No. Opening one sends them back to Attendance |
+| Students' pages, money, books, teachers, setup | No. Opening one sends them back to Attendance |
 
-A teacher covering someone else's class for a day can't open it. Staff take that day's sheet.
+A teacher covering someone else's class time for a day can't open it. Staff take that day's sheet.
 
 A student's login can do less again:
 
 | Action | Student |
 |---|---|
-| See their skills (branch, class time, class, teacher, dates, status) | Their own, at every branch |
+| See their skills (branch, class time, teacher, dates, status) | Their own, at every branch |
 | See their attendance: the rate per skill, and every day's mark | Their own |
 | See their fees: each registration fee and every month, paid or unpaid, and what they owe altogether | Their own |
 | See their details | Their own, read-only. Changes go through staff |
@@ -1148,14 +1136,14 @@ The installed app logs in the same way and shows the same screens. Without inter
 
 ### The screen layout
 
-- **The sidebar** on the left. Students (**Students**, **Register student** and **Attendance**) is there for everyone. Admins also get Money (**Dashboard**, **Income**, **Fees owed**, **Expenses**, **Expense categories**, **Teacher pay**, **Monthly budget**) and Admin (**Branches**, **Skills**, **Categories**, **Books**, **Teachers**, **Classes**, **Staff accounts**, **Settings**). Branch staff get Your branch instead (**Income**, **Fees owed**, **Books**, **Teachers** and **Classes**), which shows only their own branch; the teachers and classes there can't be changed, and of the books only the copies on the shelf can. A teacher gets Teaching instead (**Attendance** and **My pay**) and nothing else, and a student gets Your studies (**My skills**, **Attendance** and **My details**; **My fees** is switched off for now). The bottom shows your name, your role and your branch.
+- **The sidebar** on the left. Students (**Students**, **Register student** and **Attendance**) is there for everyone. Admins also get Money (**Dashboard**, **Income**, **Fees owed**, **Expenses**, **Expense categories**, **Teacher pay**, **Monthly budget**) and Admin (**Branches**, **Skills**, **Categories**, **Books**, **Teachers**, **Staff accounts**, **Settings**). Branch staff get Your branch instead (**Income**, **Fees owed**, **Books** and **Teachers**), which shows only their own branch; the teachers there can't be changed, and of the books only the copies on the shelf can. A teacher gets Teaching instead (**Attendance** and **My pay**) and nothing else, and a student gets Your studies (**My skills**, **Attendance** and **My details**; **My fees** is switched off for now). The bottom shows your name, your role and your branch.
 - **The header** shows "All branches" for an admin, your branch's name for branch staff, a teacher's branches, or a student's home branch. The button on the left of the header hides and shows the sidebar.
 - **On a phone**, the sidebar folds away. Open it with the button at the top left.
 - **Tables** are wider than a phone, so the last columns sit off the side. Instead of scrolling across, tap a row: a pop-up lists everything in it, one line per column, with that row's buttons at the bottom. Tapping a link inside the row, such as a student's name, still opens that page. The same click works on a computer.
 - After every change, a short message appears at the top of the screen.
 - While a page loads, a spinner turns where it will appear. On a slow connection it can stay a few seconds.
 - If a page fails to load, it says "Something went wrong loading this page", with **Try again** and a code. If Try again doesn't help, send the admin that code: it finds the real error in the logs.
-- A student, class or book that was deleted, or that belongs to another branch, shows "Not found". An address that isn't a page at all shows "Page not found".
+- A student, class time or book that was deleted, or that belongs to another branch, shows "Not found". An address that isn't a page at all shows "Page not found".
 
 ### Setting up the college for the first time
 
@@ -1163,13 +1151,12 @@ Log in as the admin and do these in order, because each step needs the one befor
 
 1. **Categories.** Technology Skills and Hand Skills already exist. Add others if you need them.
 2. **Branches.** Add each branch.
-3. **Classes.** Add the rooms at each branch.
-4. **Teachers.** Add each teacher and tick the branches they work at.
-5. **Skills.** Add each skill with its category, duration, registration fee and monthly fee. After saving, the app opens the skill's page.
-6. **On each skill's page**, press **Add to a branch** for every branch that teaches it, then **Add class time** under that branch: the hours, the days, a class and a teacher. A skill no branch teaches can't be taken by anyone, and neither can a branch skill with no class time.
-7. **Staff accounts.** Create an account for each person at each branch with their Gmail address, and tell them to sign in with Google. A teacher with no Google account gets a login with the Gmail left blank, and then a password from **Give password**.
-8. **Settings.** Set the exchange rate, so staff can take shillings.
-9. **Books**, if the college sells any. Add each book with its default price, then on its page **Add to a branch** for every branch that sells it, and **Add copies** for what's on that branch's shelf. Staff at the branch can add copies themselves from then on.
+3. **Teachers.** Add each teacher and tick the branches they work at.
+4. **Skills.** Add each skill with its category, duration, registration fee and monthly fee. After saving, the app opens the skill's page.
+5. **On each skill's page**, press **Add to a branch** for every branch that teaches it, then **Add class time** under that branch: a name, the hours, the days and a teacher. A skill no branch teaches can't be taken by anyone, and neither can a branch skill with no class time.
+6. **Staff accounts.** Create an account for each person at each branch with their Gmail address, and tell them to sign in with Google. A teacher with no Google account gets a login with the Gmail left blank, and then a password from **Give password**.
+7. **Settings.** Set the exchange rate, so staff can take shillings.
+8. **Books**, if the college sells any. Add each book with its default price, then on its page **Add to a branch** for every branch that sells it, and **Add copies** for what's on that branch's shelf. Staff at the branch can add copies themselves from then on.
 
 After that, staff can register students.
 
@@ -1181,28 +1168,19 @@ Every setup screen follows the same pattern. There's a table, an **Add** button 
 
 Add, edit, deactivate and delete branches. Each has a name, a phone and an address. The table shows how many students registered at each branch and how many skills it teaches.
 
-A deactivated branch disappears from every form: new classes, teacher branches, staff accounts, registration, and adding skills to students. Its old records stay.
+A deactivated branch disappears from every form: teacher branches, staff accounts, registration, and adding skills to students. Its old records stay.
 
 #### Categories
 
 Add, rename, deactivate and delete categories. A deactivated category can't be picked for new skills. Skills already in it keep working normally.
 
-#### Classes
-
-Add a class by picking its branch and typing a name. You can rename a class, but not move it to another branch, because class times at that branch may already use it. A deactivated class can't be picked for class times anymore. The class times already there keep it until you change them. The table shows each class's class times: the skill, when, and who teaches it.
-
-Click a class's name to see its week: one box per day, Saturday to Friday, with what meets there in clock order. Each class time shows its hours, skill, teacher and how many students it has, and the free hours between two classes show as a dashed line, so it's easy to see when a room is empty. A deactivated class time still shows, with a badge, while students still come to it. Class times that use the class but have no hours yet are listed underneath. The student count on each box opens that class time's students. On a phone the days sit one under another.
-
-Branch staff see this page too, with only their branch's classes and no buttons. They can open the week of their own branch's classes only.
-
-
 #### Teachers
 
-Add a teacher with a name, an optional phone, at least one branch, and how they're paid. A fixed salary has a Currency dropdown beside it: the salary is set in that currency, and their pay is always recorded in it. When you edit a teacher, you can't untick a branch where they still have a class time: give that class time another teacher first. You also can't deactivate a teacher who still teaches a class time that's active or has students. The table shows every class time each teacher teaches: the skill, the branch and the hours.
+Add a teacher with a name, an optional phone, at least one branch, and how they're paid. A fixed salary has a Currency dropdown beside it: the salary is set in that currency, and their pay is always recorded in it. When you edit a teacher, you can't untick a branch where they still have a class time: give that class time another teacher first. You also can't deactivate a teacher who still teaches a class time that's active or has students. The table shows every class time each teacher teaches, like Computer Basics 1, with the branch and the hours.
 
 Each teacher's Teacher ID, like `TCH-00003`, shows under their name, before the phone. A teacher with a login shows "Logs in as" and the address under that, or "Logs in with Teacher ID" when the login has no Gmail. Deactivating that teacher also deactivates their login and logs them out, and activating them turns it back on. A teacher with a login can't be deleted: deactivate them instead.
 
-Branch staff see this page too, with only the teachers at their branch, the class times each one teaches there, in which class and at what hours, and no buttons.
+Branch staff see this page too, with only the teachers at their branch, the class times each one teaches there and at what hours, and no buttons.
 
 #### Skills
 
@@ -1217,37 +1195,51 @@ On a **skill's page** you can:
 
 Each branch that teaches the skill is a row you click to open, like the questions on an FAQ page. The closed row shows the branch, Active or Inactive, its duration, fees and how many students take it there, with an arrow on the right. Every row starts closed, and several can be open at once; a row you opened stays open after you use one of its buttons. Open a row to see its buttons and, under them, its class times. The buttons:
 
-- **Add class time.** Type when it starts and ends, tick the days, and pick a class and a teacher. The lists only hold that branch's active classes and teachers. Any hours work: a class can run 4–6 pm while another runs 4–5 pm in a different room, and a third takes that room 5–6 pm. The app refuses a class that already has another skill at that time on one of those days, and a teacher who's teaching somewhere else then, at any branch. A skill can have as many class times as it needs, such as a morning one and an evening one.
+- **Add class time.** Type a **Name**, when it starts and ends, tick the days, and pick a teacher. The name starts at the next free number, like 2 when there's a 1 already; any short name works, as long as the skill has no other class time called that at this branch. The list only holds that branch's active teachers. Any hours work, like 4–6 pm, or 4:00 to 5:30 pm. The app refuses a teacher who's teaching another skill then, at any branch. A skill can have as many class times as it needs, such as a morning one and an evening one, or two at the same hours: see [Two class times at the same hours](#two-class-times-at-the-same-hours).
 - **Change fees** sets that branch's duration and fees. A new fee or duration only applies to students who join afterwards; current students keep what they joined with.
 - **Deactivate** stops that branch taking new students for this skill. Current ones continue. **Remove** appears only if no student ever took it there, and removes its class times with it.
 
-Each class time row shows its time, days, class, teacher and how many students it has, with these buttons:
+Each class time row shows its name, time, days, teacher and how many students it has, with these buttons:
 
-- **Students** opens the class time's own page, described below. The time itself is a link to the same page.
-- **Change** its hours, days, class or teacher. Its students move with it, so the app also refuses a change that would put one of them in another skill at the same time. A new teacher earns from fees paid from then on; fees already paid stay with the teacher they were paid under.
+- **Students** opens the class time's own page, described below. The name itself is a link to the same page.
+- **Change** its name, hours, days or teacher. Its students move with it, so the app also refuses a change that would put one of them in another skill at the same time. A new teacher earns from fees paid from then on; fees already paid stay with the teacher they were paid under.
 - **Set time** instead of Change on a class time with a yellow **Time not set** badge. Those came from before class times had hours: type its hours and tick its days.
-- **Deactivate** stops it taking new students. The students already in it stay, and it keeps its class and teacher until they've all finished.
+- **Deactivate** stops it taking new students. The students already in it stay, and it keeps its teacher until they've all finished.
 - **Remove**, only while no student has ever been in it.
 
 #### A class time's students
 
-Everyone studying one skill at one time is on one page. Open it from the **Students** button on a class time's row on the skill's page, or from the student count on a box in a class's week. Branch staff reach it from the week, and only for their own branch's class times: another branch's gives Not found, the same as a class there does.
+Everyone in one class time is on one page, called by the class time, like Computer Basics 1. Open it from the **Students** button or the name on a class time's row on the skill's page, or from the class time on the Attendance page. Branch staff reach it from Attendance, and only for their own branch's class times: another branch's gives Not found.
 
-The top card says what the class time is: the skill, the branch, the class, the teacher, the hours and days, how many students are in it now (and how many have ever joined, when that's more), the length of the course and the two fees, with "Free" for a monthly fee of zero. Under it is the list of students, A to Z, each with their phone and the responsible person's phone, the day they joined, their end date, whether the registration fee is paid, and Active, Finished or Deactivated. An Active student past their end date gets a yellow **Past end date** badge, and an unpaid fee shows its amount. A student's name opens their page. The list opens on the **Active** students; **Finished**, **Dropped** and **All** beside the heading switch it, each with its count.
+The top card says what the class time is: the skill, its name, the branch, the teacher, the hours and days, how many students are in it now (and how many have ever joined, when that's more), the length of the course and the two fees, with "Free" for a monthly fee of zero. Under it is the list of students, A to Z, each with their phone and the responsible person's phone, the day they joined, their end date, whether the registration fee is paid, and Active, Finished or Deactivated. An Active student past their end date gets a yellow **Past end date** badge, and an unpaid fee shows its amount. A student's name opens their page. The list opens on the **Active** students; **Finished**, **Dropped** and **All** beside the heading switch it, each with its count.
 
 Between the two is the **Attendance** card: the last six days the class time met, oldest first, with a tick on each day whose attendance was taken and "not taken" on the others. Today's button is filled in until it's taken. Each opens that day's sheet, and **By month** opens [the month's grid](#a-class-times-month). A class time that says "Time not set" takes no attendance, and the card says so.
 
+#### Two class times at the same hours
+
+Some skills have about 20 students at one hour, taught as two halves by the same teacher: one in the Computer lab, with a helper who isn't in the app, and one in a theory room, swapping rooms from day to day. In the app they're two ordinary class times of the skill, each with its own name, its own students and its own attendance, like Computer Basics 1 and Computer Basics 2. The app doesn't keep which room either is in.
+
+To set one up on the skill's page:
+
+1. Press **Add class time** under the branch. The name starts at the next number, like **2**.
+2. Give it exactly the same hours, the same days and the same teacher as the one already there, and save. The app lets one teacher take two class times of the same skill at exactly the same hours and days; anything else at those hours still counts as teaching two things at once.
+3. Move half the students into the new one, with **Change class time** on each student's page.
+
+On the Attendance page the two are separate rows, Computer Basics 1 and Computer Basics 2, so each half's sheet lists only its own students.
+
+To move both halves to other hours, **Change** one and then the other to match it. If the new hours overlap the old ones, like 8–9 pm to 8:30–9:30 pm, the app refuses the first change, because for a while the teacher would have two class times at overlapping but different hours. Then move the first one to some free hours, change the second to the new hours, and change the first to match.
+
 #### Setting the hours on class times that say "Time not set"
 
-The `class_times` migration turned every skill already set up at a branch into one class time, in the class and with the teacher it already had, and put its students in it. It couldn't know the hours, so each of those class times says **Time not set** until the admin types them. It's a one-time job, done once after the update goes live, and again for any database moved over from before class times existed.
+The `class_times` migration turned every skill already set up at a branch into one class time, with the teacher it already had, and put its students in it. It couldn't know the hours, so each of those class times says **Time not set** until the admin types them. It's a one-time job, done once after the update goes live, and again for any database moved over from before class times existed.
 
-A class time with no hours still works: students can join it and their fees are right. What it can't do is protect you from a clash. The app skips any class time with no hours when it checks whether a class, a teacher or a student is in two places at once, so until you set it, the same room could be given to another skill at the same time and nothing would warn you. It also stays off the week on the Classes page, where it's listed in a **Time not set** box at the bottom, and the Teachers page says "time not set" beside it.
+A class time with no hours still works: students can join it and their fees are right. What it can't do is protect you from a clash. The app skips any class time with no hours when it checks whether a teacher or a student is in two places at once, so until you set it, its teacher could be given another skill at the same time and nothing would warn you. It also takes no attendance, and the Teachers page says "time not set" beside it.
 
 Before you start, write down for every skill at every branch: the hours, the days, and whether it really runs more than once, like a morning group and an evening group. The branch staff or the teachers know. Then, for each skill:
 
 1. Open **Skills** and click the skill's name.
 2. Open the branch's row. In its table, a row with a yellow **Time not set** badge needs its hours.
-3. Press **Set time** on that row. The dialog is called "Change class time at" and the branch's name. The class and the teacher already hold what the skill had before, so leave them unless they're wrong.
+3. Press **Set time** on that row. The dialog is called "Change class time at" and the branch's name. The name and the teacher are already filled in, so leave them unless they're wrong.
 4. Type **Starts** and **Ends**, in 5-minute steps. Any hours work, like 4:00 pm to 5:30 pm, as long as it ends after it starts.
 5. Tick the **Days** it meets.
 6. Press **Save**. The row now shows its hours and days.
@@ -1255,16 +1247,14 @@ Before you start, write down for every skill at every branch: the hours, the day
 
 If the app refuses, nothing is saved, and the message says why:
 
-- *Room 1 already has Graphic Design at 4:00–5:00 pm on Monday.* Another class time holds that class then. Pick other hours or another class.
-- *Demo Teacher 2 already teaches Tailoring at Main Branch at 5:00–6:00 pm on Monday.* The teacher is busy then, here or at another branch. Pick other hours or another teacher.
+- *Demo Teacher 2 already teaches Tailoring 1 at Main Branch at 5:00–6:00 pm on Monday.* The teacher is busy then, here or at another branch. Pick other hours or another teacher.
 - *A student in this class time would be in two places at once,* followed by a student's name and the skill. That student already takes another skill at those hours. Pick other hours, or fix the other skill's class time first.
 
-A skill that really runs twice needs a second class time. After setting the first, press **Add class time** under the same branch and give it the other hours, or another class at the same hours. Then open each student who belongs in the second group and press **Change class time**. Their fees and payments don't change.
+A skill that really runs twice needs a second class time. After setting the first, press **Add class time** under the same branch and give it the other hours, or the same hours for students taught as two halves. Then open each student who belongs in the second group and press **Change class time**. Their fees and payments don't change.
 
-When you're done, check it three ways:
+When you're done, check it two ways:
 
 - No yellow **Time not set** badge is left on any skill's page.
-- On the Classes page, click each class's name: the **Time not set** box is gone and the week looks like the real timetable.
 - The Teachers page doesn't say "time not set" anywhere.
 
 #### Books
@@ -1342,7 +1332,7 @@ Press **Register student**. The form has two parts.
 **Skills**:
 
 - **Start date** is today by default. Every skill you tick starts on this day.
-- **Skills** lists the skills open at the home branch, each with its fees and duration. A skill with one class time shows when, where and with whom; a skill with several says how many, and once you tick it a **class time** dropdown appears under the list for you to pick one. A skill with no class time yet can't be ticked. Tick at least one. Two skills at the same time on the same day are refused, because the student can't be in two rooms at once.
+- **Skills** lists the skills open at the home branch, each with its fees and duration. A skill with one class time shows its name, when and with whom; a skill with several says how many, and once you tick it a **class time** dropdown appears under the list for you to pick one. A skill with no class time yet can't be ticked. Tick at least one. Two skills at the same time on the same day are refused, because the student can't be in two places at once.
 - **Registration fee paid** appears once you tick a skill that has a registration fee. It shows the total, and each skill's share when there's more than one. Tick it if the student paid now, then pick **Paid by** (Cash, ZAAD, eDahab or Bank / other) and **Paid in** (USD or SLSH). In shillings, the form shows what the fees come to at today's rate, and that's what's recorded. The fees are recorded as paid on the registration date, which is also right for a student from the old system who paid long ago. Leave it empty if they'll pay later. The tick clears itself when you change the skills, so you always confirm the final amount.
 
 Press **Register student**. If something is missing, every problem shows at once under its field and nothing you typed is lost. When it works, you see "registered as STU-00006" and the app opens the student's page.
@@ -1352,7 +1342,7 @@ Press **Register student**. If something is missing, every problem shows at once
 The top shows the photo, name, student ID and Active or Inactive. The buttons are:
 
 - **Edit details**, for an admin or staff at the student's home branch.
-- **Add skill.** Pick a skill, its class time if it has more than one, and a start date. The dialog shows the fees, roughly when the skill will end and, for a skill with one class time, when and where it is. A skill with no class time yet isn't in the list; the dialog names it underneath. The app refuses a class time that clashes with another skill the student takes now, at any branch. When the skill has a registration fee, tick **Registration fee paid** if the student paid now and say how: it's recorded as paid today. Branch staff only see their branch's skills, and skills the student already has Active don't appear. The button is greyed out when there's nothing left to add.
+- **Add skill.** Pick a skill, its class time if it has more than one, and a start date. The dialog shows the fees, roughly when the skill will end and, for a skill with one class time, when it is and with whom. A skill with no class time yet isn't in the list; the dialog names it underneath. The app refuses a class time that clashes with another skill the student takes now, at any branch. When the skill has a registration fee, tick **Registration fee paid** if the student paid now and say how: it's recorded as paid today. Branch staff only see their branch's skills, and skills the student already has Active don't appear. The button is greyed out when there's nothing left to add.
 - **Sell books**, the same dialog as on the Income screen with this student already filled in. It's greyed out when no branch you can sell at has copies of anything.
 - **Delete**, for admins only. Use it only for duplicates and typing mistakes: it removes the student, every skill record they have and every payment they made, for good, which changes the income already recorded for those days. Books they bought are the exception: those sales stay, with no student named, because the copies have left the shelf either way. It's greyed out for a student who has paid even one monthly fee, and the app refuses it too. The money is already in the books, and a percentage teacher may have been paid a share of it. To take that student out of their classes, deactivate their skills instead: they show as Inactive and their history stays.
 
@@ -1366,7 +1356,7 @@ The top shows the photo, name, student ID and Active or Inactive. The buttons ar
 - **Turn off**, after confirming, stops the student signing in and logs them out. Nothing in their record changes. **Turn back on** lets them in again with the password they had.
 - Underneath, the last five changes: what, by whom, at which branch and when.
 
-**Skills** lists each enrollment with its branch, its class time (the hours and days, then the class and teacher), start and end dates, attendance, registration fee, monthly fee and status. **Attendance** is the student's rate for that skill, like 92%, over every sheet they were on, with how many days they got each mark underneath. It says "Not taken yet" until a sheet has marked them. A yellow **Class time deactivated** badge means the student still comes to a class time that takes nobody new: move them to another one. Branch staff see only the skills at their branch, with a note saying so.
+**Skills** lists each enrollment with its branch, its class time (the hours and days, then its name and teacher, like Computer Basics 1 with Demo Teacher 1), start and end dates, attendance, registration fee, monthly fee and status. **Attendance** is the student's rate for that skill, like 92%, over every sheet they were on, with how many days they got each mark underneath. It says "Not taken yet" until a sheet has marked them. A yellow **Class time deactivated** badge means the student still comes to a class time that takes nobody new: move them to another one. Branch staff see only the skills at their branch, with a note saying so.
 
 The **Registration fee** column shows one of three things:
 
@@ -1386,7 +1376,7 @@ The other buttons on each row are:
 - **Change class time** moves the student to another of the skill's class times, say from the evening to the morning. It shows only on an Active skill that has another class time taking students. Fees, dates and payments stay exactly as they are. A teacher paid by percentage earns from the fees paid after the move, so the new class time's teacher earns from then on and the old one keeps what they already earned. The app refuses a class time that clashes with another skill the student takes.
 - **Mark finished** when the student completed the skill.
 - **Deactivate**, after confirming, when the student stopped coming before finishing.
-- **Set active**, after confirming, to undo a Finished or Deactivated by mistake. It's refused if the student is already taking that skill again, or if its class time now clashes with a skill they took up since. If the class time was deactivated and its class or teacher has gone to another class time since, it's refused too: add the skill again in another class time instead.
+- **Set active**, after confirming, to undo a Finished or Deactivated by mistake. It's refused if the student is already taking that skill again, or if its class time now clashes with a skill they took up since. If the class time was deactivated and its teacher has since been given another class time at those hours, it's refused too: add the skill again in another class time instead.
 
 When the last Active skill is finished or deactivated, the student becomes Inactive by themselves. Adding a new skill makes them Active again.
 
@@ -1407,7 +1397,7 @@ Staff at a branch and the admin take attendance, and so does a teacher with a lo
 
 #### The day's class times
 
-**Attendance** in the sidebar lists the class times meeting today, in clock order: the hours, the skill, the class, the teacher, the branch for an admin, how many students are on the sheet, and whether its attendance is **Taken** or **Not taken**. A taken one shows its marks counted ("18 present, 2 absent") and who took it. **Take attendance** opens the sheet; **Open** opens one already taken. Pick another day in the **Day** box and press **Show** to see that day instead, and **Today** to come back.
+**Attendance** in the sidebar lists the class times meeting today, in clock order: the hours, the class time, like Computer Basics 1, the teacher, the branch for an admin, how many students are on the sheet, and whether its attendance is **Taken** or **Not taken**. A taken one shows its marks counted ("18 present, 2 absent") and who took it. **Take attendance** opens the sheet; **Open** opens one already taken. Pick another day in the **Day** box and press **Show** to see that day instead, and **Today** to come back.
 
 Branch staff see their own branch's class times, the admin every branch's. A class time with nobody in it that day isn't listed, because there's no one to mark. A class time that says "Time not set" isn't either, and a line under the table counts them.
 
@@ -1421,7 +1411,7 @@ Who is on the sheet: everyone in the class time that day, meaning they had start
 
 The app refuses a sheet for:
 
-- a day the class time doesn't meet, like a Friday for a class that meets Saturday to Thursday. A lesson made up on another day isn't recorded for now.
+- a day the class time doesn't meet, like a Friday for a class time that meets Saturday to Thursday. A lesson made up on another day isn't recorded for now.
 - a day that hasn't come yet.
 - a class time that says "Time not set", until the admin sets its hours and days.
 - another branch's class time, for branch staff: the page is Not found, the same as the class time's own page.
@@ -1434,7 +1424,7 @@ If the list changed while the sheet was open, say a student joined, saving is re
 
 #### What a teacher sees
 
-A teacher's **Attendance** lists only the class times they teach that meet on the day, without the Teacher column. Under it, **Your class times** lists everything they teach, with the days, hours, class and students, and an **Attendance** button that opens each one's month. **Take attendance** and **Open** work as they do for staff, but only today's sheet can be saved. Another day's sheet opens read-only, saying "You mark today's attendance only. To change this day's, ask the office." A day nobody took has nothing to open, and the month's grid lists the days not taken without buttons. Student names aren't links, because a student's page is for staff. A class time someone else teaches is Not found, even on a day they covered it.
+A teacher's **Attendance** lists only the class times they teach that meet on the day, without the Teacher column. Under it, **Your class times** lists everything they teach, with the days, hours and students, and an **Attendance** button that opens each one's month. **Take attendance** and **Open** work as they do for staff, but only today's sheet can be saved. Another day's sheet opens read-only, saying "You mark today's attendance only. To change this day's, ask the office." A day nobody took has nothing to open, and the month's grid lists the days not taken without buttons. Student names aren't links, because a student's page is for staff. A class time someone else teaches is Not found, even on a day they covered it.
 
 **Password**, in a teacher's menu, changes the password they sign in with along with their Teacher ID. It asks for the current one and logs out their other phones and computers. A teacher who only uses Google sees that they have no password there and can ask the admin for one. A teacher still on the admin's temporary password sees no menu, only **Choose your password**, until they've chosen one: at least 10 characters, not only numbers, and without their Teacher ID.
 
@@ -1442,8 +1432,8 @@ A teacher's **Attendance** lists only the class times they teach that meet on th
 
 A student's side looks like a teacher's: the same sidebar and header, with their own menu, **Your studies**. On a phone the menu folds away behind the button at the top left. A student still on the temporary password sees no menu, only the page to choose their own, until they've chosen it.
 
-- **My skills** (`/portal`) is where a student lands. One card per skill, at every branch, with its branch, class time, class, teacher, dates and status, and their attendance rate with how many days they got each mark. Tapping the attendance opens that skill's days. While fees are switched on and they have unpaid fees, a yellow box above says how much ("You have $105.00 in unpaid fees"), with **See my fees**.
-- **Attendance** lists their rate in each skill. Each one opens the skill's attendance: the rate at the top, then a timeline by month, newest first. Each day has a date tile coloured by its mark (green Present, red Absent, yellow Late, grey Excused), the mark with an icon, and the class time and room it was taken in. A class day nobody marked them, from the first sheet taken in their class time up to today, shows as **Not taken** with a dashed tile, so a gap doesn't look like a day they came.
+- **My skills** (`/portal`) is where a student lands. One card per skill, at every branch, called by its class time, like Computer Basics 1, with its branch, hours and days, teacher, dates and status, and their attendance rate with how many days they got each mark. Tapping the attendance opens that skill's days. While fees are switched on and they have unpaid fees, a yellow box above says how much ("You have $105.00 in unpaid fees"), with **See my fees**.
+- **Attendance** lists their rate in each skill. Each one opens the skill's attendance: the rate at the top, then a timeline by month, newest first. Each day has a date tile coloured by its mark (green Present, red Absent, yellow Late, grey Excused), the mark with an icon, and the hours and class time it was taken in, like "8:00–9:00 pm · Computer Basics 1". A class day nobody marked them, from the first sheet taken in their class time up to today, shows as **Not taken** with a dashed tile, so a gap doesn't look like a day they came.
 - **My fees** is switched off for now (10 Oct 2026), so a student sees nothing about their fees: it isn't in the menu, the yellow box on My skills doesn't show, and the address `/portal/fees` says Not found. Nothing was deleted. `PORTAL_SHOWS_FEES` in `src/app/portal/fees-switch.ts` is the one switch for all three, and setting it to `true` brings them back. Staff see every fee on their own side as before. When it's on, My fees has one card per skill, with the registration fee (paid, with the day, or unpaid) and every month from the one they joined to this one, paid with the amount or unpaid, and their unpaid fees altogether at the top, or "You have no unpaid fees". The same months and the same total staff see on the student's page, because both come from `fee-schedule.ts`. Unpaid fees never hide anything. The portal never says "owe" to a student: it always says unpaid.
 - **My details** shows their photo, name, Student ID, Active or Inactive, sex, home branch, registration date and both phones, read-only, with a note to ask at their branch to change anything. Underneath, **Change password** asks for the current one, and logs them out on any other phone.
 
@@ -1545,6 +1535,8 @@ Admins only, and the first thing under Money. Pick a day, a month and optionally
 
 **A student starts another skill later.** Open their page and press Add skill. The new skill has its own registration fee.
 
+**Students at one hour are split between the lab and a theory room.** Make it two class times of the skill at exactly the same hours and days with the same teacher: press Add class time, which names it 2, and move half the students to it with Change class time. Each half's attendance is its own sheet. See [Two class times at the same hours](#two-class-times-at-the-same-hours).
+
 **A student pays the registration fee later.** Open their page and press Record payment on that skill. Pick the day they paid and how. The amount starts at the full fee; lower it if they could only pay part.
 
 **A student pays for a month.** Open their page, find the skill under Monthly fees and click the yellow box for that month. The amount is already there; change it if they were given a discount, then pick the day and the method. If the teacher is paid by percentage, their share is worked out and added at the same moment.
@@ -1617,7 +1609,7 @@ Admins only, and the first thing under Money. Pick a day, a month and optionally
 
 **A teacher takes today's attendance.** They open Attendance on their phone, press Take attendance on their class time, tap the students who aren't Present and save. The sheet says they took it.
 
-**Someone covers a class for a day.** The teacher covering it tells the office, and staff take that day's sheet. A teacher only sees the class times they teach.
+**Someone covers a class time for a day.** The teacher covering it tells the office, and staff take that day's sheet. A teacher only sees the class times they teach.
 
 **A teacher needs to fix a day that's over.** They can't change it any more. Staff open that day's sheet and change it.
 
@@ -1627,21 +1619,19 @@ Admins only, and the first thing under Money. Pick a day, a month and optionally
 
 **A student was marked wrong.** Open that day's sheet from the class time's month or the Attendance list, change the mark and press Save changes. The sheet says who changed it and when.
 
-**A class didn't happen, say on a holiday.** Leave that day's sheet untaken. A day nobody took counts against no student.
+**A class time didn't meet, say on a holiday.** Leave that day's sheet untaken. A day nobody took counts against no student.
 
 **A lesson was made up on another day.** It can't be recorded yet: sheets are only for the days the class time meets.
 
-**A skill gets a second group.** Too many students for one room at 4 pm? On the skill's page, press Add class time under that branch and give it other hours, or another class at the same hours. New students pick which one they join.
+**A skill gets a second class time.** Too many students for one room at 4 pm? On the skill's page, press Add class time under that branch and give it other hours, or the same hours with the same teacher for two halves. New students pick which one they join.
 
-**A class moves to another time.** On the skill's page, press Change on that class time and type the new hours or tick other days. Its students move with it. If the new time clashes with another skill one of them takes, the app says who.
+**A class time moves to another time.** On the skill's page, press Change on that class time and type the new hours or tick other days. Its students move with it. If the new time clashes with another skill one of them takes, the app says who.
 
 **A student wants another time.** Open the student, press Change class time on that skill and pick the new one. Their fees and payments don't change.
 
 **Class times say "Time not set".** They came from before class times had hours. They work, but the app can't check them for clashes until the admin types their hours. See [Setting the hours on class times](#setting-the-hours-on-class-times-that-say-time-not-set).
 
 **A class time closes.** On the skill's page, press Deactivate on it: nobody new can join, and its students keep coming. Their pages show a yellow Class time deactivated badge; open each one and press Change class time. Once nobody is left in it, its class and teacher are free for other class times.
-
-**Finding a free room.** Open Classes and click a class's name. The dashed lines show when it stands empty on each day.
 
 **A branch stops teaching a skill.** On the skill's page, deactivate that branch's row. Current students continue, and nobody new can join there.
 
@@ -1694,7 +1684,7 @@ The [README](../README.md) has the full first-time setup and the steps to deploy
 
 ### Sample data
 
-`pnpm db:demo` adds two branches (Main Branch and Second Branch), four skills with six class times (the Computer Lab holds Computer Basics from 4 to 6 pm and Graphic Design after it, Computer Basics also runs in the morning, and Tailoring takes Room 1 for one hour), four teachers, four students and a branch staff account `staff@college.local` at Main Branch. That address isn't a Google account, so it signs in with a password, which the script prints once. If you lose it, set a new one under Staff accounts.
+`pnpm db:demo` adds two branches (Main Branch and Second Branch), four skills with six class times (Computer Basics 1 in the morning and Computer Basics 2 from 4 to 6 pm, Graphic Design after it, and Tailoring for one hour), four teachers, four students and a branch staff account `staff@college.local` at Main Branch. That address isn't a Google account, so it signs in with a password, which the script prints once. If you lose it, set a new one under Staff accounts.
 
 The sample students cover a student with two skills, a student past their end date, a student taking skills at both branches, an Inactive student, and both paid and unpaid registration fees. The money is there too: two of the four teachers are on a fixed salary (one of them in shillings) and two on a percentage, fees are paid across all four methods with some months left owing, books were sold over the counter (one Books payment with a note, from before the book list, so the list itself starts empty), rent and electricity went out for this month and last, last month's salaries were paid and this month's weren't, and both branches have a plan for this month to compare against. The exchange rate is set at 8,550, one student pays the Second Branch in shillings, which earns her teacher a shilling share, and the Second Branch pays its electricity in shillings. Never run it on the real database. It refuses anyway if branches already exist.
 
