@@ -114,34 +114,23 @@ open:
 
 ## Still to do (no decision needed)
 
-**Class times without classes, before they go live.** Built on 18 Oct 2026.
-`pnpm lint` and `pnpm build` pass. Tried in the browser by the user the same
-day on the test database: the names on the skill's page, a 2 at the same hours
-with the same teacher, and moving a student into it with Change class time.
+**Class times without classes: live, two things left.** Built on 18 Oct
+2026. The user backed up production and applied
+`20261018120000_class_times_without_classes` to `ep-square-silence` the same
+day, main was pushed straight after, and the user checked the live site
+("everything is perfect"). Left:
 
-Going live:
+- Split the four Computer Basics hours (5 to 9 pm, the Technology skills
+  branch): a second class time at each hour, on the same days, with Suhayb
+  Faysal, and about half the students moved into it. Each Active student's
+  row on a class time's page has Change class time for this, for now.
+- When the split is done, set `CLASS_TIME_PAGE_MOVES_STUDENTS` in
+  `src/app/(app)/class-times/move-switch.ts` to `false`, or take the buttons
+  out with the switch. The student's own page keeps Change class time.
 
-- Commit first, so the push is ready.
-- Apply `20261018120000_class_times_without_classes` to production
-  (`ep-square-silence`) after a backup, then push straight away. Unlike the
-  earlier migrations this one takes columns away: the live site's old code
-  reads the class, so its class time, attendance and student pages fail from
-  the migration until the new code is deployed, about a minute. Do it when
-  nobody is taking attendance. It deletes the list of classes, and the class
-  each class time was in, for good, so the backup is the only way back. It
-  names every class time 1, 2, 3 and on for each branch skill, by start time.
-  Students, attendance and fees don't change. The Neon test database has it
-  already.
-- Push main.
-- On the live site, for each of the four Computer Basics hours (5 to 9 pm,
-  the Technology skills branch): add a second class time at the same hour, on
-  the same days, with Suhayb Faysal, then move about half its students to it
-  with Change class time. The migration numbers inactive class times too, so
-  look at the names the four got before adding; the app suggests the next
-  free number for each new one, and any short name works.
-- `pnpm db:import-students` finds a Computer Basics class time by the hour it
-  starts, so once two share an hour it stops with "More than one Computer
-  Basics class time starts at". It was a one-off for September's list.
+`pnpm db:import-students` finds a Computer Basics class time by the hour it
+starts, so once two share an hour it stops with "More than one Computer Basics
+class time starts at". It was a one-off for September's list.
 
 **Teacher passwords, before they go live.** Built on 6 Oct 2026. `pnpm lint`
 and `pnpm build` pass. Tried the same day with a script against the Neon test
