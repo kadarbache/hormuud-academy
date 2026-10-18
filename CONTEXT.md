@@ -11,11 +11,11 @@ Hormuud Academy, the one organisation this system runs. There is no second colle
 _Avoid_: Tenant, organisation, school
 
 **Branch**:
-One location of the college, often in its own city. Classes, teachers and branch staff belong to a branch; the skill catalog and students belong to the whole college. What a skill costs is set per branch, because a branch in a poorer city charges less.
+One location of the college, often in its own city. Teachers and branch staff belong to a branch; the skill catalog and students belong to the whole college. What a skill costs is set per branch, because a branch in a poorer city charges less.
 _Avoid_: Campus, sub-college, site
 
 **Admin**:
-A staff account that works across every branch and sets up branches, skills, teachers, classes and staff accounts.
+A staff account that works across every branch and sets up branches, skills, teachers and staff accounts.
 _Avoid_: Head office, super admin, owner
 
 **Branch staff**:
@@ -37,12 +37,16 @@ A skill as taught at one branch, with that branch's duration, registration fee a
 _Avoid_: Offering, section, course run
 
 **Class**:
-A room at a branch, like Room 3, holding different skills at different times of the day. Never a group of students.
+The college's word for a room at a branch, like the Computer lab or Room 3. The app doesn't keep classes: a class time has no room, and its teacher and students know where to go. Never a group of students.
 _Avoid_: Group, batch, section
 
 **Class time**:
-One branch skill taught in one class, from a start time to an end time on chosen days, by one teacher, like Graphic Design in Room 3 from 4 to 6 pm on Saturday, Monday and Wednesday. Each sets its own hours, a branch skill can run at several, and no class, teacher or student is ever in two class times at once.
+One branch skill under a short name, taught from a start time to an end time on chosen days by one teacher, like Graphic Design 1 from 4 to 6 pm on Saturday, Monday and Wednesday. Each sets its own hours, and a branch skill can run at several. No teacher or student is ever in two class times at once, except that one teacher can take class times of the same branch skill at exactly the same hours and days, like about 20 students at one hour taught as two halves, one in the Computer lab and one in a theory room.
 _Avoid_: Shift, group, session, section, batch, slot
+
+**Class time name**:
+The short name every class time has, like "1" or "2", shown after its skill: Computer Basics 1. No two class times of a branch skill share one, whatever the capitals.
+_Avoid_: Label, code, group, Group A and Group B
 
 **Teacher**:
 A person who teaches skills at one or more branches. Not a staff account, though the admin can give them a teacher login.
@@ -128,7 +132,7 @@ _Avoid_: Overdue, expired
 A student with at least one Active enrollment, at any branch. Every other student is an Inactive student. Nobody sets this by hand: to take a student out of their classes, deactivate their skills. A student who has paid even one monthly fee can never be deleted, so that is the only way out; deleting is for duplicates and typing mistakes.
 
 **Deactivate**:
-Take a branch, category, expense category, skill, branch skill, teacher, class, class time or staff account out of new use while keeping its history. Deleting is only for records nothing uses yet. A student's enrollment can be deactivated too: see **Deactivated**.
+Take a branch, category, expense category, skill, branch skill, teacher, class time or staff account out of new use while keeping its history. Deleting is only for records nothing uses yet. A student's enrollment can be deactivated too: see **Deactivated**.
 _Avoid_: Archive, disable
 
 ### Attendance
