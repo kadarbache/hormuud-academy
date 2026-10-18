@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
 import { EmptyRow } from "@/components/status-badge";
-import { formatSlot } from "@/lib/class-times";
+import { classTimeName, formatSlot } from "@/lib/class-times";
 import { addDays, collegeToday, formatDateTime, isIsoDate, monthOf } from "@/lib/dates";
 import { formatStudentNumber } from "@/lib/format";
 import { requireSignedIn } from "@/lib/session";
@@ -43,7 +43,7 @@ export default async function AttendanceSheetPage({
   const problem = sheetDayProblem(classTime, date, today, sheet !== null);
   const readOnly = !canMarkOn(user, date, today);
   const marks = new Map(sheet?.entries.map((entry) => [entry.enrollmentId, entry.mark]));
-  const skillName = classTime.branchSkill.skill.name;
+  const name = classTimeName(classTime.branchSkill.skill.name, classTime);
   const here = `/class-times/${id}/attendance`;
 
   // The class days either side, to go through a week of paper sheets in a row.
@@ -57,13 +57,13 @@ export default async function AttendanceSheetPage({
       <Button variant="ghost" size="sm" asChild className="-ml-2">
         <Link href={`${here}?month=${monthOf(date)}`}>
           <ChevronLeft />
-          Attendance for {skillName}
+          Attendance for {name}
         </Link>
       </Button>
 
       <PageHeader
         title={formatLongDay(date)}
-        description={`${skillName}, ${formatSlot(classTime)}, in ${classTime.classroom.name} with ${classTime.teacher.name}. ${classTime.branchSkill.branch.name}.`}
+        description={`${name}, ${formatSlot(classTime)}, with ${classTime.teacher.name}. ${classTime.branchSkill.branch.name}.`}
       >
         {previous && (
           <Button variant="outline" size="sm" asChild>

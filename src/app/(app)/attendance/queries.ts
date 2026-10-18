@@ -1,7 +1,7 @@
 import "server-only";
 import type { AttendanceMark, Prisma } from "@/generated/prisma/client";
 import { inUse } from "@/lib/clashes";
-import { weekdayOf } from "@/lib/class-times";
+import { compareClassTimes, weekdayOf } from "@/lib/class-times";
 import { addDays, collegeDayStart, fromDbDate, monthEnd, monthStart, toDbDate } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
 import type { AppUser } from "@/lib/session";
@@ -75,7 +75,6 @@ export async function findClassTime(user: AppUser, id: string) {
   return prisma.classTime.findFirst({
     where: { id, ...visibleClassTimes(user) },
     include: {
-      classroom: { select: { id: true, name: true } },
       teacher: { select: { name: true } },
       branchSkill: {
         select: {
@@ -182,9 +181,7 @@ export async function classTimesOn(user: AppUser, day: string) {
           { attendanceSheets: { some: { date } } },
         ],
       },
-      orderBy: [{ startMinute: "asc" }, { endMinute: "asc" }],
       include: {
-        classroom: { select: { name: true } },
         teacher: { select: { name: true } },
         branchSkill: {
           select: {
@@ -218,9 +215,9 @@ export async function classTimesOn(user: AppUser, day: string) {
   ]);
 
   return {
-    classTimes: classTimes.filter(
-      (classTime) => classTime._count.enrollments > 0 || classTime.attendanceSheets.length > 0,
-    ),
+    classTimes: classTimes
+      .filter((classTime) => classTime._count.enrollments > 0 || classTime.attendanceSheets.length > 0)
+      .toSorted(compareClassTimes),
     untimed,
   };
 }
@@ -246,11 +243,9 @@ export async function marksByEnrollment(enrollmentIds: string[]) {
 
 /** Every class time a teacher teaches now, with how many students are in each. */
 export async function classTimesTaughtBy(teacherId: string) {
-  return prisma.classTime.findMany({
+  const classTimes = await prisma.classTime.findMany({
     where: { teacherId, ...inUse },
-    orderBy: [{ startMinute: "asc" }, { endMinute: "asc" }],
     include: {
-      classroom: { select: { name: true } },
       branchSkill: {
         select: {
           skill: { select: { name: true } },
@@ -260,4 +255,5 @@ export async function classTimesTaughtBy(teacherId: string) {
       _count: { select: { enrollments: { where: { status: "ACTIVE" } } } },
     },
   });
+  return classTimes.toSorted(compareClassTimes);
 }

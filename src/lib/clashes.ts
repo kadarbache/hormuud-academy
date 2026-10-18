@@ -1,6 +1,7 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
 import {
+  classTimeName,
   formatDayList,
   formatHours,
   sharedDays,
@@ -11,19 +12,24 @@ import {
 import { formatStudentNumber } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 
-// Nothing and nobody is in two places at once. A class holds one class time
-// at a time, a teacher teaches one at a time at any branch, and a student
-// sits in one at a time. "At once" means overlapping hours on a day both
-// meet, so 4–6 pm on Saturdays and 4–6 pm on Sundays can share a class.
+// Nobody is in two places at once. A teacher teaches one class time at a
+// time at any branch, and a student sits in one at a time. "At once" means
+// overlapping hours on a day both meet, so 4–6 pm on Saturdays and 4–6 pm on
+// Sundays don't clash.
+//
+// One exception: a teacher can teach class times of the same skill at a
+// branch at exactly the same hours and days, like Computer Basics 1 and 2.
+// About 20 students at one hour are taught that way, as two halves, one in
+// the Computer lab with a helper and one in a theory room.
 //
 // The checks run before the write, outside any transaction: the local
 // database takes one connection at a time, so a query on `prisma` inside a
 // transaction would wait forever.
 
 /**
- * A class time holds its class and its teacher while it's active, and after
- * it's deactivated for as long as students are still in it, because they
- * still come.
+ * A class time holds its teacher while it's active, and after it's
+ * deactivated for as long as students are still in it, because they still
+ * come.
  */
 export const inUse = {
   OR: [{ active: true }, { enrollments: { some: { status: "ACTIVE" } } }],
@@ -34,36 +40,42 @@ function when(slot: Slot, other: Slot) {
   return `at ${formatHours(other)} on ${formatDayList(sharedDays(slot.days, other.days))}`;
 }
 
-export type ClassTimeClash = { field: "classroomId" | "teacherId"; message: string };
+/** Whether two slots are exactly the same hours on exactly the same days. */
+function sameSlot(a: Slot, b: Slot) {
+  return (
+    a.startMinute === b.startMinute &&
+    a.endMinute === b.endMinute &&
+    a.days.length === b.days.length &&
+    a.days.every((day) => b.days.includes(day))
+  );
+}
 
 /**
- * Whether a class time, as it's about to be saved, would share its class or
- * its teacher with another class time at the same moment. The teacher is
- * checked at every branch by the clock, because a teacher can't be at two
- * branches at once either. A clash over the class is reported first.
+ * Why a class time, as it's about to be saved, would have its teacher in two
+ * places at once, or null. The teacher is checked at every branch by the
+ * clock, because a teacher can't be at two branches at once either. Another
+ * class time of the same branch skill at exactly the same hours and days
+ * doesn't count.
  */
-export async function classTimeClash(proposed: {
+export async function teacherClash(proposed: {
   /** Left out for a new class time. */
   id?: string;
-  classroomId: string;
+  branchSkillId: string;
   teacherId: string;
   slot: Slot;
-}): Promise<ClassTimeClash | null> {
+}): Promise<string | null> {
   const others = await prisma.classTime.findMany({
     where: {
-      AND: [
-        inUse,
-        { OR: [{ classroomId: proposed.classroomId }, { teacherId: proposed.teacherId }] },
-      ],
+      AND: [inUse, { teacherId: proposed.teacherId }],
       startMinute: { not: null },
       ...(proposed.id ? { id: { not: proposed.id } } : {}),
     },
     select: {
-      classroomId: true,
+      branchSkillId: true,
+      name: true,
       startMinute: true,
       endMinute: true,
       days: true,
-      classroom: { select: { name: true } },
       teacher: { select: { name: true } },
       branchSkill: {
         select: { skill: { select: { name: true } }, branch: { select: { name: true } } },
@@ -71,25 +83,18 @@ export async function classTimeClash(proposed: {
     },
   });
 
-  const clashing = others.flatMap((other) => {
-    const slot = slotOf(other);
-    return slot && slotsClash(proposed.slot, slot) ? [{ ...other, slot }] : [];
-  });
-  const room = clashing.find((other) => other.classroomId === proposed.classroomId);
-  if (room) {
-    return {
-      field: "classroomId",
-      message: `${room.classroom.name} already has ${room.branchSkill.skill.name} ${when(proposed.slot, room.slot)}.`,
-    };
-  }
-  const teacher = clashing[0];
-  if (teacher) {
-    return {
-      field: "teacherId",
-      message: `${teacher.teacher.name} already teaches ${teacher.branchSkill.skill.name} at ${teacher.branchSkill.branch.name} ${when(proposed.slot, teacher.slot)}.`,
-    };
-  }
-  return null;
+  const clash = others
+    .flatMap((other) => {
+      const slot = slotOf(other);
+      return slot && slotsClash(proposed.slot, slot) ? [{ ...other, slot }] : [];
+    })
+    .find(
+      (other) =>
+        other.branchSkillId !== proposed.branchSkillId || !sameSlot(proposed.slot, other.slot),
+    );
+  if (!clash) return null;
+  const name = classTimeName(clash.branchSkill.skill.name, clash);
+  return `${clash.teacher.name} already teaches ${name} at ${clash.branchSkill.branch.name} ${when(proposed.slot, clash.slot)}.`;
 }
 
 /**

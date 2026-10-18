@@ -1,4 +1,4 @@
-// Sample branches, classes, teachers, skills and their class times,
+// Sample branches, teachers, skills and their class times,
 // students and money for trying the app on a local database. Never run this
 // against the college's real database.
 //
@@ -63,13 +63,6 @@ async function main() {
     data: { name: "Second Branch", phone: "252610000002" },
   });
 
-  const [lab, room1, roomA, roomB] = await Promise.all([
-    prisma.classroom.create({ data: { name: "Computer Lab", branchId: main.id } }),
-    prisma.classroom.create({ data: { name: "Room 1", branchId: main.id } }),
-    prisma.classroom.create({ data: { name: "Room A", branchId: second.id } }),
-    prisma.classroom.create({ data: { name: "Room B", branchId: second.id } }),
-  ]);
-
 
   // Two teachers on a fixed salary, one of them paid in shillings, and two
   // on a share of the fees they bring in.
@@ -132,13 +125,13 @@ async function main() {
     offer(electrical, second.id),
   ]);
 
-  // Where, when and with whom, from and to the hour. The Computer Lab holds
-  // Computer Basics from 4 to 6 and Graphic Design after it, Computer Basics
-  // also runs in the morning, and Tailoring takes Room 1 for one hour.
+  // When and with whom, from and to the hour. Computer Basics runs in the
+  // morning and from 4 to 6, Graphic Design after it, and Tailoring for one
+  // hour.
   const SAT_TO_THU = ["SATURDAY", "SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY"] as const;
   const classTime = (
     bs: typeof mainComputer,
-    classroomId: string,
+    name: string,
     hours: [start: number, end: number],
     teacherId: string,
     days: readonly (typeof SAT_TO_THU)[number][] = SAT_TO_THU,
@@ -146,7 +139,7 @@ async function main() {
     prisma.classTime.create({
       data: {
         branchSkillId: bs.id,
-        classroomId,
+        name,
         startMinute: hours[0] * 60,
         endMinute: hours[1] * 60,
         teacherId,
@@ -155,12 +148,12 @@ async function main() {
     });
   const [computerMorning, , designEvening, tailoringAfternoon, secondComputerAfternoon, electricalMorning] =
     await Promise.all([
-      classTime(mainComputer, lab.id, [8, 10], t1.id),
-      classTime(mainComputer, lab.id, [16, 18], t1.id),
-      classTime(mainDesign, lab.id, [18, 20], t2.id, ["SATURDAY", "MONDAY", "WEDNESDAY"]),
-      classTime(mainTailoring, room1.id, [16, 17], t3.id),
-      classTime(secondComputer, roomA.id, [16, 18], t4.id),
-      classTime(secondElectrical, roomB.id, [8, 10], t3.id),
+      classTime(mainComputer, "1", [8, 10], t1.id),
+      classTime(mainComputer, "2", [16, 18], t1.id),
+      classTime(mainDesign, "1", [18, 20], t2.id, ["SATURDAY", "MONDAY", "WEDNESDAY"]),
+      classTime(mainTailoring, "1", [16, 17], t3.id),
+      classTime(secondComputer, "1", [16, 18], t4.id),
+      classTime(secondElectrical, "1", [8, 10], t3.id),
     ]);
 
   const staffPassword = randomBytes(9).toString("base64url");

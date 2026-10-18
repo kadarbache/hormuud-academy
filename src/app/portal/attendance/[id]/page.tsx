@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { EmptyRow } from "@/components/status-badge";
 import type { AttendanceMark } from "@/generated/prisma/client";
-import { formatHours, slotOf, type ClassTimeHours } from "@/lib/class-times";
+import { classTimeName, formatHours, slotOf, type ClassTimeHours } from "@/lib/class-times";
 import {
   addDays,
   collegeToday,
@@ -57,13 +57,14 @@ const look: Record<AttendanceMark | "NONE", { tile: string; icon: React.ReactNod
 
 const weekday = new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", weekday: "short" });
 
-/** "8:00–9:00 pm · Room 1", or just the room for a class time with no hours. */
-function placeOf(classTime: ClassTimeHours & { classroom: { name: string } }) {
+/** "8:00–9:00 pm · Computer Basics 1", or just the class time for one with no hours. */
+function classTimeLine(skillName: string, classTime: ClassTimeHours & { name: string }) {
   const slot = slotOf(classTime);
-  return slot ? `${formatHours(slot)} · ${classTime.classroom.name}` : classTime.classroom.name;
+  const name = classTimeName(skillName, classTime);
+  return slot ? `${formatHours(slot)} · ${name}` : name;
 }
 
-type Day = { date: string; mark: AttendanceMark | null; place: string };
+type Day = { date: string; mark: AttendanceMark | null; classTime: string };
 
 function DayRow({ day }: { day: Day }) {
   const { tile, icon } = look[day.mark ?? "NONE"];
@@ -83,7 +84,7 @@ function DayRow({ day }: { day: Day }) {
           {day.mark ? markLabel[day.mark] : "Not taken"}
         </div>
         <div className="truncate text-xs text-muted-foreground">
-          {day.mark ? day.place : "Nobody marked you this day"}
+          {day.mark ? day.classTime : "Nobody marked you this day"}
         </div>
       </div>
       {icon}
@@ -108,7 +109,7 @@ export default async function PortalSkillAttendancePage({
   const marked: Day[] = enrollment.attendance.map((entry) => ({
     date: fromDbDate(entry.sheet.date),
     mark: entry.mark,
-    place: placeOf(entry.sheet.classTime),
+    classTime: classTimeLine(enrollment.skill.name, entry.sheet.classTime),
   }));
   const counts = countMarks(enrollment.attendance.map((entry) => entry.mark));
   const rate = attendanceRate(counts);
@@ -136,7 +137,7 @@ export default async function PortalSkillAttendancePage({
       ? []
       : classDaysBetween(classTime, from, to)
           .filter((date) => !markedDates.has(date))
-          .map((date) => ({ date, mark: null, place: placeOf(classTime) }));
+          .map((date) => ({ date, mark: null, classTime: classTimeLine(enrollment.skill.name, classTime) }));
 
   const days = [...marked, ...unmarked].toSorted((a, b) => b.date.localeCompare(a.date));
   const months = Map.groupBy(days, (day) => monthOf(day.date));

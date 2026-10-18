@@ -11,7 +11,7 @@ import { DataTable } from "@/components/data-table";
 import { PageHeader } from "@/components/page-header";
 import { EmptyRow } from "@/components/status-badge";
 import { canActAtBranch } from "@/lib/access";
-import { formatDays, formatHours, slotOf } from "@/lib/class-times";
+import { classTimeName, formatDays, formatHours, slotOf } from "@/lib/class-times";
 import { collegeToday, formatDate, fromDbDate, toDbDate } from "@/lib/dates";
 import { formatMoney, formatMonths, formatStudentNumber } from "@/lib/format";
 import { isPositiveMoney } from "@/lib/money";
@@ -60,6 +60,7 @@ export async function generateMetadata({
   const classTime = await prisma.classTime.findUnique({
     where: { id },
     select: {
+      name: true,
       startMinute: true,
       endMinute: true,
       days: true,
@@ -68,13 +69,14 @@ export async function generateMetadata({
   });
   if (!classTime) return { title: "Class time" };
   const slot = slotOf(classTime);
-  return { title: `${classTime.branchSkill.skill.name}${slot ? `, ${formatHours(slot)}` : ""}` };
+  const name = classTimeName(classTime.branchSkill.skill.name, classTime);
+  return { title: `${name}${slot ? `, ${formatHours(slot)}` : ""}` };
 }
 
 /**
- * Everyone studying one skill at one time, with what the class time is: when,
- * where, who teaches it and what it costs, and its last few days' attendance. It's the page behind a class time
- * row on a skill's page and behind the student count on a class's week.
+ * Everyone in one class time, with what the class time is: when, who teaches
+ * it and what it costs, and its last few days' attendance. It's the page
+ * behind a class time row on a skill's page and on the Attendance page.
  * Branch staff see only their own branch's class times.
  */
 export default async function ClassTimePage({
@@ -91,7 +93,6 @@ export default async function ClassTimePage({
   const classTime = await prisma.classTime.findUnique({
     where: { id },
     include: {
-      classroom: { select: { id: true, name: true } },
       teacher: { select: { name: true } },
       branchSkill: {
         select: {
@@ -154,6 +155,7 @@ export default async function ClassTimePage({
 
   const bs = classTime.branchSkill;
   const skillName = bs.skill.name;
+  const name = classTimeName(skillName, classTime);
   const slot = slotOf(classTime);
   const hours = slot ? formatHours(slot) : null;
   const here = `/class-times/${classTime.id}`;
@@ -161,16 +163,16 @@ export default async function ClassTimePage({
   return (
     <>
       <Button variant="ghost" size="sm" asChild className="-ml-2">
-        <Link href={isAdmin ? `/admin/skills/${bs.skillId}` : `/classes/${classTime.classroom.id}`}>
+        <Link href={isAdmin ? `/admin/skills/${bs.skillId}` : "/attendance"}>
           <ChevronLeft />
-          {isAdmin ? skillName : classTime.classroom.name}
+          {isAdmin ? skillName : "Attendance"}
         </Link>
       </Button>
 
       <PageHeader
         title={
           <span className="flex flex-wrap items-center gap-2">
-            {skillName}
+            {name}
             <span className="font-normal text-muted-foreground">{hours ?? "Time not set"}</span>
             {!classTime.active && (
               <Badge variant="outline" className="text-muted-foreground">
@@ -179,7 +181,7 @@ export default async function ClassTimePage({
             )}
           </span>
         }
-        description={`${bs.branch.name}. Everyone studying ${skillName} at this time.`}
+        description={`${bs.branch.name}. Everyone in ${name}.`}
       />
 
       <Card>
@@ -197,12 +199,8 @@ export default async function ClassTimePage({
                 skillName
               )}
             </Detail>
+            <Detail label="Name">{classTime.name}</Detail>
             <Detail label="Branch">{bs.branch.name}</Detail>
-            <Detail label="Class">
-              <Link href={`/classes/${classTime.classroom.id}`} className="hover:underline">
-                {classTime.classroom.name}
-              </Link>
-            </Detail>
             <Detail label="Teacher">{classTime.teacher.name}</Detail>
             <Detail label="Hours">{hours ?? "Not set"}</Detail>
             <Detail label="Days">

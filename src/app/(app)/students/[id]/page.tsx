@@ -11,7 +11,7 @@ import { DataTable } from "@/components/data-table";
 import { EmptyRow } from "@/components/status-badge";
 import type { Currency, Prisma } from "@/generated/prisma/client";
 import { canActAtBranch } from "@/lib/access";
-import { formatSlot } from "@/lib/class-times";
+import { classTimeName, formatSlot } from "@/lib/class-times";
 import {
   collegeToday,
   formatDate,
@@ -47,6 +47,7 @@ import {
   setEnrollmentStatus,
 } from "../actions";
 import { enrollableBranchSkills, getStudentLogin, getStudentProfile } from "../queries";
+import { classTimeText } from "../types";
 import { ChangeClassTimeDialog } from "./change-class-time-dialog";
 import { EnrollDialog } from "./enroll-dialog";
 import { PortalLogin } from "./portal-login";
@@ -374,7 +375,7 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
                 enrollment.status === "ACTIVE" && fromDbDate(enrollment.endDate) < today;
               const canAct = canActAtBranch(user, enrollment.branchSkill.branchId);
               const { classTime } = enrollment;
-              const where = `${classTime.classroom.name} with ${classTime.teacher.name}`;
+              const nameAndTeacher = `${classTimeName(enrollment.skill.name, classTime)} with ${classTime.teacher.name}`;
               const moveTo = otherClassTimes.get(enrollment.id) ?? [];
               return {
                 key: enrollment.id,
@@ -392,7 +393,7 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
                   "Class time": (
                     <>
                       <div>{formatSlot(classTime)}</div>
-                      <div className="text-xs text-muted-foreground">{where}</div>
+                      <div className="text-xs text-muted-foreground">{nameAndTeacher}</div>
                       {/* Still coming to a class time that's closing: time to move them. */}
                       {enrollment.status === "ACTIVE" && !classTime.active && (
                         <Badge variant="outline" className={`mt-1 ${warning}`}>
@@ -438,7 +439,11 @@ export default async function StudentPage({ params }: PageProps<"/students/[id]"
                             <ChangeClassTimeDialog
                               action={changeClassTime.bind(null, enrollment.id)}
                               skillName={enrollment.skill.name}
-                              current={`${formatSlot(classTime)} in ${where}`}
+                              current={classTimeText({
+                                name: classTime.name,
+                                when: formatSlot(classTime),
+                                teacherName: classTime.teacher.name,
+                              })}
                               options={moveTo}
                               trigger={
                                 <Button variant="ghost" size="sm">

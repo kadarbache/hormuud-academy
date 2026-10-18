@@ -73,7 +73,6 @@ export async function deleteBranch(id: string): Promise<ActionResult> {
       _count: {
         select: {
           staff: true,
-          classrooms: true,
           teachers: true,
           branchSkills: true,
           branchBooks: true,
@@ -87,7 +86,7 @@ export async function deleteBranch(id: string): Promise<ActionResult> {
   const inUse = Object.values(branch._count).some((count) => count > 0);
   if (inUse) {
     return failure(
-      "This branch has staff, classes, teachers, skills, books or students. Deactivate it instead.",
+      "This branch has staff, teachers, skills, books or students. Deactivate it instead.",
     );
   }
 

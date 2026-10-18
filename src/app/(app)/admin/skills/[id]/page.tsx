@@ -14,7 +14,14 @@ import { DataTable } from "@/components/data-table";
 import { PageHeader } from "@/components/page-header";
 import { ActiveBadge, EmptyRow } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
-import { formatDays, formatHours, slotOf, toClockInput } from "@/lib/class-times";
+import {
+  classTimeName,
+  compareClassTimes,
+  formatDays,
+  formatHours,
+  slotOf,
+  toClockInput,
+} from "@/lib/class-times";
 import { formatMoney, formatMonths } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { SkillDialog } from "../skill-dialog";
@@ -36,6 +43,14 @@ import {
   updateClassTime,
 } from "../class-time-actions";
 
+/** The first of 1, 2, 3 and on that none of these class times is called yet, for a new one. */
+function nextName(classTimes: { name: string }[]) {
+  const taken = new Set(classTimes.map((classTime) => classTime.name.toLowerCase()));
+  let number = 1;
+  while (taken.has(String(number))) number += 1;
+  return String(number);
+}
+
 export async function generateMetadata({ params }: PageProps<"/admin/skills/[id]">): Promise<Metadata> {
   const { id } = await params;
   const skill = await prisma.skill.findUnique({ where: { id }, select: { name: true } });
@@ -53,10 +68,7 @@ export default async function SkillPage({ params }: PageProps<"/admin/skills/[id
         include: {
           branch: { select: { name: true } },
           classTimes: {
-            include: {
-              classroom: { select: { name: true } },
-              teacher: { select: { name: true } },
-            },
+            include: { teacher: { select: { name: true } } },
           },
         },
       },
@@ -66,17 +78,13 @@ export default async function SkillPage({ params }: PageProps<"/admin/skills/[id
   if (!skill) notFound();
 
   const branchIds = skill.branchSkills.map((bs) => bs.branchId);
-  const [categories, branches, teachers, classrooms, enrollmentCounts] = await Promise.all([
+  const [categories, branches, teachers, enrollmentCounts] = await Promise.all([
     prisma.category.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
     prisma.branch.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
     prisma.teacher.findMany({
       where: { active: true, branches: { some: { branchId: { in: branchIds } } } },
       orderBy: { name: "asc" },
       include: { branches: { select: { branchId: true } } },
-    }),
-    prisma.classroom.findMany({
-      where: { active: true, branchId: { in: branchIds } },
-      orderBy: { name: "asc" },
     }),
     prisma.enrollment.groupBy({
       by: ["classTimeId", "status"],
@@ -101,9 +109,6 @@ export default async function SkillPage({ params }: PageProps<"/admin/skills/[id
     .filter((branch) => !takenBranchIds.has(branch.id))
     .map((branch) => ({ value: branch.id, label: branch.name }));
   const choicesFor = (branchId: string): BranchChoices => ({
-    classrooms: classrooms
-      .filter((classroom) => classroom.branchId === branchId)
-      .map((classroom) => ({ value: classroom.id, label: classroom.name })),
     teachers: teachers
       .filter((teacher) => teacher.branches.some((link) => link.branchId === branchId))
       .map((teacher) => ({ value: teacher.id, label: teacher.name })),
@@ -177,8 +182,7 @@ export default async function SkillPage({ params }: PageProps<"/admin/skills/[id
           <div>
             <h2 className="text-lg font-semibold">Branches that teach it</h2>
             <p className="text-sm text-muted-foreground">
-              Each branch sets its own fees and duration. Its class times say when, where and with
-              whom.
+              Each branch sets its own fees and duration. Its class times say when and with whom.
             </p>
           </div>
           <BranchSkillDialog
@@ -207,12 +211,7 @@ export default async function SkillPage({ params }: PageProps<"/admin/skills/[id
           {skill.branchSkills.map((bs) => {
             const counts = countsFor(bs.classTimes.map((classTime) => classTime.id));
             const choices = choicesFor(bs.branchId);
-            // By the clock, with the ones still waiting for a time first.
-            const classTimes = bs.classTimes.toSorted(
-              (a, b) =>
-                (a.startMinute ?? -1) - (b.startMinute ?? -1) ||
-                a.classroom.name.localeCompare(b.classroom.name),
-            );
+            const classTimes = bs.classTimes.toSorted(compareClassTimes);
             const registration = bs.registrationFee.gt(0)
               ? `${formatMoney(bs.registrationFee.toString())} to register`
               : "no registration fee";
@@ -238,6 +237,7 @@ export default async function SkillPage({ params }: PageProps<"/admin/skills/[id
                         action={addClassTime.bind(null, bs.id)}
                         branchName={bs.branch.name}
                         choices={choices}
+                        suggestedName={nextName(bs.classTimes)}
                         trigger={
                           <Button variant="outline" size="sm">
                             <Plus />
@@ -287,13 +287,13 @@ export default async function SkillPage({ params }: PageProps<"/admin/skills/[id
                     </div>
 
                     {classTimes.length === 0 ? (
-                      <EmptyRow message="No class times yet, so nobody can join it here. Add one to say when, where and with whom." />
+                      <EmptyRow message="No class times yet, so nobody can join it here. Add one to say when and with whom." />
                     ) : (
                       <DataTable
                         columns={[
-                          { label: "Time", className: "font-medium tabular-nums" },
+                          { label: "Name", className: "font-medium" },
+                          { label: "Time", className: "tabular-nums" },
                           { label: "Days" },
-                          { label: "Class" },
                           { label: "Teacher" },
                           { label: "Students", className: "text-right tabular-nums" },
                           { label: "Status" },
@@ -303,16 +303,18 @@ export default async function SkillPage({ params }: PageProps<"/admin/skills/[id
                           const students = countsFor([classTime.id]);
                           const slot = slotOf(classTime);
                           const hours = slot ? formatHours(slot) : null;
+                          const name = classTimeName(skill.name, classTime);
                           return {
                             key: classTime.id,
-                            title: hours ?? "Time not set",
-                            description: `${classTime.classroom.name} with ${classTime.teacher.name}`,
+                            title: name,
+                            description: `${hours ?? "Time not set"} with ${classTime.teacher.name}`,
                             cells: {
-                              Time: hours ? (
+                              Name: (
                                 <Link href={`/class-times/${classTime.id}`} className="hover:underline">
-                                  {hours}
+                                  {classTime.name}
                                 </Link>
-                              ) : (
+                              ),
+                              Time: hours ?? (
                                 <Badge
                                   variant="outline"
                                   className="border-warning-border bg-warning text-warning-foreground"
@@ -321,7 +323,6 @@ export default async function SkillPage({ params }: PageProps<"/admin/skills/[id
                                 </Badge>
                               ),
                               Days: classTime.days.length > 0 ? formatDays(classTime.days) : "None",
-                              Class: classTime.classroom.name,
                               Teacher: classTime.teacher.name,
                               Students: students.active,
                               Status: <ActiveBadge active={classTime.active} />,
@@ -335,7 +336,7 @@ export default async function SkillPage({ params }: PageProps<"/admin/skills/[id
                                     branchName={bs.branch.name}
                                     choices={choices}
                                     current={{
-                                      classroomId: classTime.classroomId,
+                                      name: classTime.name,
                                       teacherId: classTime.teacherId,
                                       start: slot ? toClockInput(slot.startMinute) : "",
                                       end: slot ? toClockInput(slot.endMinute) : "",
@@ -361,7 +362,7 @@ export default async function SkillPage({ params }: PageProps<"/admin/skills/[id
                                       className="text-destructive"
                                       action={deleteClassTime.bind(null, classTime.id)}
                                       confirm={{
-                                        title: "Remove this class time?",
+                                        title: `Remove ${name}?`,
                                         description:
                                           "No student has been in it, so it can be removed for good.",
                                         confirmLabel: "Remove",

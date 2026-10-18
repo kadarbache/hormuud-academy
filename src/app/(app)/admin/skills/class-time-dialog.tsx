@@ -9,8 +9,8 @@ import type { Weekday } from "@/generated/prisma/client";
 import type { ActionResult } from "@/lib/action-result";
 import { WEEKDAYS } from "@/lib/class-times";
 
-/** What one branch offers a class time to pick from: its active classes and teachers. */
-export type BranchChoices = { classrooms: Option[]; teachers: Option[] };
+/** What one branch offers a class time to pick from: its active teachers. */
+export type BranchChoices = { teachers: Option[] };
 
 function DayCheckboxes({ checked, errors }: { checked: Weekday[]; errors?: string[] }) {
   const id = useId();
@@ -37,27 +37,30 @@ function DayCheckboxes({ checked, errors }: { checked: Weekday[]; errors?: strin
   );
 }
 
-/** "No active class at this branch. Add one on the Classes page." */
+/** "No active teacher at this branch. Add one on the Teachers page." */
 function missing(options: Option[], what: string, page: string) {
   return options.length === 0 ? `No active ${what} at this branch. Add one on the ${page} page.` : undefined;
 }
 
 /**
- * Where, when and by whom a skill is taught at one branch: a class, the
- * hours, the days, and a teacher. The lists only hold that branch's.
+ * When and by whom a skill is taught at one branch: a name, the hours, the
+ * days, and a teacher. The list only holds that branch's teachers.
  */
 export function ClassTimeDialog({
   action,
   branchName,
   choices,
+  suggestedName,
   current,
   trigger,
 }: {
   action: (formData: FormData) => Promise<ActionResult>;
   branchName: string;
   choices: BranchChoices;
+  /** The name a new class time starts with, like the next number. */
+  suggestedName?: string;
   /** The class time being changed, its hours as the time boxes hold them ("16:00"). Left out when adding. */
-  current?: { classroomId: string; teacherId: string; start: string; end: string; days: Weekday[] };
+  current?: { name: string; teacherId: string; start: string; end: string; days: Weekday[] };
   trigger: React.ReactNode;
 }) {
   return (
@@ -66,7 +69,7 @@ export function ClassTimeDialog({
       description={
         current
           ? "Its students move with it. A new teacher earns from fees paid from now on."
-          : "The class can't hold another skill, and the teacher can't be teaching elsewhere, at the same time."
+          : "The teacher can't be teaching anything else at the same time, except this skill at exactly the same hours and days."
       }
       trigger={trigger}
       action={action}
@@ -74,6 +77,15 @@ export function ClassTimeDialog({
     >
       {(errors) => (
         <>
+          <TextField
+            label="Name"
+            name="name"
+            defaultValue={current?.name ?? suggestedName ?? ""}
+            maxLength={40}
+            required
+            description="A short name, like 1 or 2, shown after the skill: Computer Basics 1."
+            errors={errors.name}
+          />
           <div className="grid gap-4 sm:grid-cols-2">
             <TextField
               label="Starts"
@@ -96,21 +108,15 @@ export function ClassTimeDialog({
           </div>
           <DayCheckboxes checked={current?.days ?? []} errors={errors.days} />
           <SelectField
-            label="Class"
-            name="classroomId"
-            options={choices.classrooms}
-            placeholder="Pick a class"
-            defaultValue={current?.classroomId ?? ""}
-            description={missing(choices.classrooms, "class", "Classes")}
-            errors={errors.classroomId}
-          />
-          <SelectField
             label="Teacher"
             name="teacherId"
             options={choices.teachers}
             placeholder="Pick a teacher"
             defaultValue={current?.teacherId ?? ""}
-            description={missing(choices.teachers, "teacher", "Teachers")}
+            description={
+              missing(choices.teachers, "teacher", "Teachers") ??
+              "The same teacher can take class times of this skill at exactly the same hours and days, like 1 and 2."
+            }
             errors={errors.teacherId}
           />
         </>

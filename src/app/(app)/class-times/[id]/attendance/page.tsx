@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/table";
 import { PageHeader } from "@/components/page-header";
 import { EmptyRow } from "@/components/status-badge";
-import { formatHours, slotOf } from "@/lib/class-times";
+import { classTimeName, formatHours, slotOf } from "@/lib/class-times";
 import { addMonthsToMonth, collegeMonth, collegeToday, formatMonth, isIsoMonth } from "@/lib/dates";
 import { formatStudentNumber } from "@/lib/format";
 import { one } from "@/lib/search-params";
@@ -66,7 +66,7 @@ export default async function ClassTimeAttendancePage({
   const month = isIsoMonth(asked) && asked <= thisMonth ? asked : thisMonth;
   const { days, rows } = await loadMonth(classTime, month, today);
   const notTaken = days.filter((day) => !day.taken);
-  const skillName = classTime.branchSkill.skill.name;
+  const name = classTimeName(classTime.branchSkill.skill.name, classTime);
   const here = `/class-times/${id}/attendance`;
   const slot = slotOf(classTime);
 
@@ -81,14 +81,14 @@ export default async function ClassTimeAttendancePage({
         ) : (
           <Link href={`/class-times/${id}`}>
             <ChevronLeft />
-            {slot ? `${skillName}, ${formatHours(slot)}` : skillName}
+            {slot ? `${name}, ${formatHours(slot)}` : name}
           </Link>
         )}
       </Button>
 
       <PageHeader
         title="Attendance"
-        description={`${skillName} in ${classTime.classroom.name} with ${classTime.teacher.name}. ${classTime.branchSkill.branch.name}.`}
+        description={`${name} with ${classTime.teacher.name}. ${classTime.branchSkill.branch.name}.`}
       >
         {meetsOn(classTime, today) && (
           <Button asChild>

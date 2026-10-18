@@ -24,7 +24,7 @@ export function getPortalSkills(studentId: string) {
           startMinute: true,
           endMinute: true,
           days: true,
-          classroom: { select: { name: true } },
+          name: true,
           teacher: { select: { name: true } },
         },
       },
@@ -67,12 +67,12 @@ export async function getPortalDetails(studentId: string) {
   return { student, isActive: activeSkills > 0 };
 }
 
-/** The hours and room a day's mark was taken in. */
-const sheetPlace = {
+/** The class time a day's mark was taken in, and its hours. */
+const sheetClassTime = {
+  name: true,
   startMinute: true,
   endMinute: true,
   days: true,
-  classroom: { select: { name: true } },
 } satisfies Prisma.ClassTimeSelect;
 
 /**
@@ -92,7 +92,7 @@ export function getPortalAttendance(studentId: string, enrollmentId: string) {
       branchSkill: { select: { branch: { select: { name: true } } } },
       classTime: {
         select: {
-          ...sheetPlace,
+          ...sheetClassTime,
           attendanceSheets: { orderBy: { date: "asc" }, take: 1, select: { date: true } },
         },
       },
@@ -100,7 +100,7 @@ export function getPortalAttendance(studentId: string, enrollmentId: string) {
         orderBy: { sheet: { date: "desc" } },
         select: {
           mark: true,
-          sheet: { select: { date: true, classTime: { select: sheetPlace } } },
+          sheet: { select: { date: true, classTime: { select: sheetClassTime } } },
         },
       },
     },

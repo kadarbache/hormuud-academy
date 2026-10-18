@@ -4,15 +4,23 @@ import { refresh } from "next/cache";
 import { z } from "zod";
 import { Weekday } from "@/generated/prisma/client";
 import { formatSlot, parseClock, slotOf } from "@/lib/class-times";
-import { classTimeClash, studentClash } from "@/lib/clashes";
+import { studentClash, teacherClash } from "@/lib/clashes";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
-import { failure, invalid, success, type ActionResult } from "@/lib/action-result";
-import { formObject, requiredId } from "@/lib/validation";
+import {
+  failure,
+  invalid,
+  isUniqueViolation,
+  success,
+  type ActionResult,
+} from "@/lib/action-result";
+import { sameNameAs } from "@/lib/unique-name";
+import { formObject, requiredId, requiredText } from "@/lib/validation";
 
-// A class time is one branch skill in one class, from a start time to an end
-// time on chosen days, with one teacher. The class and teacher belong to the
-// skill's branch, and nothing may be in two places at once (src/lib/clashes.ts).
+// A class time is one branch skill under a short name, from a start time to
+// an end time on chosen days, with one teacher. The teacher works at the
+// skill's branch, and nobody may be in two places at once (src/lib/clashes.ts).
+// The app doesn't keep the room it meets in.
 
 /** A time from an <input type="time">, as minutes after midnight. */
 const clock = (message: string) =>
@@ -24,7 +32,7 @@ const clock = (message: string) =>
 /** The form, read into what a class time stores: the times become minutes. */
 const classTimeSchema = z
   .object({
-    classroomId: requiredId("Pick the class."),
+    name: requiredText("Give it a name, like 1 or 2.", 40),
     teacherId: requiredId("Pick the teacher."),
     startTime: clock("Enter the time it starts."),
     endTime: clock("Enter the time it ends."),
@@ -52,19 +60,30 @@ function readClassTime(formData: FormData) {
 const highlighted = (field: string, message: string) =>
   failure("Check the highlighted fields.", { [field]: [message] });
 
-/** Checks that the class and the teacher are active and at the branch. */
-async function placementProblem(branchId: string, input: ClassTimeInput) {
-  const [classroom, teacher] = await Promise.all([
-    prisma.classroom.findUnique({ where: { id: input.classroomId } }),
+const nameTaken = (name: string) =>
+  highlighted("name", `This skill already has a class time called ${name} at this branch. Pick another name.`);
+
+/**
+ * Checks that no other class time of the skill at the branch has the name,
+ * whatever its capitals, and that the teacher is active and at the branch.
+ * `id` is the class time being changed, left out when adding one.
+ */
+async function nameOrTeacherProblem(
+  branchSkill: { id: string; branchId: string },
+  input: ClassTimeInput,
+  id?: string,
+) {
+  const [sameName, teacher] = await Promise.all([
+    prisma.classTime.findFirst({
+      where: { branchSkillId: branchSkill.id, ...sameNameAs(input.name, id) },
+    }),
     prisma.teacher.findUnique({
       where: { id: input.teacherId },
-      include: { branches: { where: { branchId } } },
+      include: { branches: { where: { branchId: branchSkill.branchId } } },
     }),
   ]);
 
-  if (!classroom?.active || classroom.branchId !== branchId) {
-    return highlighted("classroomId", "Pick an active class at this branch.");
-  }
+  if (sameName) return nameTaken(sameName.name);
   if (!teacher?.active || teacher.branches.length === 0) {
     return highlighted("teacherId", "Pick an active teacher who works at this branch.");
   }
@@ -78,15 +97,21 @@ export async function addClassTime(branchSkillId: string, formData: FormData): P
 
   const branchSkill = await prisma.branchSkill.findUnique({ where: { id: branchSkillId } });
   if (!branchSkill) return failure("That branch setup no longer exists.");
-  const problem = await placementProblem(branchSkill.branchId, parsed.data);
+  const problem = await nameOrTeacherProblem(branchSkill, parsed.data);
   if (problem) return problem;
 
-  const clash = await classTimeClash({ ...parsed.data, slot: parsed.data });
-  if (clash) return highlighted(clash.field, clash.message);
+  const clash = await teacherClash({ branchSkillId, ...parsed.data, slot: parsed.data });
+  if (clash) return highlighted("teacherId", clash);
 
-  await prisma.classTime.create({ data: { branchSkillId, ...parsed.data } });
+  try {
+    await prisma.classTime.create({ data: { branchSkillId, ...parsed.data } });
+  } catch (error) {
+    // Someone else gave a class time the name in the meantime.
+    if (isUniqueViolation(error)) return nameTaken(parsed.data.name);
+    throw error;
+  }
   refresh();
-  return success(`Class time added: ${formatSlot(parsed.data)}.`);
+  return success(`Class time ${parsed.data.name} added: ${formatSlot(parsed.data)}.`);
 }
 
 /**
@@ -103,16 +128,21 @@ export async function updateClassTime(id: string, formData: FormData): Promise<A
   const classTime = await prisma.classTime.findUnique({
     where: { id },
     include: {
-      branchSkill: { select: { branchId: true } },
+      branchSkill: { select: { id: true, branchId: true } },
       enrollments: { where: { status: "ACTIVE" }, select: { studentId: true } },
     },
   });
   if (!classTime) return failure("That class time no longer exists.");
-  const problem = await placementProblem(classTime.branchSkill.branchId, parsed.data);
+  const problem = await nameOrTeacherProblem(classTime.branchSkill, parsed.data, id);
   if (problem) return problem;
 
-  const clash = await classTimeClash({ id, ...parsed.data, slot: parsed.data });
-  if (clash) return highlighted(clash.field, clash.message);
+  const clash = await teacherClash({
+    id,
+    branchSkillId: classTime.branchSkillId,
+    ...parsed.data,
+    slot: parsed.data,
+  });
+  if (clash) return highlighted("teacherId", clash);
   const students = await studentClash(
     classTime.enrollments.map((enrollment) => enrollment.studentId),
     parsed.data,
@@ -120,14 +150,19 @@ export async function updateClassTime(id: string, formData: FormData): Promise<A
   );
   if (students) return failure(`A student in this class time would be in two places at once. ${students}`);
 
-  await prisma.classTime.update({ where: { id }, data: parsed.data });
+  try {
+    await prisma.classTime.update({ where: { id }, data: parsed.data });
+  } catch (error) {
+    if (isUniqueViolation(error)) return nameTaken(parsed.data.name);
+    throw error;
+  }
   refresh();
   return success("Class time saved.");
 }
 
 /**
  * An inactive class time takes no new students. The ones already in it stay,
- * and it keeps its class and teacher until they've all finished or moved.
+ * and it keeps its teacher until they've all finished or moved.
  */
 export async function setClassTimeActive(id: string, active: boolean): Promise<ActionResult> {
   await requireAdmin();
@@ -138,11 +173,11 @@ export async function setClassTimeActive(id: string, active: boolean): Promise<A
   if (!classTime) return failure("That class time no longer exists.");
 
   // Switched off with nobody in it, it held nothing, so switching it back on
-  // has to find its class and teacher free again.
+  // has to find its teacher free again.
   const slot = slotOf(classTime);
   if (active && slot) {
-    const clash = await classTimeClash({ ...classTime, slot });
-    if (clash) return failure(clash.message);
+    const clash = await teacherClash({ ...classTime, slot });
+    if (clash) return failure(clash);
   }
 
   await prisma.classTime.update({ where: { id }, data: { active } });

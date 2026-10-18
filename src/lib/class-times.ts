@@ -55,6 +55,29 @@ export function formatSlot(classTime: ClassTimeHours) {
   return slot ? `${formatHours(slot)}, ${formatDays(slot.days)}` : "Time not set";
 }
 
+/**
+ * "Computer Basics 1": a class time's skill with its name, which tells it
+ * apart from the skill's other class times at its branch.
+ */
+export function classTimeName(skillName: string, classTime: { name: string }) {
+  return `${skillName} ${classTime.name}`;
+}
+
+/**
+ * The order lists show class times in: by the clock, with any whose hours
+ * aren't set yet first, then by name, so 2 comes before 10.
+ */
+export function compareClassTimes(
+  a: ClassTimeHours & { name: string },
+  b: ClassTimeHours & { name: string },
+) {
+  return (
+    (a.startMinute ?? -1) - (b.startMinute ?? -1) ||
+    (a.endMinute ?? -1) - (b.endMinute ?? -1) ||
+    a.name.localeCompare(b.name, undefined, { numeric: true })
+  );
+}
+
 /** "16:00", from an <input type="time">, -> 960. Seconds are ignored. Null for anything else. */
 export function parseClock(value: string): number | null {
   const match = /^(\d{2}):(\d{2})(?::\d{2})?$/.exec(value.trim());

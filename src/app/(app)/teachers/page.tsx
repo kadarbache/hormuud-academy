@@ -6,7 +6,7 @@ import { ActionButton } from "@/components/action-button";
 import { DataTable } from "@/components/data-table";
 import { PageHeader } from "@/components/page-header";
 import { ActiveBadge, EmptyRow } from "@/components/status-badge";
-import { formatHours, slotOf } from "@/lib/class-times";
+import { classTimeName, compareClassTimes, formatHours, slotOf } from "@/lib/class-times";
 import { currentRate } from "@/lib/exchange-rate";
 import { formatMoney, formatTeacherNumber } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
@@ -35,7 +35,6 @@ export default async function TeachersPage() {
         branches: { include: { branch: { select: { name: true } } } },
         classTimes: {
           include: {
-            classroom: { select: { name: true } },
             enrollments: { where: { status: "ACTIVE" }, select: { id: true }, take: 1 },
             branchSkill: {
               select: {
@@ -154,6 +153,7 @@ export default async function TeachersPage() {
                 // have students. Branch staff see their own branch's.
                 Teaches:
                   teacher.classTimes
+                    .toSorted(compareClassTimes)
                     .filter(
                       (classTime) =>
                         (classTime.active || classTime.enrollments.length > 0) &&
@@ -162,9 +162,10 @@ export default async function TeachersPage() {
                     .map((classTime) => {
                       const slot = slotOf(classTime);
                       const hours = slot ? formatHours(slot) : "time not set";
+                      const name = classTimeName(classTime.branchSkill.skill.name, classTime);
                       return isAdmin
-                        ? `${classTime.branchSkill.skill.name} (${classTime.branchSkill.branch.name}, ${hours})`
-                        : `${classTime.branchSkill.skill.name} in ${classTime.classroom.name}, ${hours}`;
+                        ? `${name} (${classTime.branchSkill.branch.name}, ${hours})`
+                        : `${name}, ${hours}`;
                     })
                     .join("; ") || "Nothing yet",
                 Status: <ActiveBadge active={teacher.active} />,

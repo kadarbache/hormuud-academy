@@ -13,8 +13,8 @@
 //   pnpm db:import-students --apply                 writes to the local database
 //   pnpm db:import-students --apply --host <host>   writes to a remote database
 //
-// Other flags: --file <csv>, --branch <name> (when more than one branch has the
-// Computer Lab), --as <email> (who the students are recorded as created by,
+// Other flags: --file <csv>, --branch <name> (when more than one branch teaches
+// Computer Basics), --as <email> (who the students are recorded as created by,
 // default SEED_ADMIN_EMAIL), --ignore-warnings.
 import "dotenv/config";
 import fs from "node:fs";
@@ -25,7 +25,6 @@ import { formatPhone, toStoredPhone } from "../src/lib/phone";
 import { prisma } from "../src/lib/prisma";
 
 const SKILL_NAME = "Computer Basics";
-const ROOM_NAME = "Computer Lab";
 /** Everyone on the list registered, and started, on the first of September. */
 const REGISTERED_ON = "2026-09-01";
 const STARTED_ON = "2026-09-01";
@@ -180,37 +179,27 @@ async function main() {
   if (!user) fail(`There's no user ${email} in this database. Use --as <email> with an account that exists here.`);
   console.log(`Created by: ${user.name} <${user.email}>`);
 
-  // Everything is found from the Computer Lab's Computer Basics class times, so
-  // a typed branch name can't disagree with where those classes really are.
+  // Everything is found from the active Computer Basics class times, so a
+  // typed branch name can't disagree with where they really are.
   const found = await prisma.classTime.findMany({
     where: {
       active: true,
-      // Spelled however the admin typed it: "Computer lab" is the same room.
-      classroom: { name: { equals: ROOM_NAME, mode: "insensitive" }, active: true },
+      // Spelled however the admin typed it: "Computer basics" is the same skill.
       branchSkill: { active: true, skill: { name: { equals: SKILL_NAME, mode: "insensitive" }, active: true } },
     },
     include: {
       teacher: { select: { name: true } },
-      classroom: { include: { branch: true } },
-      branchSkill: true,
+      branchSkill: { include: { branch: true } },
     },
   });
-  const branches = [...new Map(found.map((c) => [c.classroom.branch.id, c.classroom.branch])).values()];
+  const branches = [...new Map(found.map((c) => [c.branchSkill.branch.id, c.branchSkill.branch])).values()];
   const wanted = option("branch");
   const candidates = wanted ? branches.filter((b) => b.name.toLowerCase() === wanted.toLowerCase()) : branches;
   if (candidates.length === 0) {
     // Show what is there, so a wrong name or an inactive record can be seen at once.
     const similar = await prisma.classTime.findMany({
-      where: {
-        OR: [
-          { classroom: { name: { contains: "computer", mode: "insensitive" } } },
-          { branchSkill: { skill: { name: { contains: "computer", mode: "insensitive" } } } },
-        ],
-      },
-      include: {
-        classroom: { include: { branch: true } },
-        branchSkill: { include: { skill: true } },
-      },
+      where: { branchSkill: { skill: { name: { contains: "computer", mode: "insensitive" } } } },
+      include: { branchSkill: { include: { skill: true, branch: true } } },
       take: 20,
     });
     if (similar.length > 0) {
@@ -219,21 +208,20 @@ async function main() {
         const hours = c.startMinute === null || c.endMinute === null ? "no hours set" : `${clock(c.startMinute)}-${clock(c.endMinute)}`;
         const off = [
           c.active ? null : "class time inactive",
-          c.classroom.active ? null : "class inactive",
           c.branchSkill.active ? null : "branch skill inactive",
           c.branchSkill.skill.active ? null : "skill inactive",
         ].filter(Boolean);
-        console.error(`  ${c.classroom.branch.name} / "${c.classroom.name}" / "${c.branchSkill.skill.name}" / ${hours}${off.length ? `  [${off.join(", ")}]` : ""}`);
+        console.error(`  ${c.branchSkill.branch.name} / "${c.branchSkill.skill.name}" / ${c.name} / ${hours}${off.length ? `  [${off.join(", ")}]` : ""}`);
       }
     }
-    fail(`No active ${SKILL_NAME} class times in a class called "${ROOM_NAME}"${wanted ? ` at ${wanted}` : ""}.`);
+    fail(`No active ${SKILL_NAME} class times${wanted ? ` at ${wanted}` : ""}.`);
   }
   if (candidates.length > 1) {
-    fail(`More than one branch has ${SKILL_NAME} in "${ROOM_NAME}": ${candidates.map((b) => b.name).join(", ")}.\nPick one with --branch "<name>".`);
+    fail(`More than one branch teaches ${SKILL_NAME}: ${candidates.map((b) => b.name).join(", ")}.\nPick one with --branch "<name>".`);
   }
   const branch = candidates[0];
   if (!branch.active) fail(`${branch.name} isn't active.`);
-  const classTimes = found.filter((c) => c.classroom.branch.id === branch.id);
+  const classTimes = found.filter((c) => c.branchSkill.branchId === branch.id);
   const branchSkill = classTimes[0].branchSkill;
 
   const warnings: string[] = [];
@@ -242,7 +230,7 @@ async function main() {
     registration: Number(branchSkill.registrationFee),
     monthly: Number(branchSkill.monthlyFee),
   };
-  console.log(`Branch:    ${branch.name}, class "${classTimes[0].classroom.name}"`);
+  console.log(`Branch:    ${branch.name}`);
   console.log(
     `Skill:     ${SKILL_NAME}, ${fees.duration} months, registration ${formatMoney(fees.registration)}, monthly ${formatMoney(fees.monthly)}`,
   );
@@ -260,7 +248,7 @@ async function main() {
     const matches = classTimes.filter((c) => c.startMinute === hour * 60);
     if (matches.length !== 1) {
       const have = classTimes.map((c) => (c.startMinute === null ? "no hours set" : clock(c.startMinute))).join(", ");
-      fail(`${matches.length === 0 ? "No" : "More than one"} ${SKILL_NAME} class time in ${ROOM_NAME} starts at ${clock(hour * 60)}. It has: ${have || "none"}.`);
+      fail(`${matches.length === 0 ? "No" : "More than one"} ${SKILL_NAME} class time starts at ${clock(hour * 60)}. It has: ${have || "none"}.`);
     }
     const [time] = matches;
     classTimeFor[label] = time;

@@ -25,8 +25,8 @@ import { currencyOptions, paymentMethodOptions } from "../finance/labels";
 import { findStudentsByPhone } from "./actions";
 import {
   classTimeFieldName,
+  classTimeText,
   type BranchSkillOption,
-  type ClassTimeOption,
   type PhoneMatch,
   type StudentFormValues,
 } from "./types";
@@ -207,11 +207,6 @@ export function feesText(
   return Number(option.registrationFee) > 0
     ? `${formatMoney(option.registrationFee)} to register, then ${monthly}`
     : `${monthly}, no registration fee`;
-}
-
-/** "4:00–6:00 pm, Sat Mon Wed in Room 3 with Ali" */
-export function classTimeText(classTime: ClassTimeOption) {
-  return `${classTime.when} in ${classTime.classroomName} with ${classTime.teacherName}`;
 }
 
 /**

@@ -7,11 +7,10 @@ import type { ActionResult } from "@/lib/action-result";
 import { addMonths, formatDate, isIsoDate } from "@/lib/dates";
 import {
   ClassTimeField,
-  classTimeText,
   feesText,
   RegistrationFeePaidField,
 } from "../student-fields";
-import type { BranchSkillOption } from "../types";
+import { classTimeText, type BranchSkillOption } from "../types";
 
 export function EnrollDialog({
   action,

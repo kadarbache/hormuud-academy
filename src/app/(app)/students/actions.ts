@@ -11,6 +11,7 @@ import {
   uploadStudentPhoto,
 } from "@/lib/cloudinary";
 import {
+  classTimeName,
   formatDayList,
   formatHours,
   formatSlot,
@@ -19,7 +20,7 @@ import {
   slotsClash,
   type ClassTimeHours,
 } from "@/lib/class-times";
-import { classTimeClash, studentClash } from "@/lib/clashes";
+import { studentClash, teacherClash } from "@/lib/clashes";
 import { addMonths, collegeToday, toDbDate } from "@/lib/dates";
 import { ledgerFields, NO_RATE_MESSAGE } from "@/lib/exchange-rate";
 import { formatMoney, formatStudentNumber, parseStudentLookup } from "@/lib/format";
@@ -187,12 +188,12 @@ async function readFeePaidNow(
 }
 
 /** A class time as picking one needs it: when it meets. */
-type OpenClassTime = { id: string } & ClassTimeHours;
+type OpenClassTime = { id: string; name: string } & ClassTimeHours;
 
 /** The class times a skill is taking students in, when they meet. */
 const openClassTimes = {
   where: { active: true },
-  select: { id: true, startMinute: true, endMinute: true, days: true },
+  select: { id: true, name: true, startMinute: true, endMinute: true, days: true },
 } satisfies Prisma.BranchSkill$classTimesArgs;
 
 /**
@@ -492,7 +493,9 @@ export async function changeClassTime(
     data: { classTimeId: classTime.id },
   });
   refresh();
-  return success(`${enrollment.skill.name} moved to ${formatSlot(classTime)}.`);
+  return success(
+    `Moved to ${classTimeName(enrollment.skill.name, classTime)}: ${formatSlot(classTime)}.`,
+  );
 }
 
 export async function setEnrollmentStatus(
@@ -508,8 +511,8 @@ export async function setEnrollmentStatus(
       classTime: {
         select: {
           id: true,
+          branchSkillId: true,
           active: true,
-          classroomId: true,
           teacherId: true,
           startMinute: true,
           endMinute: true,
@@ -530,13 +533,13 @@ export async function setEnrollmentStatus(
   if (status === "ACTIVE" && slot) {
     const clash = await studentClash([enrollment.studentId], slot, { id: enrollmentId });
     if (clash) return failure(`${clash} Finish, deactivate or move that skill first.`);
-    // A deactivated class time with nobody left in it let go of its class and
-    // teacher, and another class time may have taken them since.
+    // A deactivated class time with nobody left in it let go of its teacher,
+    // and another class time may have taken them since.
     if (!enrollment.classTime.active) {
-      const taken = await classTimeClash({ ...enrollment.classTime, slot });
+      const taken = await teacherClash({ ...enrollment.classTime, slot });
       if (taken) {
         return failure(
-          `Its class time was deactivated, and since then: ${taken.message} Add ${enrollment.skill.name} again in another class time instead.`,
+          `Its class time was deactivated, and since then: ${taken} Add ${enrollment.skill.name} again in another class time instead.`,
         );
       }
     }

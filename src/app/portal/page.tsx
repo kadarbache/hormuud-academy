@@ -4,7 +4,7 @@ import { ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { EmptyRow } from "@/components/status-badge";
-import { formatSlot } from "@/lib/class-times";
+import { classTimeName, formatSlot } from "@/lib/class-times";
 import { collegeToday, formatDate } from "@/lib/dates";
 import { requireStudent } from "@/lib/session";
 import { attendanceRate, formatCounts, formatRate } from "../(app)/attendance/labels";
@@ -46,7 +46,7 @@ export default async function MySkillsPage() {
                 <CardHeader>
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <CardTitle>{enrollment.skill.name}</CardTitle>
+                      <CardTitle>{classTimeName(enrollment.skill.name, classTime)}</CardTitle>
                       <p className="text-sm text-muted-foreground">
                         {enrollment.branchSkill.branch.name}
                       </p>
@@ -57,7 +57,6 @@ export default async function MySkillsPage() {
                 <CardContent>
                   <dl className="grid grid-cols-2 gap-3">
                     <Detail label="Class time">{formatSlot(classTime)}</Detail>
-                    <Detail label="Class">{classTime.classroom.name}</Detail>
                     <Detail label="Teacher">{classTime.teacher.name}</Detail>
                     <Detail label="Dates">
                       {formatDate(enrollment.startDate)} to {formatDate(enrollment.endDate)}

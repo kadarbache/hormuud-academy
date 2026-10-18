@@ -9,7 +9,7 @@ export type Pricing = { durationMonths: number; registrationFee: string; monthly
 
 /**
  * Sets the fees and duration a skill has at one branch. When adding, they
- * start at the skill's defaults. Where and when it's taught are its class
+ * start at the skill's defaults. When and by whom it's taught are its class
  * times, set apart.
  */
 export function BranchSkillDialog({

@@ -3,8 +3,7 @@
 import { FormDialog } from "@/components/form-dialog";
 import { SelectField } from "@/components/form-fields";
 import type { ActionResult } from "@/lib/action-result";
-import { classTimeText } from "../student-fields";
-import type { ClassTimeOption } from "../types";
+import { classTimeText, type ClassTimeOption } from "../types";
 
 /**
  * Moves the student to another of a skill's class times. Only the class
@@ -19,7 +18,7 @@ export function ChangeClassTimeDialog({
 }: {
   action: (formData: FormData) => Promise<ActionResult>;
   skillName: string;
-  /** "4:00–6:00 pm, Sat Mon Wed in Room 3 with Ali" */
+  /** "1 · 4:00–6:00 pm, Sat Mon Wed with Ali" */
   current: string;
   /** The skill's other class times taking students. */
   options: ClassTimeOption[];

@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { DataTable } from "@/components/data-table";
 import { PageHeader } from "@/components/page-header";
 import { EmptyRow } from "@/components/status-badge";
-import { formatHours, formatSlot, slotOf } from "@/lib/class-times";
+import { classTimeName, formatHours, formatSlot, slotOf } from "@/lib/class-times";
 import { collegeToday, isIsoDate } from "@/lib/dates";
 import { one } from "@/lib/search-params";
 import { requireSignedIn } from "@/lib/session";
@@ -96,8 +96,7 @@ export default async function AttendancePage({ searchParams }: PageProps<"/atten
           <DataTable
             columns={[
               { label: "Time" },
-              { label: "Skill" },
-              { label: "Class" },
+              { label: "Class time" },
               ...(isTeacher ? [] : [{ label: "Teacher" }]),
               ...(showBranch ? [{ label: "Branch" }] : []),
               { label: "Students", className: "text-right tabular-nums" },
@@ -107,25 +106,24 @@ export default async function AttendancePage({ searchParams }: PageProps<"/atten
             rows={classTimes.map((classTime) => {
               const slot = slotOf(classTime);
               const sheet = classTime.attendanceSheets[0];
-              const skillName = classTime.branchSkill.skill.name;
+              const name = classTimeName(classTime.branchSkill.skill.name, classTime);
               const href = `/class-times/${classTime.id}/attendance/${day}`;
               const canMark = canMarkOn(user, day, today);
               return {
                 key: classTime.id,
-                title: skillName,
+                title: name,
                 description: slot ? formatHours(slot) : undefined,
                 cells: {
                   Time: slot ? formatHours(slot) : "Time not set",
-                  Skill: (
+                  "Class time": (
                     // A teacher has no class time page, only its attendance.
                     <Link
                       href={isTeacher ? `/class-times/${classTime.id}/attendance` : `/class-times/${classTime.id}`}
                       className="font-medium hover:underline"
                     >
-                      {skillName}
+                      {name}
                     </Link>
                   ),
-                  Class: classTime.classroom.name,
                   Teacher: classTime.teacher.name,
                   Branch: classTime.branchSkill.branch.name,
                   Students: sheet ? sheet.entries.length : classTime._count.enrollments,
@@ -177,30 +175,31 @@ export default async function AttendancePage({ searchParams }: PageProps<"/atten
           ) : (
             <DataTable
               columns={[
-                { label: "Skill" },
+                { label: "Class time" },
                 { label: "When" },
-                { label: "Class" },
                 ...(showBranch ? [{ label: "Branch" }] : []),
                 { label: "Students", className: "text-right tabular-nums" },
                 { label: "Actions", actions: true, className: "text-right" },
               ]}
-              rows={taught.map((classTime) => ({
-                key: classTime.id,
-                title: classTime.branchSkill.skill.name,
-                description: formatSlot(classTime),
-                cells: {
-                  Skill: <span className="font-medium">{classTime.branchSkill.skill.name}</span>,
-                  When: formatSlot(classTime),
-                  Class: classTime.classroom.name,
-                  Branch: classTime.branchSkill.branch.name,
-                  Students: classTime._count.enrollments,
-                  Actions: (
-                    <Button size="sm" variant="outline" asChild>
-                      <Link href={`/class-times/${classTime.id}/attendance`}>Attendance</Link>
-                    </Button>
-                  ),
-                },
-              }))}
+              rows={taught.map((classTime) => {
+                const name = classTimeName(classTime.branchSkill.skill.name, classTime);
+                return {
+                  key: classTime.id,
+                  title: name,
+                  description: formatSlot(classTime),
+                  cells: {
+                    "Class time": <span className="font-medium">{name}</span>,
+                    When: formatSlot(classTime),
+                    Branch: classTime.branchSkill.branch.name,
+                    Students: classTime._count.enrollments,
+                    Actions: (
+                      <Button size="sm" variant="outline" asChild>
+                        <Link href={`/class-times/${classTime.id}/attendance`}>Attendance</Link>
+                      </Button>
+                    ),
+                  },
+                };
+              })}
             />
           )}
         </section>

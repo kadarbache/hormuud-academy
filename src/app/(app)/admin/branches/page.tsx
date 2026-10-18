@@ -19,7 +19,6 @@ export default async function BranchesPage() {
       _count: {
         select: {
           staff: true,
-          classrooms: true,
           teachers: true,
           branchSkills: true,
           branchBooks: true,
@@ -33,7 +32,7 @@ export default async function BranchesPage() {
     <>
       <PageHeader
         title="Branches"
-        description="Every branch of the college. Staff, classes and students each belong to one."
+        description="Every branch of the college. Staff and students each belong to one."
       >
         <BranchDialog
           action={createBranch}

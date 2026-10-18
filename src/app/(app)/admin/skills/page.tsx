@@ -59,7 +59,7 @@ export default async function SkillsPage() {
     <>
       <PageHeader
         title="Skills"
-        description="The skill catalog for the whole college. Open a skill to set its teacher, class and fees at each branch."
+        description="The skill catalog for the whole college. Open a skill to set its fees and class times at each branch."
       >
         <SkillDialog
           action={createSkill}

@@ -8,7 +8,6 @@ import {
   CalendarRange,
   ChartNoAxesColumn,
   ClipboardCheck,
-  DoorOpen,
   GraduationCap,
   HandCoins,
   HandHelping,
@@ -82,12 +81,6 @@ const teachersItem: NavItem = {
   icon: Presentation,
   match: under("/teachers"),
 };
-const classesItem: NavItem = {
-  href: "/classes",
-  label: "Classes",
-  icon: DoorOpen,
-  match: under("/classes"),
-};
 
 // Branch staff take money at the counter, so they record and read their own
 // branch's income. Expenses, teacher pay and budgets are the admin's alone.
@@ -114,7 +107,7 @@ const booksItem: NavItem = {
   match: under("/books"),
 };
 
-const branchItems: NavItem[] = [incomeItem, owedItem, booksItem, teachersItem, classesItem];
+const branchItems: NavItem[] = [incomeItem, owedItem, booksItem, teachersItem];
 
 const financeItems: NavItem[] = [
   {
@@ -184,7 +177,6 @@ const adminItems: NavItem[] = [
   { href: "/admin/categories", label: "Categories", icon: Tags, match: under("/admin/categories") },
   booksItem,
   teachersItem,
-  classesItem,
   { href: "/admin/staff", label: "Staff accounts", icon: KeyRound, match: under("/admin/staff") },
   { href: "/admin/settings", label: "Settings", icon: Settings, match: under("/admin/settings") },
 ];

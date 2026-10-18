@@ -14,7 +14,7 @@ const roleOptions: Option[] = [
 ];
 
 const roleDescriptions: Record<Role, string> = {
-  admin: "Admins see every branch and manage skills, teachers, classes and accounts.",
+  admin: "Admins see every branch and manage skills, teachers and accounts.",
   staff: "Branch staff register and enroll students at their own branch.",
   teacher:
     "A teacher takes today's attendance for the class times they teach and sees their own pay. Nothing else. They sign in with Google, or their Teacher ID and a password you give them.",

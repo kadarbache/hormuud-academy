@@ -1,6 +1,6 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
-import { formatSlot } from "@/lib/class-times";
+import { compareClassTimes, formatSlot } from "@/lib/class-times";
 import { collegeToday, toDbDate } from "@/lib/dates";
 import { parseStudentLookup } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
@@ -14,19 +14,17 @@ export const PAGE_SIZE = 25;
 /** A branch skill's class times taking students, with what a picker shows. */
 const openClassTimes = {
   where: { active: true },
-  include: { classroom: { select: { name: true } }, teacher: { select: { name: true } } },
+  include: { teacher: { select: { name: true } } },
 } satisfies Prisma.BranchSkill$classTimesArgs;
 
-/** Those class times as picker options, by the clock, with any not set yet first. */
+/** Those class times as picker options, in the order lists show class times. */
 function classTimeOptions(
   classTimes: Prisma.ClassTimeGetPayload<typeof openClassTimes>[],
 ): ClassTimeOption[] {
-  return classTimes
-    .toSorted((a, b) => (a.startMinute ?? -1) - (b.startMinute ?? -1))
-    .map((classTime) => ({
+  return classTimes.toSorted(compareClassTimes).map((classTime) => ({
       id: classTime.id,
+      name: classTime.name,
       when: formatSlot(classTime),
-      classroomName: classTime.classroom.name,
       teacherName: classTime.teacher.name,
     }));
 }
@@ -215,7 +213,7 @@ export async function getStudentProfile(user: StaffUser, id: string) {
               startMinute: true,
               endMinute: true,
               days: true,
-              classroom: { select: { name: true } },
+              name: true,
               teacher: { select: { name: true } },
             },
           },

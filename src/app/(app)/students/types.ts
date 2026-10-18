@@ -11,11 +11,17 @@ export const classTimeFieldName = (branchSkillId: string) => `classTime-${branch
 /** One class time a student can join, ready to show in a picker. */
 export type ClassTimeOption = {
   id: string;
+  /** "1", which tells it apart from the skill's other class times. */
+  name: string;
   /** "4:00–6:00 pm, Sat Mon Wed" */
   when: string;
-  classroomName: string;
   teacherName: string;
 };
+
+/** "1 · 4:00–6:00 pm, Sat Mon Wed with Ali" */
+export function classTimeText(classTime: Pick<ClassTimeOption, "name" | "when" | "teacherName">) {
+  return `${classTime.name} · ${classTime.when} with ${classTime.teacherName}`;
+}
 
 /** A skill as offered at one branch, ready to show in a picker. */
 export type BranchSkillOption = {
