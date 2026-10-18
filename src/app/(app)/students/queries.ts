@@ -22,11 +22,20 @@ function classTimeOptions(
   classTimes: Prisma.ClassTimeGetPayload<typeof openClassTimes>[],
 ): ClassTimeOption[] {
   return classTimes.toSorted(compareClassTimes).map((classTime) => ({
-      id: classTime.id,
-      name: classTime.name,
-      when: formatSlot(classTime),
-      teacherName: classTime.teacher.name,
-    }));
+    id: classTime.id,
+    name: classTime.name,
+    when: formatSlot(classTime),
+    teacherName: classTime.teacher.name,
+  }));
+}
+
+/** Where a student in one class time can move to: the skill's other class times taking students. */
+export async function classTimesToMoveTo(branchSkillId: string, classTimeId: string) {
+  const classTimes = await prisma.classTime.findMany({
+    where: { ...openClassTimes.where, branchSkillId, id: { not: classTimeId } },
+    include: openClassTimes.include,
+  });
+  return classTimeOptions(classTimes);
 }
 
 /**

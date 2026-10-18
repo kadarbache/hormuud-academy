@@ -11,7 +11,7 @@ import { DataTable } from "@/components/data-table";
 import { PageHeader } from "@/components/page-header";
 import { EmptyRow } from "@/components/status-badge";
 import { canActAtBranch } from "@/lib/access";
-import { classTimeName, formatDays, formatHours, slotOf } from "@/lib/class-times";
+import { classTimeName, formatDays, formatHours, formatSlot, slotOf } from "@/lib/class-times";
 import { collegeToday, formatDate, fromDbDate, toDbDate } from "@/lib/dates";
 import { formatMoney, formatMonths, formatStudentNumber } from "@/lib/format";
 import { isPositiveMoney } from "@/lib/money";
@@ -20,6 +20,11 @@ import { prisma } from "@/lib/prisma";
 import { requireStaff } from "@/lib/session";
 import { recentClassDays } from "../../attendance/days";
 import { formatShortDay } from "../../attendance/labels";
+import { ChangeClassTimeDialog } from "../../students/[id]/change-class-time-dialog";
+import { changeClassTime } from "../../students/actions";
+import { classTimesToMoveTo } from "../../students/queries";
+import { classTimeText } from "../../students/types";
+import { CLASS_TIME_PAGE_MOVES_STUDENTS } from "../move-switch";
 
 const warning = "border-warning-border bg-warning text-warning-foreground";
 
@@ -111,7 +116,7 @@ export default async function ClassTimePage({
 
   const today = collegeToday();
   const recentDays = recentClassDays(classTime, today, RECENT_DAYS);
-  const [enrollments, counts, recentSheets] = await Promise.all([
+  const [enrollments, counts, recentSheets, moveTo] = await Promise.all([
     prisma.enrollment.findMany({
       where: { classTimeId: id, ...(filter.status ? { status: filter.status } : {}) },
       orderBy: [{ student: { fullName: "asc" } }, { startDate: "asc" }],
@@ -144,6 +149,8 @@ export default async function ClassTimePage({
       where: { classTimeId: id, date: { in: recentDays.map(toDbDate) } },
       select: { date: true },
     }),
+    // Temporary: see move-switch.ts.
+    CLASS_TIME_PAGE_MOVES_STUDENTS ? classTimesToMoveTo(classTime.branchSkillId, id) : [],
   ]);
   const takenOn = new Set(recentSheets.map((sheet) => fromDbDate(sheet.date)));
 
@@ -159,6 +166,13 @@ export default async function ClassTimePage({
   const slot = slotOf(classTime);
   const hours = slot ? formatHours(slot) : null;
   const here = `/class-times/${classTime.id}`;
+  // Temporary, while class times are split: a move button on each row.
+  const showMove = moveTo.length > 0;
+  const currentText = classTimeText({
+    name: classTime.name,
+    when: formatSlot(classTime),
+    teacherName: classTime.teacher.name,
+  });
 
   return (
     <>
@@ -314,6 +328,7 @@ export default async function ClassTimePage({
               { label: "Ends" },
               { label: "Registration fee" },
               { label: "Status" },
+              ...(showMove ? [{ label: "Actions", actions: true, className: "text-right" }] : []),
             ]}
             rows={enrollments.map((enrollment) => {
               const { student } = enrollment;
@@ -363,6 +378,21 @@ export default async function ClassTimePage({
                     "None"
                   ),
                   Status: <StatusBadge status={enrollment.status} />,
+                  Actions: enrollment.status === "ACTIVE" && (
+                    <div className="flex justify-end">
+                      <ChangeClassTimeDialog
+                        action={changeClassTime.bind(null, enrollment.id)}
+                        skillName={skillName}
+                        current={currentText}
+                        options={moveTo}
+                        trigger={
+                          <Button variant="ghost" size="sm">
+                            Change class time
+                          </Button>
+                        }
+                      />
+                    </div>
+                  ),
                 },
               };
             })}
